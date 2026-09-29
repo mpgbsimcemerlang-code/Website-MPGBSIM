@@ -12,6 +12,7 @@ import {
   CheckCircle,
   MoveUp,
   MoveDown,
+  ChevronsUp,
   Search,
   Camera,
   Upload,
@@ -182,7 +183,9 @@ export const AdminLeadershipManagement: React.FC = () => {
     showToast(`Tokoh kepimpinan "${name}" telah dipadam.`);
   };
 
-  const handleMove = async (index: number, direction: 'up' | 'down') => {
+  const handleMove = async (leaderId: string, direction: 'up' | 'down') => {
+    const index = leaders.findIndex((l) => l.id === leaderId);
+    if (index === -1) return;
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= leaders.length) return;
 
@@ -192,7 +195,18 @@ export const AdminLeadershipManagement: React.FC = () => {
     newArr[targetIndex] = temp;
 
     await reorderLeaders(newArr);
-    showToast('Susunan urutan tokoh berjaya dikemaskini!');
+    showToast('Susunan urutan tokoh berjaya disimpan!');
+  };
+
+  const handleMoveToTop = async (leaderId: string) => {
+    const index = leaders.findIndex((l) => l.id === leaderId);
+    if (index <= 0) return;
+
+    const targetLeader = leaders[index];
+    const newArr = [targetLeader, ...leaders.filter((l) => l.id !== leaderId)];
+
+    await reorderLeaders(newArr);
+    showToast(`"${targetLeader.name}" berjaya diletakkan pada kedudukan teratas (#1)!`);
   };
 
   const filteredLeaders = leaders.filter(
@@ -576,33 +590,62 @@ export const AdminLeadershipManagement: React.FC = () => {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-1">
-                    <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block bg-teal-50 px-2 py-0.5 rounded-md self-start inline-block">
-                      {leader.role}
-                    </span>
+                  {(() => {
+                    const realIndex = leaders.findIndex((l) => l.id === leader.id);
+                    const isFirst = realIndex === 0;
+                    const isLast = realIndex === leaders.length - 1;
 
-                    {/* Move Up / Down Buttons */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => handleMove(index, 'up')}
-                        className="p-1 rounded-md text-slate-400 hover:text-teal-700 hover:bg-slate-100 transition cursor-pointer disabled:opacity-30"
-                        title="Alih ke atas"
-                      >
-                        <MoveUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={index === leaders.length - 1}
-                        onClick={() => handleMove(index, 'down')}
-                        className="p-1 rounded-md text-slate-400 hover:text-teal-700 hover:bg-slate-100 transition cursor-pointer disabled:opacity-30"
-                        title="Alih ke bawah"
-                      >
-                        <MoveDown className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
+                    return (
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isFirst ? (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-emerald-700 text-white shadow-xs inline-flex items-center gap-1">
+                              ★ #1 Teratas
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 text-slate-800 font-mono shadow-xs">
+                              #{realIndex + 1}
+                            </span>
+                          )}
+                          <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wider block bg-teal-50 px-2 py-0.5 rounded-md">
+                            {leader.role}
+                          </span>
+                        </div>
+
+                        {/* Move Up / Down / To Top Buttons */}
+                        <div className="flex items-center gap-0.5 shrink-0 bg-slate-50 p-0.5 rounded-lg border border-slate-200">
+                          {!isFirst && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoveToTop(leader.id)}
+                              className="p-1 rounded-md text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 transition cursor-pointer"
+                              title="Pindahkan terus ke paling atas (#1)"
+                            >
+                              <ChevronsUp className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={isFirst}
+                            onClick={() => handleMove(leader.id, 'up')}
+                            className="p-1 rounded-md text-slate-500 hover:text-teal-700 hover:bg-slate-200 transition cursor-pointer disabled:opacity-30"
+                            title="Alih ke atas"
+                          >
+                            <MoveUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLast}
+                            onClick={() => handleMove(leader.id, 'down')}
+                            className="p-1 rounded-md text-slate-500 hover:text-teal-700 hover:bg-slate-200 transition cursor-pointer disabled:opacity-30"
+                            title="Alih ke bawah"
+                          >
+                            <MoveDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <h4 className="text-sm font-bold text-slate-900 mt-1 leading-snug">
                     {leader.name}

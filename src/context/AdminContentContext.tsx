@@ -420,11 +420,13 @@ const sanitizeMemberApplicationsList = (apps: MemberApplication[] = []): MemberA
 
 const sanitizeLeadershipList = (list: LeaderProfile[] = []): LeaderProfile[] => {
   const baseList = !list || list.length === 0 ? LEADERSHIP_TEAM : list;
-  return baseList.map((l) => {
-    const isFaiz = l.id === 'lead-1' || l.name.toLowerCase().includes('faiz');
+  const mapped = baseList.map((l, index) => {
+    const isFaiz = l.id === 'lead-1' || l.name?.toLowerCase().includes('faiz');
     const avatar = isFaiz
       ? (l.avatarUrl && !l.avatarUrl.includes('photo-1507003211169') ? l.avatarUrl : faizLeaderPhoto)
       : (l.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600');
+    // Mohamad Faiz Azizan is authoritative #1 (order: 0) if order not yet defined
+    const effectiveOrder = l.order !== undefined ? Number(l.order) : (isFaiz ? 0 : index + 1);
     return {
       ...l,
       name: isFaiz ? (l.name || 'Mohamad Faiz Azizan') : l.name,
@@ -432,8 +434,11 @@ const sanitizeLeadershipList = (list: LeaderProfile[] = []): LeaderProfile[] => 
       term: l.term || 'Penggal 2026–2028',
       category: l.category || 'Kepimpinan Utama',
       avatarUrl: avatar,
+      order: effectiveOrder,
     };
   });
+
+  return mapped.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 };
 
 const INITIAL_SUBMISSIONS: ContactSubmission[] = [
@@ -2054,7 +2059,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     let nextList: LeaderProfile[] = [];
     setSiteData((prev) => {
       const currentList = Array.isArray(prev.leadership) && prev.leadership.length > 0 ? prev.leadership : LEADERSHIP_TEAM;
-      nextList = [...currentList, item];
+      const leaderWithOrder = { ...item, order: item.order !== undefined ? item.order : currentList.length };
+      nextList = sanitizeLeadershipList([...currentList, leaderWithOrder]);
       const nextState = { ...prev, leadership: nextList };
       persistSiteContent(nextState).catch(() => {});
       return nextState;
@@ -2067,7 +2073,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     let nextList: LeaderProfile[] = [];
     setSiteData((prev) => {
       const currentList = Array.isArray(prev.leadership) && prev.leadership.length > 0 ? prev.leadership : LEADERSHIP_TEAM;
-      nextList = currentList.map((l) => (l.id === id ? { ...l, ...updatedLeader } : l));
+      nextList = sanitizeLeadershipList(currentList.map((l) => (l.id === id ? { ...l, ...updatedLeader } : l)));
       const nextState = { ...prev, leadership: nextList };
       persistSiteContent(nextState).catch(() => {});
       return nextState;
@@ -2080,7 +2086,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     let nextList: LeaderProfile[] = [];
     setSiteData((prev) => {
       const currentList = Array.isArray(prev.leadership) && prev.leadership.length > 0 ? prev.leadership : LEADERSHIP_TEAM;
-      nextList = currentList.filter((l) => l.id !== id);
+      const filtered = currentList.filter((l) => l.id !== id);
+      nextList = sanitizeLeadershipList(filtered.map((l, idx) => ({ ...l, order: idx })));
       const nextState = { ...prev, leadership: nextList };
       persistSiteContent(nextState).catch(() => {});
       return nextState;
@@ -2090,15 +2097,31 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const reorderLeaders = async (reordered: LeaderProfile[]): Promise<void> => {
+    // 1. Assign strict index order (0 = teratas)
+    const withOrder = reordered.map((l, idx) => ({
+      ...l,
+      order: idx,
+    }));
+    const sanitized = sanitizeLeadershipList(withOrder);
+
+    // 2. Update local state & storage immediately
     setSiteData((prev) => {
-      const nextState = { ...prev, leadership: reordered };
+      const nextState = { ...prev, leadership: sanitized };
       persistSiteContent(nextState).catch(() => {});
       return nextState;
     });
-    reordered.forEach((l) => {
-      setDoc(doc(db, 'leadership', l.id), l, { merge: true }).catch(() => {});
-    });
-    await saveCmsContentToFirestore({ leadership: reordered });
+
+    // 3. Save authoritative ordered array to siteSettings/cmsContent
+    await saveCmsContentToFirestore({ leadership: sanitized });
+
+    // 4. Update order on individual leadership documents
+    await Promise.all(
+      sanitized.map((l) =>
+        setDoc(doc(db, 'leadership', l.id), l, { merge: true }).catch((err) => {
+          console.warn('Sync individual leader document:', err);
+        })
+      )
+    );
   };
 
   const updateHero = (data: Partial<HeroData>) => {

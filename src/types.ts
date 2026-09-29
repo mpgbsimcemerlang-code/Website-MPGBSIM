@@ -237,6 +237,7 @@ export interface LeaderProfile {
   avatarUrl: string;
   term?: string; // e.g. 'Penggal 2026–2028' | '2026–2028'
   category?: 'Kepimpinan Utama' | 'Exco Kebangsaan' | 'Pengerusi Biro' | string;
+  order?: number;
 }
 
 export interface MemberSchool {
