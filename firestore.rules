@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Auth & Role Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'mpgbsim.cemerlang@gmail.com';
+    }
+
+    function isAuthorizedAdmin() {
+      return isSuperAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // 1. Admins Collection
+    // Only super admin can grant or modify admin privileges; authorized admins can read
+    match /admins/{adminId} {
+      allow read: if isAuthorizedAdmin();
+      allow write: if isSuperAdmin();
+    }
+
+    // 2. Users Collection (Profile & Role Management)
+    // User can only create or edit their own profile; admins can manage and delete
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAuthorizedAdmin());
+      allow delete: if isAuthorizedAdmin();
+    }
+
+    // 3. Member Schools Directory
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() || isAuthorizedAdmin();
+      allow delete: if isAuthorizedAdmin();
+    }
+
+    // Leadership Collection (Barisan Kepimpinan PGB Kebangsaan)
+    match /leadership/{leaderId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 4. Announcements
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 5. Events / Program Management
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 6. Documents Centre
+    match /documents/{documentId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 7. Best Practices Hub
+    match /bestPractices/{practiceId} {
+      allow read: if true;
+      allow create: if isSignedIn() || isAuthorizedAdmin();
+      allow update, delete: if isAuthorizedAdmin();
+    }
+
+    // 8. Member Submissions & Feedback (Contact messages, school submissions)
+    // Public can create submissions; only admins can read and manage to protect PII
+    match /submissions/{submissionId} {
+      allow create: if true;
+      allow read, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 9. Resource Centre
+    match /resources/{resourceId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 10. In-App Notifications
+    match /notifications/{notificationId} {
+      allow read: if true;
+      allow create: if isSignedIn() || isAuthorizedAdmin();
+      allow update, delete: if isAuthorizedAdmin();
+    }
+
+    // 11. Audit Logs (Immutable audit trail)
+    match /auditLogs/{logId} {
+      allow read: if isAuthorizedAdmin();
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
+    // 12. Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 13. News & School Achievements
+    match /news/{newsId} {
+      allow read: if true;
+      allow create: if isSignedIn() || isAuthorizedAdmin();
+      allow update, delete: if isAuthorizedAdmin();
+    }
+
+    // 14. Media Gallery
+    match /media/{mediaId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 15. Site Settings (CMS Content)
+    // Public read for website visitors; only authorized admins can edit CMS content
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 16. Member Applications (School Registration)
+    // Public schools can submit applications; only admins can read, approve, reject or delete
+    match /memberApplications/{applicationId} {
+      allow create: if true;
+      allow read, update, delete: if isAuthorizedAdmin();
+    }
+
+    // 17. Connection validation test path
+    match /test/{testId} {
+      allow read: if true;
+    }
+  }
+}

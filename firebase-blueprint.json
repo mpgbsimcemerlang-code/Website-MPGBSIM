@@ -1,0 +1,330 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access control for MPGBSIM Member Portal",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["PUBLIC", "MEMBER", "MEDIA_AJK", "ADMIN"] },
+        "position": { "type": "string" },
+        "school": { "type": "string" },
+        "state": { "type": "string" },
+        "phone": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "expertise": { "type": "string" },
+        "interests": { "type": "string" },
+        "membershipNo": { "type": "string" },
+        "joinYear": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "pending", "inactive"] },
+        "hidePhone": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "fullName", "role"]
+    },
+    "School": {
+      "title": "School",
+      "description": "Directory of member Islamic schools",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "type": { "type": "string" },
+        "state": { "type": "string" },
+        "district": { "type": "string" },
+        "principal": { "type": "string" },
+        "principalPhotoUrl": { "type": "string" },
+        "schoolPhotoUrl": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "website": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "description": { "type": "string" },
+        "studentCount": { "type": "number" },
+        "teacherCount": { "type": "number" },
+        "joinYear": { "type": "number" }
+      },
+      "required": ["name", "state", "type"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Official announcements for MPGBSIM members",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["Rasmi", "Mesyuarat", "Program", "Kebajikan", "Peluang", "Penting"] },
+        "author": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "pinned": { "type": "boolean" },
+        "imageUrl": { "type": "string" }
+      },
+      "required": ["title", "category", "status", "date"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "MPGBSIM events, courses and leadership programs",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "venue": { "type": "string" },
+        "mode": { "type": "string", "enum": ["Fizikal", "Dalam Talian", "Hibrid"] },
+        "description": { "type": "string" },
+        "organiser": { "type": "string" },
+        "registrationLink": { "type": "string" },
+        "status": { "type": "string", "enum": ["Upcoming", "Ongoing", "Completed"] },
+        "posterUrl": { "type": "string" }
+      },
+      "required": ["title", "date", "status"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Documents and official circulars for member download",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["Mesyuarat", "Pentadbiran", "Program", "Sumber PGB", "AI & Digital", "Modul", "Template", "Dokumen MPGBSIM"] },
+        "fileSize": { "type": "string" },
+        "version": { "type": "string" },
+        "uploadDate": { "type": "string" },
+        "uploader": { "type": "string" },
+        "visibility": { "type": "string", "enum": ["PUBLIC", "MEMBER", "ADMIN"] },
+        "downloadUrl": { "type": "string" }
+      },
+      "required": ["title", "category", "visibility"]
+    },
+    "BestPractice": {
+      "title": "BestPractice",
+      "description": "Educational best practices and leadership models from Islamic schools",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "school": { "type": "string" },
+        "author": { "type": "string" },
+        "category": { "type": "string", "enum": ["Kepimpinan", "Kurikulum", "HEM", "Kokurikulum", "Tarbiah", "AI", "Digital", "HR", "Kewangan", "Pengurusan", "Inovasi"] },
+        "challenge": { "type": "string" },
+        "approach": { "type": "string" },
+        "implementation": { "type": "string" },
+        "outcome": { "type": "string" },
+        "lessonLearned": { "type": "string" },
+        "images": { "type": "string" },
+        "supportingDocs": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Submitted", "Under Review", "Approved", "Published", "Rejected"] }
+      },
+      "required": ["title", "school", "category", "status"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Member submissions such as best practices, proposals, school news",
+      "type": "object",
+      "properties": {
+        "submitter": { "type": "string" },
+        "submitterEmail": { "type": "string" },
+        "school": { "type": "string" },
+        "type": { "type": "string", "enum": ["Best Practice", "Cadangan program", "Cadangan penambahbaikan", "Kisah kejayaan", "Berita sekolah", "Sumber perkongsian"] },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "attachment": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Submitted", "Under Review", "Approved", "Rejected", "Published"] },
+        "rejectionReason": { "type": "string" }
+      },
+      "required": ["submitter", "type", "title", "status"]
+    },
+    "Resource": {
+      "title": "Resource",
+      "description": "Resource materials like articles, webinars, modules, presentation decks",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["artikel", "modul", "template", "video", "webinar", "presentation", "external"] },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "url": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["title", "type", "category"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notifications for member portal users",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string" },
+        "read": { "type": "boolean" },
+        "link": { "type": "string" }
+      },
+      "required": ["title", "message"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Administrative actions audit log",
+      "type": "object",
+      "properties": {
+        "user": { "type": "string" },
+        "email": { "type": "string" },
+        "action": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["user", "action", "timestamp"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "System and portal configuration settings",
+      "type": "object",
+      "properties": {
+        "organisationName": { "type": "string" },
+        "shortName": { "type": "string" },
+        "motto": { "type": "string" },
+        "description": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "address": { "type": "string" }
+      }
+    },
+    "News": {
+      "title": "News",
+      "description": "Berita dan pengumuman kejayaan sekolah MPGBSIM yang dipaparkan secara langsung di laman utama",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "summary": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "author": { "type": "string" },
+        "readTime": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "featured": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["published", "draft", "scheduled"] },
+        "schoolName": { "type": "string" },
+        "schoolCode": { "type": "string" },
+        "state": { "type": "string" },
+        "submittedBy": { "type": "string" },
+        "isSchoolAchievement": { "type": "boolean" },
+        "achievementLevel": { "type": "string" }
+      },
+      "required": ["title", "summary", "category", "date"]
+    },
+    "MemberApplication": {
+      "title": "MemberApplication",
+      "description": "Permohonan keahlian baharu sekolah Islam bagi MPGBSIM",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string" },
+        "schoolCode": { "type": "string" },
+        "state": { "type": "string" },
+        "principalName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "schoolType": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["schoolName", "state", "email", "principalName"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Tetapan kandungan global laman web termasuk maklumat organisasi, saf kepimpinan dan statistik",
+      "type": "object",
+      "properties": {
+        "branding": { "type": "string" },
+        "hero": { "type": "string" },
+        "leadership": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Media": {
+      "title": "Media",
+      "description": "Galeri foto dan video aktiviti rasmi majlis",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["photo", "video"] },
+        "url": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["title", "type", "url"]
+    }
+  },
+  "firestore": {
+    "/news/{newsId}": {
+      "schema": { "$ref": "#/entities/News" },
+      "description": "Berita rasmi dan berita kejayaan sekolah ahli MPGBSIM secara langsung"
+    },
+    "/memberApplications/{applicationId}": {
+      "schema": { "$ref": "#/entities/MemberApplication" },
+      "description": "Permohonan pendaftaran keahlian sekolah Islam baharu"
+    },
+    "/siteSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Konfigurasi kandungan CMS laman web rasmi"
+    },
+    "/media/{mediaId}": {
+      "schema": { "$ref": "#/entities/Media" },
+      "description": "Galeri media visual aktiviti majlis"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and RBAC role records"
+    },
+    "/schools/{schoolId}": {
+      "schema": { "$ref": "#/entities/School" },
+      "description": "Directory of member Islamic schools"
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Portal announcements collection"
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Events and programs calendar"
+    },
+    "/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/Document" },
+      "description": "Official documents repository"
+    },
+    "/bestPractices/{practiceId}": {
+      "schema": { "$ref": "#/entities/BestPractice" },
+      "description": "Best educational practices repository"
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/Submission" },
+      "description": "Member submissions and review queue"
+    },
+    "/resources/{resourceId}": {
+      "schema": { "$ref": "#/entities/Resource" },
+      "description": "Resource centre library items"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "In-app notifications"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Security and administrative audit trail"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Global portal configurations"
+    }
+  }
+}

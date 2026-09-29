@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="100%" height="100%">
+  <defs>
+    <!-- Upper Path for Jawi Text -->
+    <!-- Starts from right (around 320 deg / 4 o'clock) going over the top to left (around 220 deg / 8 o'clock) -->
+    <path id="jawiArc" d="M 235 185 A 110 110 0 1 0 65 185" fill="none" />
+    
+    <!-- Lower Path for Year 1988 -->
+    <!-- Bottom arc from left to right -->
+    <path id="bottomArc" d="M 75 195 A 110 110 0 0 0 225 195" fill="none" />
+  </defs>
+
+  <!-- Background White Circle -->
+  <circle cx="150" cy="150" r="146" fill="#ffffff" />
+
+  <!-- Outermost Thin Black Border -->
+  <circle cx="150" cy="150" r="146" fill="none" stroke="#111827" stroke-width="2.5" />
+
+  <!-- White Spacer Ring -->
+  <circle cx="150" cy="150" r="142" fill="none" stroke="#ffffff" stroke-width="3" />
+
+  <!-- Middle Thick Black Border -->
+  <circle cx="150" cy="150" r="139" fill="none" stroke="#111827" stroke-width="4.5" />
+
+  <!-- Thin inner line before white text band -->
+  <circle cx="150" cy="150" r="135" fill="none" stroke="#111827" stroke-width="1.5" />
+
+  <!-- Inner Turquoise Disc -->
+  <circle cx="150" cy="150" r="88" fill="#8ed4d4" stroke="#111827" stroke-width="3.5" />
+
+  <!-- Jawi Text on Circular Arc -->
+  <text font-family="'Amiri', 'Traditional Arabic', 'Noto Naskh Arabic', 'Scheherazade New', serif" font-size="19.5" font-weight="bold" fill="#111827">
+    <textPath href="#jawiArc" startOffset="50%" text-anchor="middle">
+      مجليس فغتوا ݢورو بسر سکوله - سکوله اسلام مليسيا
+    </textPath>
+  </text>
+
+  <!-- Year 1988 with Stars on Bottom Arc -->
+  <text font-family="'Plus Jakarta Sans', 'Arial', sans-serif" font-size="20" font-weight="900" fill="#111827">
+    <textPath href="#bottomArc" startOffset="50%" text-anchor="middle">
+      *  1988  *
+    </textPath>
+  </text>
+
+  <!-- Center Acronym: MPGBSIM -->
+  <text x="150" y="162" text-anchor="middle" font-family="'Impact', 'Arial Black', 'Trebuchet MS', sans-serif" font-size="37" font-weight="900" letter-spacing="1" fill="#0f172a">
+    MPGBSIM
+  </text>
+</svg>
