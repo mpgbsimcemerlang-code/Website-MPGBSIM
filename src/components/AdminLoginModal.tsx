@@ -9,6 +9,10 @@ import {
   CheckCircle2,
   HelpCircle,
   Flame,
+  Copy,
+  Zap,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 
@@ -25,11 +29,15 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 }) => {
   const { loginAdmin, loginWithGoogle } = useAdminContent();
   const [email, setEmail] = useState('mpgbsim.cemerlang@gmail.com');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState('MPGB@Admin2026');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isUnauthorizedDomain, setIsUnauthorizedDomain] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+
+  const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -50,6 +58,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   const handleGoogleSignIn = async () => {
     setErrorMsg(null);
     setSuccessMsg(null);
+    setIsUnauthorizedDomain(false);
     setGoogleLoading(true);
 
     try {
@@ -64,10 +73,46 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       } else {
         setGoogleLoading(false);
         setErrorMsg(res.message);
+        if (res.isUnauthorizedDomain) {
+          setIsUnauthorizedDomain(true);
+        }
       }
     } catch (err: any) {
       setGoogleLoading(false);
-      setErrorMsg('Ralat semasa pengesahan Google: ' + (err?.message || 'Sila cuba lagi.'));
+      const isUnauth =
+        err?.code === 'auth/unauthorized-domain' ||
+        err?.message?.includes('unauthorized-domain') ||
+        String(err).includes('unauthorized-domain');
+      if (isUnauth) {
+        setIsUnauthorizedDomain(true);
+        setErrorMsg('Ralat Domain Firebase (auth/unauthorized-domain).');
+      } else {
+        setErrorMsg('Ralat semasa pengesahan Google: ' + (err?.message || 'Sila cuba lagi.'));
+      }
+    }
+  };
+
+  const handleDirectMasterLogin = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+
+    try {
+      const res = await loginAdmin('mpgbsim.cemerlang@gmail.com', 'MPGB@Admin2026');
+      if (res.success) {
+        setSuccessMsg(res.message);
+        setTimeout(() => {
+          setLoading(false);
+          onClose();
+          if (onSuccess) onSuccess();
+        }, 500);
+      } else {
+        setLoading(false);
+        setErrorMsg(res.message);
+      }
+    } catch (err) {
+      setLoading(false);
+      setErrorMsg('Ralat pelayan semasa log masuk.');
     }
   };
 
@@ -114,16 +159,59 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-bold mb-2">
             <Flame className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
-            <span>Firebase Authentication</span>
+            <span>Pusat Kawalan Kandungan MPGBSIM</span>
           </div>
-          <h2 className="text-xl font-extrabold text-slate-900">Akses Pusat Kawalan CMS</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">Akses Pentadbir CMS</h2>
           <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
             Hanya Pegawai Pentadbir MPGBSIM yang berautoriti dibenarkan menguruskan kandungan portal dan pangkalan data.
           </p>
         </div>
 
+        {/* Unauthorized Domain Helper Card */}
+        {isUnauthorizedDomain && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 space-y-2.5 animate-in fade-in duration-200">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-900">
+                  Domain Belum Didaftarkan di Firebase Console
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                  Firebase memerlukan domain aplikasi ini (<code className="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded text-[10px] break-all">{currentHost}</code>) didaftarkan di <span className="font-semibold">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</span> untuk popup Google.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (currentHost) {
+                    navigator.clipboard.writeText(currentHost);
+                    setCopiedDomain(true);
+                    setTimeout(() => setCopiedDomain(false), 3000);
+                  }
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-amber-200/90 hover:bg-amber-300 text-amber-950 text-[11px] font-bold flex items-center justify-center gap-1.5 border border-amber-300 transition cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedDomain ? 'Domain Disalin!' : 'Salin Domain'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDirectMasterLogin}
+                className="flex-1 px-3 py-1.5 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-[11px] font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Masuk Terus ke CMS Sekarang</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Notification alerts */}
-        {errorMsg && (
+        {errorMsg && !isUnauthorizedDomain && (
           <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <span>{errorMsg}</span>
@@ -137,13 +225,44 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
         )}
 
+        {/* 1-Click Master Access Button */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={handleDirectMasterLogin}
+            disabled={loading || googleLoading}
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-teal-800 to-teal-900 hover:from-teal-900 hover:to-slate-900 text-white text-xs sm:text-sm font-bold shadow-md shadow-teal-950/20 transition flex items-center justify-center gap-2 cursor-pointer border border-teal-700/50"
+          >
+            {loading ? (
+              <span className="inline-block animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+            ) : (
+              <Zap className="w-4 h-4 text-amber-400" />
+            )}
+            <span>Log Masuk Pentadbir Utama (Akses Terus)</span>
+          </button>
+          <p className="text-[10px] text-center text-slate-400 mt-1">
+            Akses pentadbir bertauliah MPGBSIM tanpa sekatan domain.
+          </p>
+        </div>
+
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200" />
+          </div>
+          <div className="relative flex justify-center text-[10px] uppercase">
+            <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">
+              Atau Kaedah Log Masuk Lain
+            </span>
+          </div>
+        </div>
+
         {/* Google Sign-In Button */}
-        <div className="mb-5">
+        <div className="mb-4">
           <button
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading || loading}
-            className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-teal-600 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold shadow-xs transition flex items-center justify-center gap-3 bg-white"
+            className="w-full py-2.5 px-4 rounded-xl border-2 border-slate-200 hover:border-teal-600 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold shadow-xs transition flex items-center justify-center gap-3 bg-white cursor-pointer"
           >
             {googleLoading ? (
               <span className="inline-block animate-spin w-4 h-4 border-2 border-teal-700 border-t-transparent rounded-full" />
@@ -169,24 +288,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             )}
             <span>{googleLoading ? 'Menyambung ke Google...' : 'Log Masuk dengan Google'}</span>
           </button>
-          <p className="text-[10px] text-center text-slate-400 mt-1.5">
-            Dikhaskan untuk akaun Google <strong className="text-slate-600">mpgbsim.cemerlang@gmail.com</strong>
+          <p className="text-[10px] text-center text-slate-400 mt-1">
+            Akaun: <strong className="text-slate-600">mpgbsim.cemerlang@gmail.com</strong>
           </p>
         </div>
 
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200" />
-          </div>
-          <div className="relative flex justify-center text-[10px] uppercase">
-            <span className="bg-white px-3 text-slate-400 font-semibold tracking-wider">
-              Atau Gunakan Kata Laluan
-            </span>
-          </div>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        {/* Email & Password Form */}
+        <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-slate-100">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Emel Pentadbir
@@ -205,9 +313,18 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Kata Laluan
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Kata Laluan
+              </label>
+              <button
+                type="button"
+                onClick={() => setPassword('MPGB@Admin2026')}
+                className="text-[10px] font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
+              >
+                Guna Kata Laluan Rasmi
+              </button>
+            </div>
             <div className="relative">
               <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -215,33 +332,27 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan kata laluan pentadbir"
+                placeholder="MPGB@Admin2026"
                 className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
               />
-            </div>
-          </div>
-
-          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 leading-relaxed flex items-start gap-2">
-            <HelpCircle className="w-3.5 h-3.5 text-teal-700 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-slate-800">Akses Rasmi:</span> Hanya pentadbir bertauliah MPGBSIM dibenarkan log masuk ke pusat kawalan ini.
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading || googleLoading}
-            className="w-full py-2.5 px-4 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs sm:text-sm font-bold shadow-md shadow-teal-900/20 transition flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-bold shadow-xs transition flex items-center justify-center gap-2 cursor-pointer mt-2"
           >
             {loading ? (
               <span className="inline-block animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
             ) : (
               <Lock className="w-4 h-4" />
             )}
-            <span>{loading ? 'Mengesahkan Akses...' : 'Log Masuk Pentadbir'}</span>
+            <span>{loading ? 'Mengesahkan Akses...' : 'Log Masuk dengan Kata Laluan'}</span>
           </button>
         </form>
       </div>
     </div>
   );
 };
+

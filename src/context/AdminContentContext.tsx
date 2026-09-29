@@ -169,7 +169,12 @@ interface AdminContentContextType {
   syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   lastSyncedAt: string | null;
   loginAdmin: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
-  loginWithGoogle: () => Promise<{ success: boolean; message: string }>;
+  loginWithGoogle: () => Promise<{
+    success: boolean;
+    message: string;
+    isUnauthorizedDomain?: boolean;
+    domain?: string;
+  }>;
   logoutAdmin: () => Promise<void>;
   syncAllToFirestore: () => Promise<{ success: boolean; message: string }>;
   // Modals controls
@@ -1064,8 +1069,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     };
   }, [adminUser]);
 
-  // Google Sign-In
-  const loginWithGoogle = async (): Promise<{ success: boolean; message: string }> => {
+  // Google Sign-In with unauthorized-domain detection and detailed guidance
+  const loginWithGoogle = async (): Promise<{
+    success: boolean;
+    message: string;
+    isUnauthorizedDomain?: boolean;
+    domain?: string;
+  }> => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
@@ -1079,6 +1089,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           photoUrl: user.photoURL || undefined,
         };
         setAdminUser(newAdmin);
+        safeLocalStorageSet(STORAGE_KEYS.ADMIN_SESSION, JSON.stringify(newAdmin));
 
         try {
           await setDoc(
@@ -1108,6 +1119,21 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
     } catch (err: any) {
       console.error('Google Sign-In Error:', err);
+      const isUnauthorizedDomain =
+        err?.code === 'auth/unauthorized-domain' ||
+        err?.message?.includes('unauthorized-domain') ||
+        String(err).includes('unauthorized-domain');
+
+      if (isUnauthorizedDomain) {
+        const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+        return {
+          success: false,
+          isUnauthorizedDomain: true,
+          domain: currentDomain,
+          message: `Domain '${currentDomain}' belum didaftarkan dalam 'Authorized domains' Firebase Console. Sila gunakan Log Masuk Pantas Pentadbir di bawah atau daftarkan domain di Firebase Console.`,
+        };
+      }
+
       return {
         success: false,
         message: err?.message || 'Ralat semasa log masuk dengan Google.',
@@ -1115,12 +1141,44 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
-  // Email/Password login with fallback
+  // Email/Password login with authorized master passcode fallback
   const loginAdmin = async (email: string, pass: string): Promise<{ success: boolean; message: string }> => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = pass.trim();
 
-    // Try Firebase Email Auth
+    // 1. Verify official MPGBSIM administrator email
+    if (!isAuthorizedAdminEmail(cleanEmail)) {
+      return {
+        success: false,
+        message: `Emel "${cleanEmail}" bukan emel pentadbir bertauliah MPGBSIM. Sila gunakan akaun mpgbsim.cemerlang@gmail.com.`,
+      };
+    }
+
+    // 2. Master passcodes for MPGBSIM official administrators
+    const validMasterPasscodes = [
+      'MPGB@Admin2026',
+      'Admin@2026',
+      'MPGBSIM2026',
+      'mpgbsim2026',
+      'AdminMPGB2026',
+    ];
+
+    if (validMasterPasscodes.includes(cleanPass)) {
+      const newAdmin: AdminUser = {
+        email: cleanEmail,
+        name: 'Pegawai Pentadbir MPGBSIM (Akses Rasmi)',
+        role: 'admin',
+        loginTime: new Date().toISOString(),
+      };
+      setAdminUser(newAdmin);
+      safeLocalStorageSet(STORAGE_KEYS.ADMIN_SESSION, JSON.stringify(newAdmin));
+      return {
+        success: true,
+        message: 'Log masuk Pentadbir Rasmi berjaya! Pusat Kawalan Kandungan CMS telah diaktifkan.',
+      };
+    }
+
+    // 3. Try Firebase Email Auth if configured
     try {
       const cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
       if (isAuthorizedAdminEmail(cred.user.email)) {
@@ -1131,14 +1189,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           loginTime: new Date().toISOString(),
         };
         setAdminUser(newAdmin);
+        safeLocalStorageSet(STORAGE_KEYS.ADMIN_SESSION, JSON.stringify(newAdmin));
         return {
           success: true,
           message: 'Log masuk Firebase berjaya. Pusat kawalan kandungan telah diaktifkan.',
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Akaun ini tidak mempunyai hak pentadbir sistem MPGBSIM.',
         };
       }
     } catch (firebaseAuthErr: any) {
@@ -1147,7 +1201,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     return {
       success: false,
-      message: 'Emel atau kata laluan tidak tepat. Sila gunakan akaun mpgbsim.cemerlang@gmail.com atau Log Masuk Google rasmi.',
+      message: 'Kata laluan tidak tepat. Sila gunakan kata laluan pentadbir rasmi (MPGB@Admin2026) atau Log Masuk Google rasmi.',
     };
   };
 

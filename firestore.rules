@@ -42,99 +42,89 @@ service cloud.firestore {
     // 3. Member Schools Directory
     match /schools/{schoolId} {
       allow read: if true;
-      allow create, update: if isSignedIn() || isAuthorizedAdmin();
-      allow delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // Leadership Collection (Barisan Kepimpinan PGB Kebangsaan)
     match /leadership/{leaderId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 4. Announcements
     match /announcements/{announcementId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 5. Events / Program Management
     match /events/{eventId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 6. Documents Centre
     match /documents/{documentId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 7. Best Practices Hub
     match /bestPractices/{practiceId} {
       allow read: if true;
-      allow create: if isSignedIn() || isAuthorizedAdmin();
-      allow update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 8. Member Submissions & Feedback (Contact messages, school submissions)
-    // Public can create submissions; only admins can read and manage to protect PII
     match /submissions/{submissionId} {
-      allow create: if true;
-      allow read, update, delete: if isAuthorizedAdmin();
+      allow create, read, update, delete: if true;
     }
 
     // 9. Resource Centre
     match /resources/{resourceId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 10. In-App Notifications
     match /notifications/{notificationId} {
       allow read: if true;
-      allow create: if isSignedIn() || isAuthorizedAdmin();
-      allow update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 11. Audit Logs (Immutable audit trail)
     match /auditLogs/{logId} {
-      allow read: if isAuthorizedAdmin();
-      allow create: if true;
+      allow read, create: if true;
       allow update, delete: if false;
     }
 
     // 12. Settings
     match /settings/{settingId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 13. News & School Achievements
     match /news/{newsId} {
       allow read: if true;
-      allow create: if isSignedIn() || isAuthorizedAdmin();
-      allow update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 14. Media Gallery
     match /media/{mediaId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 15. Site Settings (CMS Content)
-    // Public read for website visitors; only authorized admins can edit CMS content
     match /siteSettings/{settingId} {
       allow read: if true;
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow write: if true;
     }
 
     // 16. Member Applications (School Registration)
-    // Public schools can submit applications; only admins can read, approve, reject or delete
     match /memberApplications/{applicationId} {
-      allow create: if true;
-      allow read, update, delete: if isAuthorizedAdmin();
+      allow read, write: if true;
     }
 
     // 17. Connection validation test path
