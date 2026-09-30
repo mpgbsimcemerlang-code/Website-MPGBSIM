@@ -352,7 +352,7 @@ export const PortalLoginView: React.FC = () => {
       <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-6 lg:px-8 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Logo className="w-10 h-10 sm:w-11 sm:h-11 shadow-md" />
+            <Logo showText={false} size="sm" className="shrink-0" />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-base sm:text-lg tracking-wide text-white">

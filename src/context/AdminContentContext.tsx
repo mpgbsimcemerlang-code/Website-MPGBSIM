@@ -12,6 +12,7 @@ import {
   ContactSubmission,
   MemberApplication,
   DashboardConfig,
+  EventRegistration,
 } from '../types';
 import {
   LATEST_NEWS_LIST,
@@ -24,6 +25,7 @@ import {
   RESOURCE_DOCS,
   SAMPLE_MEMBER_SCHOOLS,
   SAMPLE_MEMBER_APPLICATIONS,
+  DEFAULT_EVENT_REGISTRATIONS,
 } from '../data/mockData';
 
 import {
@@ -151,6 +153,7 @@ export interface SiteContentState {
   submissions: ContactSubmission[];
   memberApplications: MemberApplication[];
   dashboardConfig?: DashboardConfig;
+  eventRegistrations?: EventRegistration[];
 }
 
 export interface AdminUser {
@@ -242,6 +245,14 @@ interface AdminContentContextType {
   addSubmission: (item: Omit<ContactSubmission, 'id' | 'date' | 'status'>) => Promise<void>;
   updateSubmissionStatus: (id: string, status: 'unread' | 'read' | 'replied') => Promise<void>;
   deleteSubmission: (id: string) => Promise<void>;
+  // Event Registrations (Pendaftaran Program & Kapasiti)
+  eventRegistrations: EventRegistration[];
+  registerForEvent: (
+    eventId: string,
+    participantData: Omit<EventRegistration, 'id' | 'eventId' | 'eventTitle' | 'registeredAt' | 'status'>
+  ) => Promise<{ success: boolean; message: string; registrationId?: string }>;
+  updateEventRegistrationStatus: (regId: string, status: 'confirmed' | 'attended' | 'cancelled') => Promise<void>;
+  deleteEventRegistration: (regId: string, eventId: string) => Promise<void>;
   resetAllContent: () => void;
 }
 
@@ -678,6 +689,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
+  // Event Registrations state (Pendaftaran Acara & Rekod Kehadiran)
+  const [eventRegistrations, setEventRegistrations] = useState<EventRegistration[]>(DEFAULT_EVENT_REGISTRATIONS);
+
   // Sync to IndexedDB + safe localStorage whenever siteData changes
   useEffect(() => {
     persistSiteContent(siteData).catch((err) => {
@@ -808,6 +822,34 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       unsubscribes.push(unsubEvents);
     } catch (e) {
       console.warn('Events listener setup:', e);
+    }
+
+    // 2b. Event Registrations listener (Real-time participant tracking)
+    try {
+      const unsubEventRegs = onSnapshot(
+        collection(db, 'eventRegistrations'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: EventRegistration[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+            });
+            list.sort(
+              (a, b) =>
+                new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime()
+            );
+            setEventRegistrations(list);
+          } else {
+            setEventRegistrations(DEFAULT_EVENT_REGISTRATIONS);
+          }
+        },
+        (err) => {
+          console.warn('Firestore eventRegistrations listener notification:', err.message);
+        }
+      );
+      unsubscribes.push(unsubEventRegs);
+    } catch (e) {
+      console.warn('eventRegistrations listener setup:', e);
     }
 
     // 3. Best Practices listener
@@ -1538,6 +1580,205 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       await deleteDoc(doc(db, 'events', id));
     } catch (e) {
       console.warn('Firestore delete event notice:', e);
+    }
+  };
+
+  // Event Registration & Live Capacity Management
+  const registerForEvent = async (
+    eventId: string,
+    participantData: Omit<EventRegistration, 'id' | 'eventId' | 'eventTitle' | 'registeredAt' | 'status'>
+  ): Promise<{ success: boolean; message: string; registrationId?: string }> => {
+    const targetEvent = siteData.programs?.find((p) => p.id === eventId);
+    const eventTitle = targetEvent?.title || 'Program MPGBSIM';
+    const eventDate = targetEvent?.date || new Date().toISOString().split('T')[0];
+
+    const spotsTotal = targetEvent?.spotsTotal || 100;
+    const currentSpotsFilled = targetEvent?.spotsFilled || 0;
+
+    if (currentSpotsFilled >= spotsTotal) {
+      return {
+        success: false,
+        message: `Maaf, kapasiti bagi program "${eventTitle}" telah penuh (${spotsTotal}/${spotsTotal} peserta). Pendaftaran telah ditutup.`,
+      };
+    }
+
+    const newSpotsFilled = currentSpotsFilled + 1;
+    const isNowFull = newSpotsFilled >= spotsTotal;
+    const registrationId = `reg-${Date.now()}`;
+
+    const newRegistration: EventRegistration = {
+      id: registrationId,
+      eventId,
+      eventTitle,
+      eventDate,
+      participantName: participantData.participantName.trim(),
+      participantEmail: participantData.participantEmail.trim().toLowerCase(),
+      participantPhone: participantData.participantPhone?.trim() || '',
+      schoolName: participantData.schoolName.trim(),
+      position: participantData.position?.trim() || 'Peserta',
+      state: participantData.state?.trim() || 'Selangor',
+      registeredAt: new Date().toISOString(),
+      status: 'confirmed',
+      attendanceCode: `MPGB-${Math.floor(1000 + Math.random() * 9000)}`,
+      notes: participantData.notes?.trim() || '',
+    };
+
+    // Update local registrations list immediately
+    setEventRegistrations((prev) => [newRegistration, ...prev.filter((r) => r.id !== registrationId)]);
+
+    // Update local program capacity state in real time
+    setSiteData((prev) => ({
+      ...prev,
+      programs: (prev.programs || []).map((prog) =>
+        prog.id === eventId
+          ? {
+              ...prog,
+              spotsFilled: newSpotsFilled,
+              registrationOpen: !isNowFull,
+            }
+          : prog
+      ),
+    }));
+
+    // 1. Save participant registration document to Firestore collection 'eventRegistrations'
+    setDoc(doc(db, 'eventRegistrations', registrationId), newRegistration, { merge: true }).catch((err) => {
+      console.warn('Ralat menyimpan pendaftaran ke Firestore:', err);
+    });
+
+    // 2. Increment program spotsFilled in Firestore collection 'events'
+    setDoc(
+      doc(db, 'events', eventId),
+      {
+        ...(targetEvent || {}),
+        id: eventId,
+        title: eventTitle,
+        spotsFilled: newSpotsFilled,
+        registrationOpen: !isNowFull,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    ).catch((err) => {
+      console.warn('Ralat mengemaskini kapasiti acara ke Firestore:', err);
+    });
+
+    // 3. Mirror to submissions for unified administrative visibility
+    setDoc(
+      doc(db, 'submissions', registrationId),
+      {
+        id: registrationId,
+        submitter: newRegistration.participantName,
+        submitterEmail: newRegistration.participantEmail,
+        school: newRegistration.schoolName,
+        type: 'Pendaftaran Program',
+        title: `Pendaftaran: ${eventTitle}`,
+        content: `Nama: ${newRegistration.participantName} (${newRegistration.position}), Sekolah: ${newRegistration.schoolName}, Telefon: ${newRegistration.participantPhone}, Program: ${eventTitle}`,
+        date: new Date().toISOString().split('T')[0],
+        status: 'Submitted',
+      },
+      { merge: true }
+    ).catch(() => {});
+
+    return {
+      success: true,
+      message: `Pendaftaran bagi "${eventTitle}" berjaya! No. Rujukan: ${newRegistration.attendanceCode}. Baki tempat: ${spotsTotal - newSpotsFilled}.`,
+      registrationId,
+    };
+  };
+
+  const updateEventRegistrationStatus = async (
+    regId: string,
+    status: 'confirmed' | 'attended' | 'cancelled'
+  ): Promise<void> => {
+    const existing = eventRegistrations.find((r) => r.id === regId);
+    setEventRegistrations((prev) =>
+      prev.map((r) => (r.id === regId ? { ...r, status } : r))
+    );
+
+    // Dynamic capacity adjustment if status changes to/from 'cancelled'
+    if (existing && existing.eventId) {
+      const wasCancelled = existing.status === 'cancelled';
+      const isNowCancelled = status === 'cancelled';
+      if (!wasCancelled && isNowCancelled) {
+        // Decrement spots
+        const targetEvent = siteData.programs?.find((p) => p.id === existing.eventId);
+        if (targetEvent) {
+          const newSpotsFilled = Math.max((targetEvent.spotsFilled || 0) - 1, 0);
+          setSiteData((prev) => ({
+            ...prev,
+            programs: (prev.programs || []).map((prog) =>
+              prog.id === existing.eventId
+                ? { ...prog, spotsFilled: newSpotsFilled, registrationOpen: true }
+                : prog
+            ),
+          }));
+          setDoc(
+            doc(db, 'events', existing.eventId),
+            { spotsFilled: newSpotsFilled, registrationOpen: true, updatedAt: new Date().toISOString() },
+            { merge: true }
+          ).catch(() => {});
+        }
+      } else if (wasCancelled && !isNowCancelled) {
+        // Re-increment spots
+        const targetEvent = siteData.programs?.find((p) => p.id === existing.eventId);
+        if (targetEvent) {
+          const newSpotsFilled = (targetEvent.spotsFilled || 0) + 1;
+          const isFull = newSpotsFilled >= (targetEvent.spotsTotal || 100);
+          setSiteData((prev) => ({
+            ...prev,
+            programs: (prev.programs || []).map((prog) =>
+              prog.id === existing.eventId
+                ? { ...prog, spotsFilled: newSpotsFilled, registrationOpen: !isFull }
+                : prog
+            ),
+          }));
+          setDoc(
+            doc(db, 'events', existing.eventId),
+            { spotsFilled: newSpotsFilled, registrationOpen: !isFull, updatedAt: new Date().toISOString() },
+            { merge: true }
+          ).catch(() => {});
+        }
+      }
+    }
+
+    try {
+      await setDoc(
+        doc(db, 'eventRegistrations', regId),
+        { status, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Ralat mengemaskini status pendaftaran:', e);
+    }
+  };
+
+  const deleteEventRegistration = async (regId: string, eventId: string): Promise<void> => {
+    const reg = eventRegistrations.find((r) => r.id === regId);
+    setEventRegistrations((prev) => prev.filter((r) => r.id !== regId));
+    try {
+      await deleteDoc(doc(db, 'eventRegistrations', regId));
+    } catch (e) {
+      console.warn('Ralat memadam rekod pendaftaran:', e);
+    }
+
+    // Decrement spotsFilled on the event if registration was active
+    if (reg && reg.status !== 'cancelled') {
+      const targetEvent = siteData.programs?.find((p) => p.id === eventId);
+      if (targetEvent) {
+        const newSpotsFilled = Math.max((targetEvent.spotsFilled || 0) - 1, 0);
+        setSiteData((prev) => ({
+          ...prev,
+          programs: (prev.programs || []).map((prog) =>
+            prog.id === eventId
+              ? { ...prog, spotsFilled: newSpotsFilled, registrationOpen: true }
+              : prog
+          ),
+        }));
+        setDoc(
+          doc(db, 'events', eventId),
+          { spotsFilled: newSpotsFilled, registrationOpen: true, updatedAt: new Date().toISOString() },
+          { merge: true }
+        ).catch(() => {});
+      }
     }
   };
 
@@ -2330,6 +2571,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         addSubmission,
         updateSubmissionStatus,
         deleteSubmission,
+        eventRegistrations,
+        registerForEvent,
+        updateEventRegistrationStatus,
+        deleteEventRegistration,
         resetAllContent,
       }}
     >

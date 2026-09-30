@@ -123,6 +123,23 @@ export interface ProgramEvent {
   registeredUserIds?: string[];
 }
 
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  eventDate?: string;
+  participantName: string;
+  participantEmail: string;
+  participantPhone?: string;
+  schoolName: string;
+  position?: string;
+  state?: string;
+  registeredAt: string;
+  status: 'confirmed' | 'attended' | 'cancelled';
+  attendanceCode?: string;
+  notes?: string;
+}
+
 export interface AnnouncementItem {
   id: string;
   title: string;

@@ -102,9 +102,9 @@ export const PortalHeader: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setPortalTab('dashboard')}
-              className="flex items-center gap-3 text-left focus:outline-hidden group"
+              className="flex items-center gap-3 text-left focus:outline-hidden group cursor-pointer"
             >
-              <Logo className="w-9 h-9 sm:w-11 sm:h-11 shadow-sm" />
+              <Logo showText={false} size="sm" className="shrink-0" />
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm sm:text-base tracking-wide text-white group-hover:text-amber-300 transition-colors">

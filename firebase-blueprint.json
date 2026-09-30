@@ -86,6 +86,25 @@
       },
       "required": ["title", "date", "status"]
     },
+    "EventRegistration": {
+      "title": "EventRegistration",
+      "description": "Pendaftaran rasmi peserta bagi program dan acara anjuran MPGBSIM",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string" },
+        "eventTitle": { "type": "string" },
+        "eventDate": { "type": "string" },
+        "participantName": { "type": "string" },
+        "participantEmail": { "type": "string" },
+        "participantPhone": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "position": { "type": "string" },
+        "state": { "type": "string" },
+        "registeredAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["confirmed", "attended", "cancelled"] }
+      },
+      "required": ["eventId", "eventTitle", "participantName", "participantEmail", "schoolName"]
+    },
     "Document": {
       "title": "Document",
       "description": "Documents and official circulars for member download",
@@ -297,6 +316,10 @@
     "/events/{eventId}": {
       "schema": { "$ref": "#/entities/Event" },
       "description": "Events and programs calendar"
+    },
+    "/eventRegistrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/EventRegistration" },
+      "description": "Pendaftaran rasmi peserta bagi program dan acara"
     },
     "/documents/{documentId}": {
       "schema": { "$ref": "#/entities/Document" },

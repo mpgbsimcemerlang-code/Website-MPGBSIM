@@ -63,6 +63,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // 5b. Event Registrations (Pendaftaran Peserta Acara)
+    match /eventRegistrations/{regId} {
+      allow read, write: if true;
+    }
+
     // 6. Documents Centre
     match /documents/{documentId} {
       allow read: if true;

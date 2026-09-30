@@ -486,7 +486,7 @@ export const PortalProfile: React.FC = () => {
               {/* Card Header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <Logo className="w-9 h-9" />
+                  <Logo showText={false} size="sm" className="shrink-0" />
                   <div>
                     <span className="text-[11px] font-black text-white tracking-wider block">
                       MPGBSIM MEMBER
@@ -1373,7 +1373,7 @@ export const PortalProfile: React.FC = () => {
             {/* Letterhead Header */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pb-4 border-b-2 border-teal-900/80">
               <div className="shrink-0 p-1 bg-white rounded-xl">
-                <Logo className="w-20 h-20" />
+                <Logo showText={false} size="lg" className="shrink-0" />
               </div>
               <div className="text-center sm:text-left flex-1">
                 <h1 className="text-base sm:text-lg font-black text-teal-950 uppercase tracking-tight">

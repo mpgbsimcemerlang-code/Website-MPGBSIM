@@ -40,6 +40,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
     deleteSubmission,
     approveMemberApplication,
     rejectMemberApplication,
+    eventRegistrations,
   } = useAdminContent();
 
   const [syncing, setSyncing] = useState(false);
@@ -331,7 +332,9 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
             <div className="text-xs font-bold text-slate-600 mt-0.5">{dashboardConfig.cardEventsTitle}</div>
             <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span className="text-emerald-700 font-semibold">{upcomingEvents} Akan Datang</span>
-              <span>{pastEvents} Lepas</span>
+              <span className="text-teal-800 font-bold bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                {eventRegistrations?.length || 0} Peserta Daftar
+              </span>
             </div>
           </div>
 

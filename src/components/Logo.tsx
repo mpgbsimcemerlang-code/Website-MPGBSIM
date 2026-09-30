@@ -6,6 +6,7 @@ interface LogoProps {
   variant?: 'light' | 'dark';
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showSubtitle?: boolean;
+  showText?: boolean;
   className?: string;
 }
 
@@ -13,6 +14,7 @@ export const Logo: React.FC<LogoProps> = ({
   variant = 'dark',
   size = 'md',
   showSubtitle = true,
+  showText = true,
   className = '',
 }) => {
   const isLight = variant === 'light';
@@ -70,24 +72,26 @@ export const Logo: React.FC<LogoProps> = ({
       </div>
 
       {/* Brand Name Typography */}
-      <div className="flex flex-col leading-tight">
-        <span
-          className={`font-black tracking-wider uppercase font-sans ${titleSizes[size]} ${
-            isLight ? 'text-slate-900' : 'text-white'
-          }`}
-        >
-          {branding.shortName || 'MPGBSIM'}
-        </span>
-        {showSubtitle && (
+      {showText && (
+        <div className="flex flex-col leading-tight min-w-0">
           <span
-            className={`text-[10px] md:text-[11px] font-medium tracking-tight uppercase line-clamp-1 ${
-              isLight ? 'text-slate-600' : 'text-teal-200/90'
+            className={`font-black tracking-wider uppercase font-sans ${titleSizes[size]} ${
+              isLight ? 'text-slate-900' : 'text-white'
             }`}
           >
-            {branding.orgName || 'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia'}
+            {branding.shortName || 'MPGBSIM'}
           </span>
-        )}
-      </div>
+          {showSubtitle && (
+            <span
+              className={`text-[10px] md:text-[11px] font-medium tracking-tight uppercase line-clamp-1 ${
+                isLight ? 'text-slate-600' : 'text-teal-200/90'
+              }`}
+            >
+              {branding.orgName || 'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia'}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };

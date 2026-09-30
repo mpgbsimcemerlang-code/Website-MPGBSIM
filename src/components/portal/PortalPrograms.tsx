@@ -28,13 +28,15 @@ export const PortalPrograms: React.FC = () => {
     registerForProgram,
   } = useMemberPortal();
 
-  const { siteData, addProgram } = useAdminContent();
+  const { siteData, addProgram, registerForEvent } = useAdminContent();
   const programs: ProgramEvent[] = siteData.programs || [];
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [filterMode, setFilterMode] = useState<string>('Semua');
   const [selectedProgram, setSelectedProgram] = useState<ProgramEvent | null>(null);
   const [isRegisterSuccess, setIsRegisterSuccess] = useState(false);
+  const [registerSuccessMessage, setRegisterSuccessMessage] = useState<string>('');
+  const [registeringId, setRegisteringId] = useState<string | null>(null);
 
   // New Program Modal for Admin/Media AJK
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -59,12 +61,45 @@ export const PortalPrograms: React.FC = () => {
     return true;
   });
 
-  const handleRegister = (progId: string) => {
-    registerForProgram(progId);
-    setIsRegisterSuccess(true);
-    setTimeout(() => {
-      setIsRegisterSuccess(false);
-    }, 4000);
+  const handleRegister = async (progId: string) => {
+    const prog = programs.find((p) => p.id === progId);
+    if (!prog) return;
+
+    const spotsTotal = prog.spotsTotal || 100;
+    const spotsFilled = prog.spotsFilled || 0;
+    if (spotsFilled >= spotsTotal || prog.registrationOpen === false) {
+      alert(`Maaf, kapasiti bagi program "${prog.title}" telah penuh.`);
+      return;
+    }
+
+    setRegisteringId(progId);
+    try {
+      const res = await registerForEvent(progId, {
+        participantName: currentUser?.fullName || 'Ahli PGB MPGBSIM',
+        participantEmail: currentUser?.email || 'ahli@mpgbsim.org.my',
+        participantPhone: currentUser?.phone || '',
+        schoolName: currentUser?.school || 'Sekolah Ahli MPGBSIM',
+        position: currentUser?.position || 'Pengetua / Guru Besar',
+        state: currentUser?.state || 'Selangor',
+        notes: 'Pendaftaran melalui Portal Ahli MPGBSIM',
+      });
+
+      if (res.success) {
+        registerForProgram(progId);
+        setRegisterSuccessMessage(res.message);
+        setIsRegisterSuccess(true);
+        setTimeout(() => {
+          setIsRegisterSuccess(false);
+        }, 5000);
+      } else {
+        alert(res.message);
+      }
+    } catch (e: any) {
+      console.error('Ralat mendaftar program:', e);
+      alert(e?.message || 'Ralat semasa mendaftar. Sila cuba lagi.');
+    } finally {
+      setRegisteringId(null);
+    }
   };
 
   const handleCreateProgram = (e: React.FormEvent) => {
@@ -222,6 +257,35 @@ export const PortalPrograms: React.FC = () => {
                       <span className="truncate">{prog.venue}</span>
                     </div>
                   </div>
+
+                  {/* Live Capacity Bar */}
+                  {(() => {
+                    const spotsTotal = prog.spotsTotal || 100;
+                    const spotsFilled = prog.spotsFilled || 0;
+                    const fillPercent = Math.min(Math.round((spotsFilled / spotsTotal) * 100), 100);
+                    const isFull = spotsFilled >= spotsTotal || prog.registrationOpen === false;
+                    return (
+                      <div className="space-y-1 pt-2">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                          <span className="flex items-center gap-1 font-semibold text-slate-700">
+                            <Users className="w-3 h-3 text-teal-700" />
+                            Kapasiti Pendaftaran:
+                          </span>
+                          <span className={`font-bold ${isFull ? 'text-rose-600' : 'text-teal-900'}`}>
+                            {spotsFilled} / {spotsTotal} Peserta ({fillPercent}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              isFull ? 'bg-rose-500' : fillPercent >= 80 ? 'bg-amber-500' : 'bg-teal-600'
+                            }`}
+                            style={{ width: `${fillPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="w-full lg:w-auto shrink-0 flex flex-col sm:flex-row lg:flex-col items-center justify-between gap-3 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100">
@@ -233,7 +297,7 @@ export const PortalPrograms: React.FC = () => {
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
                       onClick={() => setSelectedProgram(prog)}
-                      className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold"
+                      className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold cursor-pointer"
                     >
                       Butiran Penuh
                     </button>
@@ -245,12 +309,20 @@ export const PortalPrograms: React.FC = () => {
                         <CheckCircle className="w-3.5 h-3.5" />
                         Telah Daftar
                       </button>
+                    ) : (prog.spotsFilled || 0) >= (prog.spotsTotal || 100) || prog.registrationOpen === false ? (
+                      <button
+                        disabled
+                        className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-rose-100 text-rose-800 text-xs font-bold border border-rose-300 flex items-center justify-center gap-1 cursor-not-allowed"
+                      >
+                        Kapasiti Penuh
+                      </button>
                     ) : (
                       <button
                         onClick={() => handleRegister(prog.id)}
-                        className="flex-1 sm:flex-initial px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs transition-colors"
+                        disabled={registeringId === prog.id}
+                        className="flex-1 sm:flex-initial px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
                       >
-                        Daftar Program
+                        {registeringId === prog.id ? 'Mendaftar...' : 'Daftar Program'}
                       </button>
                     )}
                   </div>
@@ -358,6 +430,36 @@ export const PortalPrograms: React.FC = () => {
                 <Users className="w-4 h-4 text-teal-800" />
                 <span>Sasaran: {selectedProgram.targetAudience || 'Pengetua & Guru Besar'}</span>
               </div>
+
+              {/* Live Capacity Bar */}
+              <div className="pt-2 border-t border-slate-200">
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="font-semibold text-slate-600">Status Kapasiti Pendaftaran:</span>
+                  <span className="font-bold text-teal-900">
+                    {selectedProgram.spotsFilled || 0} / {selectedProgram.spotsTotal || 100} Peserta (
+                    {Math.min(
+                      Math.round(
+                        ((selectedProgram.spotsFilled || 0) / (selectedProgram.spotsTotal || 100)) * 100
+                      ),
+                      100
+                    )}
+                    %)
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-teal-600 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(
+                        Math.round(
+                          ((selectedProgram.spotsFilled || 0) / (selectedProgram.spotsTotal || 100)) * 100
+                        ),
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="mt-4">
@@ -378,7 +480,7 @@ export const PortalPrograms: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelectedProgram(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold cursor-pointer"
                 >
                   Tutup
                 </button>
@@ -389,13 +491,20 @@ export const PortalPrograms: React.FC = () => {
                   >
                     <CheckCircle className="w-4 h-4" /> Telah Mendaftar
                   </button>
+                ) : (selectedProgram.spotsFilled || 0) >= (selectedProgram.spotsTotal || 100) || selectedProgram.registrationOpen === false ? (
+                  <button
+                    disabled
+                    className="px-5 py-2 rounded-xl bg-rose-100 text-rose-800 text-xs font-bold border border-rose-300 flex items-center gap-1 cursor-not-allowed"
+                  >
+                    Kapasiti Penuh
+                  </button>
                 ) : (
                   <button
                     onClick={() => {
                       handleRegister(selectedProgram.id);
                       setSelectedProgram(null);
                     }}
-                    className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs"
+                    className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs cursor-pointer"
                   >
                     Sahkan Pendaftaran
                   </button>
