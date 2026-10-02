@@ -940,27 +940,27 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubResources = onSnapshot(
         collection(db, 'resources'),
         (snapshot) => {
+          const isSeeded = localStorage.getItem('mpgbsim_resources_seeded') === 'true';
+
           if (!snapshot.empty) {
             const list: ResourceDocument[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-
-            // Ensure canonical documents from RESOURCE_DOCS are seeded into Firestore if missing
-            RESOURCE_DOCS.forEach((res) => {
-              if (!list.some((existing) => existing.id === res.id || existing.title.toLowerCase().trim() === res.title.toLowerCase().trim())) {
-                setDoc(doc(db, 'resources', res.id), res, { merge: true }).catch(() => {});
-                list.push(res);
-              }
-            });
-
+            if (!isSeeded) {
+              localStorage.setItem('mpgbsim_resources_seeded', 'true');
+            }
             setSiteData((prev) => ({ ...prev, resources: list }));
-          } else {
-            // Seed all default RESOURCE_DOCS into Firestore if collection is completely empty
+          } else if (!isSeeded) {
+            // Seed default RESOURCE_DOCS into Firestore ONLY ONCE on initial setup
             RESOURCE_DOCS.forEach((res) => {
               setDoc(doc(db, 'resources', res.id), res, { merge: true }).catch(() => {});
             });
+            localStorage.setItem('mpgbsim_resources_seeded', 'true');
             setSiteData((prev) => ({ ...prev, resources: RESOURCE_DOCS }));
+          } else {
+            // Collection is empty because all resources were deleted by admin
+            setSiteData((prev) => ({ ...prev, resources: [] }));
           }
         },
         (err) => {
@@ -1047,6 +1047,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAlumni = onSnapshot(
         collection(db, 'alumni'),
         (snapshot) => {
+          const isSeeded = localStorage.getItem('mpgbsim_alumni_seeded') === 'true';
+
           if (!snapshot.empty) {
             const list: AlumniRecord[] = [];
             snapshot.forEach((docSnap) => {
@@ -1056,9 +1058,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               (a, b) =>
                 new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
             );
+            if (!isSeeded) {
+              localStorage.setItem('mpgbsim_alumni_seeded', 'true');
+            }
             setSiteData((prev) => ({ ...prev, alumni: list }));
-          } else {
+          } else if (!isSeeded) {
+            // Seed default SAMPLE_ALUMNI_RECORDS into Firestore ONCE on initial setup
+            SAMPLE_ALUMNI_RECORDS.forEach((rec) => {
+              setDoc(doc(db, 'alumni', rec.id), rec, { merge: true }).catch(() => {});
+            });
+            localStorage.setItem('mpgbsim_alumni_seeded', 'true');
             setSiteData((prev) => ({ ...prev, alumni: SAMPLE_ALUMNI_RECORDS }));
+          } else {
+            // Collection is empty because all alumni records were deleted by admin
+            setSiteData((prev) => ({ ...prev, alumni: [] }));
           }
         },
         (err) => {
@@ -2500,6 +2513,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const deleteResource = (id: string) => {
+    localStorage.setItem('mpgbsim_resources_seeded', 'true');
     const updated = siteData.resources.filter((r) => r.id !== id);
     setSiteData((prev) => {
       const nextState = { ...prev, resources: updated };
@@ -2603,6 +2617,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const deleteAlumniRecord = async (id: string): Promise<void> => {
+    localStorage.setItem('mpgbsim_alumni_seeded', 'true');
     setSiteData((prev) => ({
       ...prev,
       alumni: (prev.alumni || []).filter((a) => a.id !== id),
@@ -2614,6 +2629,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {
       console.warn('Firestore deleteAlumniRecord notice:', e);
     }
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_alumni_updated'));
+    } catch (e) {}
   };
 
   const approveAlumniRecord = async (
