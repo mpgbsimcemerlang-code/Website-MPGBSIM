@@ -184,12 +184,7 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
     if (!snap.empty) {
       snap.forEach((d) => {
         const sch = { id: d.id, ...(d.data() as any) } as MemberSchool;
-        const isMusleh =
-          sch.id === 'sch-musleh-1' ||
-          sch.code?.toUpperCase() === 'MJAC011' ||
-          sch.code?.toUpperCase() === 'MIA1009' ||
-          sch.name?.toLowerCase().includes('musleh');
-        if (isMusleh) {
+        if (sch.id) {
           const existing =
             schoolsMap.get(sch.id) ||
             (sch.code ? schoolsMap.get(`code:${sch.code.toUpperCase()}`) : undefined);
@@ -211,12 +206,7 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
         const parsed = JSON.parse(saved);
         if (parsed.memberSchools && Array.isArray(parsed.memberSchools)) {
           parsed.memberSchools.forEach((sch: MemberSchool) => {
-            const isMusleh =
-              sch.id === 'sch-musleh-1' ||
-              sch.code?.toUpperCase() === 'MJAC011' ||
-              sch.code?.toUpperCase() === 'MIA1009' ||
-              sch.name?.toLowerCase().includes('musleh');
-            if (isMusleh) {
+            if (sch.id) {
               const existing =
                 schoolsMap.get(sch.id) ||
                 (sch.code ? schoolsMap.get(`code:${sch.code.toUpperCase()}`) : undefined);
@@ -228,6 +218,9 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
                   schoolsMap.set(existing.id, merged);
                   if (existing.code) schoolsMap.set(`code:${existing.code.toUpperCase()}`, merged);
                 }
+              } else {
+                schoolsMap.set(sch.id, sch);
+                if (sch.code) schoolsMap.set(`code:${sch.code.toUpperCase()}`, sch);
               }
             }
           });
@@ -240,25 +233,18 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
   const rawList: MemberSchool[] = [];
   const seen = new Set<string>();
   schoolsMap.forEach((s) => {
-    const isMusleh =
-      s.id === 'sch-musleh-1' ||
-      s.code?.toUpperCase() === 'MJAC011' ||
-      s.name?.toLowerCase().includes('musleh');
-    if (isMusleh && !seen.has(s.id)) {
+    if (s.id && !seen.has(s.id)) {
       seen.add(s.id);
       rawList.push(s);
     }
   });
 
-  // Run integrity repair / normalization to ensure uniqueness of codes (MJAC011) and linkage
+  // Run integrity repair / normalization to ensure uniqueness of codes and linkage
   try {
     const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.CURRENT_USER) : null;
     const portalUser = portalUserRaw ? JSON.parse(portalUserRaw) : null;
     const { repairedSchools } = repairSchoolIntegrity(rawList.length > 0 ? rawList : SAMPLE_MEMBER_SCHOOLS, portalUser);
-    const finalMusleh = repairedSchools.filter(
-      (s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.name?.toLowerCase().includes('musleh')
-    );
-    return finalMusleh.length > 0 ? finalMusleh : SAMPLE_MEMBER_SCHOOLS;
+    return repairedSchools.length > 0 ? repairedSchools : SAMPLE_MEMBER_SCHOOLS;
   } catch (e) {
     return SAMPLE_MEMBER_SCHOOLS;
   }
@@ -1500,9 +1486,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     // 3. Update school document in Firestore if school matches
+    let targetDocId: string | null = null;
     try {
       const snap = await getDocs(collection(db, 'schools'));
-      let targetDocId: string | null = null;
       snap.forEach((d) => {
         const sch = d.data() as MemberSchool;
         const matchCode = sch.code && currentUser.membershipNo?.includes(sch.code);
@@ -1528,7 +1514,31 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Schools collection password sync notice:', e);
     }
 
-    // 4. Update local storage CMS school list cache (both v3 and legacy)
+    // 4. Update React state currentUser & local storage
+    const updatedUser: UserProfile = {
+      ...currentUser,
+      portalPassword: cleanPass,
+      updatedAt: new Date().toISOString(),
+    };
+    setCurrentUser(updatedUser);
+    safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+
+    // 5. Update registeredSchools in MemberPortalContext React state
+    setRegisteredSchools((prev) =>
+      prev.map((s) => {
+        if (
+          targetDocId === s.id ||
+          (s.email && s.email.toLowerCase() === currentUser.email?.toLowerCase()) ||
+          (s.name && s.name.toLowerCase() === currentUser.school?.toLowerCase()) ||
+          (currentUser.membershipNo && s.code && currentUser.membershipNo.includes(s.code))
+        ) {
+          return { ...s, password: cleanPass };
+        }
+        return s;
+      })
+    );
+
+    // 6. Update local storage CMS school list cache (both v3 and legacy)
     try {
       ['mpgbsim_cms_content_v3', 'mpgbsim_cms_content'].forEach((key) => {
         const saved = localStorage.getItem(key);
@@ -1561,7 +1571,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     return {
       success: true,
       message:
-        'Kata laluan log masuk anda telah berjaya dikemas kini! Anda boleh log masuk menggunakan kata laluan baharu ini pada bila-bila masa.',
+        'Kata laluan log masuk anda telah berjaya dikemas kini dan disimpan! Anda boleh log masuk menggunakan kata laluan baharu ini pada bila-bila masa.',
     };
   };
 

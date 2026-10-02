@@ -32,6 +32,7 @@ export interface UserProfile {
   pgbStartYear?: number;
   status: 'active' | 'pending' | 'inactive';
   hidePhone?: boolean;
+  portalPassword?: string;
   createdAt?: string;
   updatedAt?: string;
 }
