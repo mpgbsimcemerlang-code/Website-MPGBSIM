@@ -430,7 +430,7 @@ export interface SiteSettingsData {
 export interface ResourceDocument {
   id: string;
   title: string;
-  category: 'Pekeliling' | 'Garis Panduan' | 'Modul Kepimpinan' | 'Kertas Dasar' | string;
+  category: 'Pekeliling' | 'Garis Panduan' | 'Modul Kepimpinan' | 'Kertas Dasar' | 'Mesyuarat' | 'Pentadbiran' | 'Program' | 'Sumber PGB' | 'AI & Digital' | 'Modul' | 'Template' | 'Dokumen MPGBSIM' | string;
   publishedDate: string;
   fileSize: string;
   fileFormat: string;
@@ -438,6 +438,10 @@ export interface ResourceDocument {
   description: string;
   driveUrl?: string;
   fileUrl?: string;
+  downloadUrl?: string;
+  uploader?: string;
+  visibility?: 'PUBLIC' | 'MEMBER' | 'ADMIN';
+  version?: string;
 }
 
 export interface NetworkStats {

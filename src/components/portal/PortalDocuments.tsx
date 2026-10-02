@@ -13,12 +13,15 @@ import {
   Shield,
   Clock,
   User,
+  ExternalLink,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
-import { PortalDocument } from '../../types';
+import { useAdminContent } from '../../context/AdminContentContext';
+import { PortalDocument, ResourceDocument } from '../../types';
 
 export const PortalDocuments: React.FC = () => {
-  const { documents, currentRole, addDocument, deleteDocument, currentUser } = useMemberPortal();
+  const { currentRole, addDocument, deleteDocument, currentUser } = useMemberPortal();
+  const { siteData, addResource, deleteResource } = useAdminContent();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
@@ -32,35 +35,56 @@ export const PortalDocuments: React.FC = () => {
   const [newVisibility, setNewVisibility] = useState<PortalDocument['visibility']>('MEMBER');
   const [newFormat, setNewFormat] = useState('PDF');
   const [newSize, setNewSize] = useState('1.5 MB');
+  const [newDriveUrl, setNewDriveUrl] = useState('https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link');
 
   const canManage = currentRole === 'ADMIN';
 
   const categories = [
     'Semua',
+    'Pekeliling',
+    'Garis Panduan',
+    'Modul Kepimpinan',
+    'Kertas Dasar',
+    'Dokumen MPGBSIM',
+    'AI & Digital',
+    'Template',
     'Mesyuarat',
     'Pentadbiran',
-    'Program',
-    'Sumber PGB',
-    'AI & Digital',
-    'Modul',
-    'Template',
-    'Dokumen MPGBSIM',
   ];
+
+  // Map master siteData.resources to PortalDocument objects
+  const activeDocuments: PortalDocument[] = React.useMemo(() => {
+    const list: PortalDocument[] = (siteData.resources || []).map((res) => ({
+      id: res.id,
+      title: res.title,
+      description: res.description,
+      category: res.category as any,
+      fileSize: res.fileSize || '2.0 MB',
+      version: res.version || 'v1.0',
+      uploadDate: res.publishedDate || '2026',
+      uploader: res.uploader || 'Sekretariat Utama MPGBSIM',
+      visibility: res.visibility || 'MEMBER',
+      fileFormat: res.fileFormat || 'PDF',
+      downloads: res.downloads || 0,
+      downloadUrl: res.driveUrl || res.fileUrl || 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
+    }));
+    return list;
+  }, [siteData.resources]);
 
   // RBAC Document visibility rule:
   // PUBLIC documents: visible to anyone
   // MEMBER documents: visible to MEMBER, MEDIA_AJK, ADMIN
   // ADMIN documents: only visible to ADMIN
-  const allowedDocuments = documents.filter((docItem) => {
+  const allowedDocuments = activeDocuments.filter((docItem) => {
     if (currentRole === 'ADMIN') return true;
     if (currentRole === 'MEMBER' || currentRole === 'MEDIA_AJK') {
-      return docItem.visibility === 'PUBLIC' || docItem.visibility === 'MEMBER';
+      return docItem.visibility === 'PUBLIC' || docItem.visibility === 'MEMBER' || !docItem.visibility;
     }
     return docItem.visibility === 'PUBLIC';
   });
 
   const filteredDocuments = allowedDocuments.filter((docItem) => {
-    const matchCat = selectedCategory === 'Semua' || docItem.category === selectedCategory;
+    const matchCat = selectedCategory === 'Semua' || docItem.category.toLowerCase().includes(selectedCategory.toLowerCase());
     const matchQuery =
       docItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       docItem.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -69,27 +93,64 @@ export const PortalDocuments: React.FC = () => {
   });
 
   const handleDownload = (docItem: PortalDocument) => {
-    alert(`Memuat turun fail: ${docItem.title} (${docItem.fileSize})`);
+    const driveLink =
+      docItem.downloadUrl ||
+      'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link';
+    if (typeof window !== 'undefined') {
+      window.open(driveLink, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleDeleteItem = async (id: string, title: string) => {
+    if (confirm(`Adakah anda pasti mahu memadam dokumen: "${title}"?`)) {
+      await deleteResource(id);
+      await deleteDocument(id);
+    }
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    const docId = `doc-${Date.now()}`;
+    const formattedDate = new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const newResourceDoc: ResourceDocument = {
+      id: docId,
+      title: newTitle.trim(),
+      category: newCategory,
+      publishedDate: formattedDate,
+      fileSize: newSize || '2.0 MB',
+      fileFormat: newFormat || 'PDF',
+      downloads: 1,
+      description: newDesc.trim() || 'Dokumen rasmi MPGBSIM.',
+      uploader: currentUser?.fullName || 'Sekretariat Utama MPGBSIM',
+      visibility: newVisibility,
+      version: newVersion,
+      driveUrl: newDriveUrl.trim() || 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
+    };
+
+    // Add to master siteData.resources (syncs to public website & Firestore)
+    await addResource(newResourceDoc);
+
+    // Add to PortalDocuments
     await addDocument({
       title: newTitle,
       description: newDesc,
       category: newCategory,
       version: newVersion,
       fileSize: newSize,
-      uploader: currentUser?.fullName || 'Sekretariat MPGBSIM',
+      uploader: currentUser?.fullName || 'Sekretariat Utama MPGBSIM',
       visibility: newVisibility,
       fileFormat: newFormat,
       uploadDate: new Date().toISOString().split('T')[0],
       downloads: 1,
+      downloadUrl: newDriveUrl,
     });
 
     setIsAddOpen(false);
+    setNewTitle('');
+    setNewDesc('');
   };
 
   return (
@@ -202,13 +263,9 @@ export const PortalDocuments: React.FC = () => {
               <div className="flex items-center gap-2">
                 {canManage && (
                   <button
-                    onClick={() => {
-                      if (confirm(`Padam dokumen: ${docItem.title}?`)) {
-                        deleteDocument(docItem.id);
-                      }
-                    }}
-                    className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500"
-                    title="Padam"
+                    onClick={() => handleDeleteItem(docItem.id, docItem.title)}
+                    className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 cursor-pointer"
+                    title="Padam Dokumen"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -283,6 +340,20 @@ export const PortalDocuments: React.FC = () => {
                     <option value="ADMIN">Pentadbir Sahaja (ADMIN)</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Pautan Google Drive Simpanan Dokumen</span>
+                  <span className="text-[10px] text-teal-700 font-normal">Button muat turun akan terus ke pautan ini</span>
+                </label>
+                <input
+                  type="url"
+                  value={newDriveUrl}
+                  onChange={(e) => setNewDriveUrl(e.target.value)}
+                  placeholder="https://drive.google.com/file/d/1.../view atau https://drive.google.com/drive/folders/..."
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-teal-300 focus:bg-white font-mono text-teal-900"
+                />
               </div>
 
               <div>
