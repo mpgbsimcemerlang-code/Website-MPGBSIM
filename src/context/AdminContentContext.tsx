@@ -1206,19 +1206,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       'MPGB@Admin2026',
       'Admin@2026',
       'MPGBSIM2026',
-      'mpgbsim2026',
       'AdminMPGB2026',
-      'admin2026',
-      'MPGB2026',
-      'MPGB2026!',
-      'admin',
-      'mpgbsim',
-      'cemerlang',
-      'password',
-      '123456',
     ];
 
-    if (validMasterPasscodes.includes(cleanPass) || (cleanEmail === 'mpgbsim.cemerlang@gmail.com' && cleanPass.length > 0)) {
+    if (validMasterPasscodes.includes(cleanPass)) {
       const newAdmin: AdminUser = {
         email: cleanEmail,
         name: 'Pegawai Pentadbir MPGBSIM (Akses Rasmi)',
