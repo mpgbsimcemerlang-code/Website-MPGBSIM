@@ -554,22 +554,22 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           branding: sanitizeBranding(saved.branding),
           hero: sanitizeHero(saved.hero),
           visionMission: sanitizeVisionMission(saved.visionMission),
-          strategicFocus: saved.strategicFocus?.length ? saved.strategicFocus : STRATEGIC_FOCUS_LIST,
+          strategicFocus: Array.isArray(saved.strategicFocus) ? saved.strategicFocus : STRATEGIC_FOCUS_LIST,
           stats: saved.stats || INITIAL_NETWORK_STATS,
-          memberSchools: sanitizeMemberSchoolsList(saved.memberSchools?.length ? saved.memberSchools : SAMPLE_MEMBER_SCHOOLS),
-          news: saved.news?.length ? saved.news : LATEST_NEWS_LIST,
-          programs: saved.programs?.length ? saved.programs : UPCOMING_PROGRAMS_LIST,
-          practices: saved.practices?.length ? saved.practices : BEST_PRACTICES_LIST,
-          leadership: sanitizeLeadershipList(saved.leadership?.length ? saved.leadership : LEADERSHIP_TEAM),
-          media: saved.media?.length ? saved.media : MEDIA_GALLERY_LIST,
+          memberSchools: sanitizeMemberSchoolsList(Array.isArray(saved.memberSchools) ? saved.memberSchools : SAMPLE_MEMBER_SCHOOLS),
+          news: Array.isArray(saved.news) ? saved.news : LATEST_NEWS_LIST,
+          programs: Array.isArray(saved.programs) ? saved.programs : UPCOMING_PROGRAMS_LIST,
+          practices: Array.isArray(saved.practices) ? saved.practices : BEST_PRACTICES_LIST,
+          leadership: sanitizeLeadershipList(Array.isArray(saved.leadership) ? saved.leadership : LEADERSHIP_TEAM),
+          media: Array.isArray(saved.media) ? saved.media : MEDIA_GALLERY_LIST,
           quote: { ...DEFAULT_QUOTE, ...saved.quote },
-          resources: saved.resources?.length ? saved.resources : RESOURCE_DOCS,
+          resources: Array.isArray(saved.resources) ? saved.resources : RESOURCE_DOCS,
           cta: { ...DEFAULT_CTA, ...saved.cta },
           contactInfo: sanitizeContactInfo(saved.contactInfo),
-          submissions: saved.submissions?.length ? saved.submissions : INITIAL_SUBMISSIONS,
-          memberApplications: sanitizeMemberApplicationsList(saved.memberApplications?.length ? saved.memberApplications : SAMPLE_MEMBER_APPLICATIONS),
+          submissions: Array.isArray(saved.submissions) ? saved.submissions : INITIAL_SUBMISSIONS,
+          memberApplications: sanitizeMemberApplicationsList(Array.isArray(saved.memberApplications) ? saved.memberApplications : SAMPLE_MEMBER_APPLICATIONS),
           dashboardConfig: { ...DEFAULT_DASHBOARD_CONFIG, ...(saved.dashboardConfig || {}) },
-          alumni: saved.alumni?.length ? saved.alumni : SAMPLE_ALUMNI_RECORDS,
+          alumni: Array.isArray(saved.alumni) ? saved.alumni : SAMPLE_ALUMNI_RECORDS,
         };
       }
     } catch (e) {
@@ -770,13 +770,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               branding: d.branding ? { ...prev.branding, ...d.branding } : prev.branding,
               hero: d.hero ? { ...prev.hero, ...d.hero } : prev.hero,
               visionMission: d.visionMission ? { ...prev.visionMission, ...d.visionMission } : prev.visionMission,
-              strategicFocus: d.strategicFocus && d.strategicFocus.length ? d.strategicFocus : prev.strategicFocus,
+              strategicFocus: Array.isArray(d.strategicFocus) ? d.strategicFocus : prev.strategicFocus,
               stats: d.stats ? { ...prev.stats, ...d.stats } : prev.stats,
               quote: d.quote ? { ...prev.quote, ...d.quote } : prev.quote,
               cta: d.cta ? { ...prev.cta, ...d.cta } : prev.cta,
               contactInfo: d.contactInfo ? { ...prev.contactInfo, ...d.contactInfo } : prev.contactInfo,
-              leadership: sanitizeLeadershipList(d.leadership && d.leadership.length ? d.leadership : prev.leadership),
-              resources: d.resources && d.resources.length ? d.resources : prev.resources,
+              leadership: sanitizeLeadershipList(Array.isArray(d.leadership) ? d.leadership : prev.leadership),
+              resources: Array.isArray(d.resources) ? d.resources : prev.resources,
               dashboardConfig: d.dashboardConfig ? { ...prev.dashboardConfig, ...d.dashboardConfig } : prev.dashboardConfig,
             }));
             setSyncStatus('synced');
@@ -2486,12 +2486,18 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const deleteResource = (id: string) => {
     const updated = siteData.resources.filter((r) => r.id !== id);
-    setSiteData((prev) => ({
-      ...prev,
-      resources: updated,
-    }));
+    setSiteData((prev) => {
+      const nextState = { ...prev, resources: updated };
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
     saveCmsContentToFirestore({ resources: updated });
-    deleteDoc(doc(db, 'resources', id)).catch(() => {});
+    deleteDoc(doc(db, 'resources', id)).catch((err) => {
+      console.warn('Ralat memadam dokumen dari Firestore collection resources:', err);
+    });
+    try {
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    } catch (e) {}
   };
 
   const updateDashboardConfig = async (data: Partial<DashboardConfig>) => {
