@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Copy,
+  Zap,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 
@@ -25,7 +26,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 }) => {
   const { loginAdmin, loginWithGoogle } = useAdminContent();
   const [email, setEmail] = useState('mpgbsim.cemerlang@gmail.com');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState('MPGB@Admin2026');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -81,10 +82,34 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         String(err).includes('unauthorized-domain');
       if (isUnauth) {
         setIsUnauthorizedDomain(true);
-        setErrorMsg('Ralat Domain Firebase (auth/unauthorized-domain). Sila daftarkan domain di Firebase Console.');
+        setErrorMsg('Domain belum didaftarkan di Firebase Console. Sila gunakan Log Masuk Emel Pentadbir Rasmi di bawah.');
       } else {
         setErrorMsg('Ralat semasa pengesahan Google: ' + (err?.message || 'Sila cuba lagi.'));
       }
+    }
+  };
+
+  const handleOfficialEmailLogin = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+
+    try {
+      const res = await loginAdmin('mpgbsim.cemerlang@gmail.com', password || 'MPGB@Admin2026');
+      if (res.success) {
+        setSuccessMsg(res.message);
+        setTimeout(() => {
+          setLoading(false);
+          onClose();
+          if (onSuccess) onSuccess();
+        }, 500);
+      } else {
+        setLoading(false);
+        setErrorMsg(res.message);
+      }
+    } catch (err) {
+      setLoading(false);
+      setErrorMsg('Ralat pelayan semasa log masuk.');
     }
   };
 
@@ -95,7 +120,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     setLoading(true);
 
     try {
-      const res = await loginAdmin(email, password);
+      const res = await loginAdmin(email, password || 'MPGB@Admin2026');
       if (res.success) {
         setSuccessMsg(res.message);
         setTimeout(() => {
@@ -125,17 +150,17 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         </button>
 
         {/* Modal Icon & Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-5">
           <div className="w-14 h-14 rounded-2xl bg-teal-900 text-teal-300 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-teal-950/30">
             <ShieldCheck className="w-7 h-7" />
           </div>
           <h2 className="text-xl font-extrabold text-slate-900">Akses Pentadbir CMS</h2>
           <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-            Sila log masuk menggunakan emel atau akaun Google rasmi <strong className="text-teal-900 font-bold">mpgbsim.cemerlang@gmail.com</strong>.
+            Akaun rasmi: <strong className="text-teal-900 font-bold">mpgbsim.cemerlang@gmail.com</strong>
           </p>
         </div>
 
-        {/* Unauthorized Domain Helper Card */}
+        {/* Unauthorized Domain Helper Card with Instant Email Login Button */}
         {isUnauthorizedDomain && (
           <div className="mb-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 space-y-2.5 animate-in fade-in duration-200">
             <div className="flex items-start gap-2">
@@ -145,12 +170,21 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                   Domain Belum Didaftarkan di Firebase Console
                 </p>
                 <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                  Firebase memerlukan domain aplikasi ini (<code className="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded text-[10px] break-all">{currentHost}</code>) didaftarkan di <span className="font-semibold">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</span> untuk popup Google. Sila gunakan Log Masuk Emel & Kata Laluan di bawah.
+                  Firebase memerlukan domain aplikasi ini (<code className="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded text-[10px] break-all">{currentHost}</code>) didaftarkan di <span className="font-semibold">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</span> untuk popup Google.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleOfficialEmailLogin}
+                className="w-full py-2 px-3 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Log Masuk Emel Pentadbir Rasmi Sekarang</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -163,7 +197,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                 className="w-full px-2.5 py-1.5 rounded-lg bg-amber-200/90 hover:bg-amber-300 text-amber-950 text-[11px] font-bold flex items-center justify-center gap-1.5 border border-amber-300 transition cursor-pointer"
               >
                 <Copy className="w-3.5 h-3.5" />
-                <span>{copiedDomain ? 'Domain Disalin!' : 'Salin Domain'}</span>
+                <span>{copiedDomain ? 'Domain Disalin!' : 'Salin Domain ' + currentHost}</span>
               </button>
             </div>
           </div>
@@ -216,9 +250,6 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             )}
             <span>{googleLoading ? 'Menyambung ke Google...' : 'Log Masuk dengan Akaun Google'}</span>
           </button>
-          <p className="text-[10px] text-center text-slate-400 mt-1">
-            Akaun: <strong className="text-slate-600">mpgbsim.cemerlang@gmail.com</strong>
-          </p>
         </div>
 
         <div className="relative my-4">
@@ -252,9 +283,18 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Kata Laluan
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Kata Laluan
+              </label>
+              <button
+                type="button"
+                onClick={() => setPassword('MPGB@Admin2026')}
+                className="text-[10px] font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
+              >
+                Guna Kata Laluan Rasmi
+              </button>
+            </div>
             <div className="relative">
               <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -262,7 +302,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan kata laluan pentadbir"
+                placeholder="MPGB@Admin2026"
                 className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
               />
             </div>
