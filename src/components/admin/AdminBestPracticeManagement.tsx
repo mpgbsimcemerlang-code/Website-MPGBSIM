@@ -117,6 +117,7 @@ export const AdminBestPracticeManagement: React.FC = () => {
       year: item.year,
       badge: item.badge || 'Amalan Teladan Kebangsaan',
       status: item.status || 'published',
+      supportingDocs: item.supportingDocs || (item as any).driveUrl || '',
     });
     setOutcomesText((item.keyOutcomes || []).join('\n'));
     setEditingId(item.id);
@@ -435,6 +436,20 @@ export const AdminBestPracticeManagement: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Huraian kaedah pelaksanaan, cabaran yang diatasi, dan tatacara pelaksanaan..."
                   className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span>Pautan Dokumen / Modul Sokongan (Google Drive / Link Muat Turun)</span>
+                  <span className="text-[10px] text-teal-700 font-normal lowercase">Boleh dimuat turun oleh pengguna/pengetua lain</span>
+                </label>
+                <input
+                  type="url"
+                  value={formData.supportingDocs || ''}
+                  onChange={(e) => setFormData({ ...formData, supportingDocs: e.target.value })}
+                  placeholder="https://drive.google.com/file/d/1.../view atau https://..."
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-teal-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white font-mono text-teal-900"
                 />
               </div>
 

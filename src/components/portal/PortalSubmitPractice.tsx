@@ -87,6 +87,8 @@ export const PortalSubmitPractice: React.FC = () => {
       outcome: bpOutcome,
       lessonLearned: bpLessonLearned,
       supportingDocs: bpSupportingFile || undefined,
+      driveUrl: bpSupportingFile || undefined,
+      documentUrl: bpSupportingFile || undefined,
       images: bpImageUrl ? [bpImageUrl] : undefined,
       status,
       year: String(new Date().getFullYear()),
@@ -375,15 +377,24 @@ export const PortalSubmitPractice: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Nama Fail Dokumen Sokongan</label>
+              <div className="md:col-span-2">
+                <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-teal-900">
+                    <FileText className="w-4 h-4 text-teal-700" />
+                    Pautan Dokumen / Modul Sokongan (Google Drive / Link Muat Turun)
+                  </span>
+                  <span className="text-[10px] text-teal-700 font-medium">Diakses & dimuat turun oleh pengguna lain</span>
+                </label>
                 <input
-                  type="text"
+                  type="url"
                   value={bpSupportingFile}
                   onChange={(e) => setBpSupportingFile(e.target.value)}
-                  placeholder="Contoh: Modul_Ringkas_Kajian_Kes.pdf"
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white text-xs"
+                  placeholder="https://drive.google.com/file/d/1.../view atau https://drive.google.com/drive/folders/..."
+                  className="w-full p-3 rounded-xl bg-slate-50 border border-teal-300 focus:bg-white text-xs font-mono text-teal-900 shadow-2xs"
                 />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Masukkan pautan Google Drive, Dropbox, atau PDF modul amalan terbaik anda supaya pengguna/pengetua lain boleh muat turun.
+                </p>
               </div>
             </div>
 

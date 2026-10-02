@@ -156,6 +156,8 @@ export interface BestPracticeItem {
   lessonLearned?: string;
   images?: string[];
   supportingDocs?: string;
+  driveUrl?: string;
+  documentUrl?: string;
   status?: 'Draft' | 'Submitted' | 'Under Review' | 'Approved' | 'Published' | 'Rejected' | 'published' | 'draft';
   rejectionReason?: string;
   submittedDate?: string;

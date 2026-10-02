@@ -320,20 +320,33 @@ export const PortalBestPractice: React.FC = () => {
               </div>
 
               {/* Supporting document if available */}
-              {selectedPractice.supportingDocs && (
-                <div className="p-3.5 rounded-2xl bg-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-teal-800" />
-                    <span className="text-xs font-semibold text-slate-900">
-                      Dokumen Sokongan: {selectedPractice.supportingDocs}
-                    </span>
+              {(selectedPractice.supportingDocs || (selectedPractice as any).driveUrl || (selectedPractice as any).documentUrl) && (
+                <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <FileText className="w-5 h-5 text-teal-800 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-teal-950 block">
+                        Dokumen & Modul Sokongan Inovasi
+                      </span>
+                      <span className="text-[11px] text-teal-800 font-mono line-clamp-1">
+                        {selectedPractice.supportingDocs || (selectedPractice as any).driveUrl || 'Modul_Inovasi_Sekolah.pdf'}
+                      </span>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => alert(`Memuat turun dokumen sokongan: ${selectedPractice.supportingDocs}`)}
-                    className="px-3 py-1.5 bg-teal-800 text-white rounded-xl text-xs font-semibold"
+                  <a
+                    href={
+                      (selectedPractice as any).driveUrl ||
+                      (selectedPractice as any).documentUrl ||
+                      (selectedPractice.supportingDocs?.startsWith('http')
+                        ? selectedPractice.supportingDocs
+                        : 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link')
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-teal-800 hover:bg-teal-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
                   >
-                    Muat Turun
-                  </button>
+                    <span>Muat Turun Dokumen / Modul</span>
+                  </a>
                 </div>
               )}
             </div>
