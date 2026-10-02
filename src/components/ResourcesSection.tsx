@@ -18,7 +18,18 @@ export const ResourcesSection: React.FC<ResourcesSectionProps> = ({ resources })
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
 
   const handleDownload = (doc: ResourceDocument) => {
-    setDownloadNotice(`Memuat turun: ${doc.title} (${doc.fileFormat})`);
+    const targetDriveUrl =
+      doc.driveUrl ||
+      doc.fileUrl ||
+      `https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link`;
+
+    setDownloadNotice(`Membuka simpanan Google Drive: ${doc.title}`);
+
+    // Open Google Drive link in new window/tab
+    if (typeof window !== 'undefined') {
+      window.open(targetDriveUrl, '_blank', 'noopener,noreferrer');
+    }
+
     setTimeout(() => {
       setDownloadNotice(null);
     }, 4000);

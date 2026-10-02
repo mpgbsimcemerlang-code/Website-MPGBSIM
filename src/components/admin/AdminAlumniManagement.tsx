@@ -16,8 +16,10 @@ import {
   Quote,
   Eye,
   MessageSquare,
+  Upload,
 } from 'lucide-react';
 import { AlumniRecord, AlumniVerificationStatus } from '../../types';
+import { compressImageFile } from '../../utils/imageCompressor';
 
 interface AdminAlumniManagementProps {
   alumniList: AlumniRecord[];
@@ -50,8 +52,27 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
   const [editBio, setEditBio] = useState('');
   const [editQuote, setEditQuote] = useState('');
   const [editContribution, setEditContribution] = useState('');
+  const [editPhoto, setEditPhoto] = useState('');
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState('');
+
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressingPhoto(true);
+    try {
+      const dataUrl = await compressImageFile(file, 600, 600, 0.85);
+      if (dataUrl) {
+        setEditPhoto(dataUrl);
+      }
+    } catch (err) {
+      alert('Ralat memproses gambar: Sila pilih fail gambar PNG atau JPG.');
+    } finally {
+      setIsCompressingPhoto(false);
+    }
+  };
 
   const filteredAlumni = alumniList.filter((item) => {
     const matchesSearch =
@@ -93,6 +114,7 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
     setEditBio(alumni.biography || '');
     setEditQuote(alumni.legacyQuote || '');
     setEditContribution(alumni.contributions || '');
+    setEditPhoto(alumni.photo || '');
   };
 
   const handleSaveEdit = async () => {
@@ -102,6 +124,7 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
         biography: editBio,
         legacyQuote: editQuote,
         contributions: editContribution,
+        photo: editPhoto,
       });
       setEditingAlumni(null);
       setStatusMessage('Kandungan profil alumni berjaya dikemaskini!');
@@ -402,6 +425,34 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
             </h3>
 
             <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Gambar Profil Alumni
+                </label>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="w-16 h-16 rounded-xl bg-slate-200 border border-amber-400 overflow-hidden shrink-0 flex items-center justify-center relative">
+                    {editPhoto ? (
+                      <img src={editPhoto} alt="Profil Alumni" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-8 h-8 text-slate-400" />
+                    )}
+                    {isCompressingPhoto && (
+                      <div className="absolute inset-0 bg-slate-900/80 flex items-center justify-center text-amber-300 text-[9px] font-bold">
+                        Memproses...
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold rounded-lg cursor-pointer transition">
+                      <Upload className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Muat Naik Gambar Baharu</span>
+                      <input type="file" accept="image/*" onChange={handlePhotoFileChange} className="hidden" />
+                    </label>
+                    <p className="text-[10px] text-slate-500">Pilih gambar rasmi dari peranti anda. Dioptimumkan secara automatik.</p>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Pesanan Legasi (Quote)

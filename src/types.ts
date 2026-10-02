@@ -430,12 +430,14 @@ export interface SiteSettingsData {
 export interface ResourceDocument {
   id: string;
   title: string;
-  category: 'Pekeliling' | 'Garis Panduan' | 'Modul Kepimpinan' | 'Kertas Dasar';
+  category: 'Pekeliling' | 'Garis Panduan' | 'Modul Kepimpinan' | 'Kertas Dasar' | string;
   publishedDate: string;
   fileSize: string;
   fileFormat: string;
   downloads: number;
   description: string;
+  driveUrl?: string;
+  fileUrl?: string;
 }
 
 export interface NetworkStats {

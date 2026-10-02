@@ -17,6 +17,7 @@ export const CMSResources: React.FC = () => {
     publishedDate: new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }),
     downloads: 150,
     description: '',
+    driveUrl: 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
   });
 
   const showToast = (msg: string) => {
@@ -46,6 +47,7 @@ export const CMSResources: React.FC = () => {
         publishedDate: form.publishedDate || new Date().toLocaleDateString('ms-MY'),
         downloads: Number(form.downloads) || 100,
         description: form.description,
+        driveUrl: form.driveUrl || 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
       });
       showToast('Dokumen sumber berjaya dikemaskini!');
       setEditingId(null);
@@ -59,9 +61,10 @@ export const CMSResources: React.FC = () => {
         publishedDate: form.publishedDate || new Date().toLocaleDateString('ms-MY'),
         downloads: Number(form.downloads) || 1,
         description: form.description,
+        driveUrl: form.driveUrl || 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
       };
       addResource(newItem);
-      showToast('Dokumen sumber baharu berjaya diterbitkan!');
+      showToast('Dokumen sumber baharu berjaya diterbitkan ke Google Drive!');
     }
 
     setIsAdding(false);
@@ -73,6 +76,7 @@ export const CMSResources: React.FC = () => {
       publishedDate: new Date().toLocaleDateString('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }),
       downloads: 150,
       description: '',
+      driveUrl: 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
     });
   };
 
@@ -223,6 +227,20 @@ export const CMSResources: React.FC = () => {
                 onChange={(e) => setForm({ ...form, publishedDate: e.target.value })}
                 placeholder="Contoh: 12 Februari 2026"
                 className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-600"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span>Pautan Google Drive Simpanan Dokumen</span>
+                <span className="text-[10px] text-teal-700 font-normal">Button muat turun akan terus ke pautan ini</span>
+              </label>
+              <input
+                type="url"
+                value={form.driveUrl || ''}
+                onChange={(e) => setForm({ ...form, driveUrl: e.target.value })}
+                placeholder="https://drive.google.com/file/d/1.../view atau https://drive.google.com/drive/folders/..."
+                className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-teal-300 bg-white focus:ring-2 focus:ring-teal-600 font-mono text-teal-900"
               />
             </div>
 

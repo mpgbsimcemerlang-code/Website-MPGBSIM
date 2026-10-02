@@ -488,7 +488,8 @@ export const RESOURCE_DOCS: ResourceDocument[] = [
     fileSize: '4.2 MB',
     fileFormat: 'PDF',
     downloads: 1240,
-    description: 'Panduan lengkap piawaian tadbir urus kewangan, pengurusan sumber manusia dan etika kepimpinan bagi PGB.'
+    description: 'Panduan lengkap piawaian tadbir urus kewangan, pengurusan sumber manusia dan etika kepimpinan bagi PGB.',
+    driveUrl: 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
   },
   {
     id: 'res-2',
@@ -498,7 +499,8 @@ export const RESOURCE_DOCS: ResourceDocument[] = [
     fileSize: '2.8 MB',
     fileFormat: 'PDF',
     downloads: 890,
-    description: 'Garis panduan rasmi pengintegrasian kecerdasan buatan (GenAI) dalam kurikulum dan operasi harian sekolah.'
+    description: 'Garis panduan rasmi pengintegrasian kecerdasan buatan (GenAI) dalam kurikulum dan operasi harian sekolah.',
+    driveUrl: 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
   },
   {
     id: 'res-3',
@@ -508,7 +510,8 @@ export const RESOURCE_DOCS: ResourceDocument[] = [
     fileSize: '6.5 MB',
     fileFormat: 'PDF',
     downloads: 2150,
-    description: 'Modul latihan kepimpinan instruksional, kemahiran syura, pengurusan konflik dan pembinaan iklim sekolah mithali.'
+    description: 'Modul latihan kepimpinan instruksional, kemahiran syura, pengurusan konflik dan pembinaan iklim sekolah mithali.',
+    driveUrl: 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
   },
   {
     id: 'res-4',
@@ -518,7 +521,8 @@ export const RESOURCE_DOCS: ResourceDocument[] = [
     fileSize: '1.4 MB',
     fileFormat: 'PDF',
     downloads: 1680,
-    description: 'Surat pekeliling rasmi berhubung tatacara pengesahan keahlian tahunan dan hak perwakilan ke Konvensyen Kebangsaan.'
+    description: 'Surat pekeliling rasmi berhubung tatacara pengesahan keahlian tahunan dan hak perwakilan ke Konvensyen Kebangsaan.',
+    driveUrl: 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
   }
 ];
 
