@@ -187,9 +187,6 @@ function AppContent() {
         {/* 8. QUOTE */}
         <QuoteSection />
 
-        {/* SUMBER (Pekeliling & Modul PGB) */}
-        <ResourcesSection resources={siteData.resources || []} />
-
         {/* 10. CALL TO ACTION */}
         <CallToAction
           onJoinClick={handleOpenPortal}

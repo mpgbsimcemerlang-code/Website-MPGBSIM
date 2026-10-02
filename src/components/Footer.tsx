@@ -163,9 +163,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
             </h4>
             <ul className="space-y-2 text-xs">
               <li>
-                <a href="#sumber" className="hover:text-teal-400 transition-colors">
-                  Pekeliling & Modul PGB
-                </a>
+                <button
+                  type="button"
+                  onClick={onOpenPortal}
+                  className="hover:text-teal-400 transition-colors cursor-pointer text-left"
+                >
+                  Pusat Sumber Ahli (Khas Ahli PGB)
+                </button>
               </li>
               <li>
                 <a href="#berita" className="hover:text-teal-400 transition-colors">
