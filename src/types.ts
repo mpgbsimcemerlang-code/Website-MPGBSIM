@@ -1,5 +1,66 @@
 export type UserRole = 'PUBLIC' | 'MEMBER' | 'MEDIA_AJK' | 'ADMIN';
 
+export type AlumniVerificationStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+
+export interface LeadershipHistoryRecord {
+  id?: string;
+  schoolName: string;
+  position: 'Pengetua' | 'Guru Besar' | 'Penolong Kanan' | 'Pengarah' | string;
+  startYear: number;
+  endYear: number;
+  state?: string;
+  district?: string;
+  highlights?: string;
+}
+
+export interface AlumniConsent {
+  allowPublicDisplay: boolean;
+  allowSchoolHistory: boolean;
+  allowExpertise: boolean;
+  allowQuote: boolean;
+  allowContact: boolean;
+}
+
+export interface AlumniRecord {
+  id: string;
+  fullName: string;
+  title?: string; // Tan Sri, Datuk, Dr., Ustaz, Hj, Hjh, Cikgu
+  photo?: string;
+  gender: 'Lelaki' | 'Perempuan';
+  email: string;
+  phone: string;
+  state: string;
+  lastPosition: string;
+  lastSchool: string;
+  careerStartYear: number;
+  retirementYear: number;
+  leadershipHistory: LeadershipHistoryRecord[];
+  expertise: string[];
+  biography?: string;
+  currentOrganisation?: string;
+  awards?: string[];
+  achievements?: string[];
+  projects?: string[];
+  innovations?: string[];
+  contributions?: string;
+  mpgbsimRole?: string;
+  mpgbsimStartYear?: number;
+  mpgbsimEndYear?: number;
+  mpgbsimContribution?: string;
+  legacyQuote: string;
+  consent: AlumniConsent;
+  verificationStatus: AlumniVerificationStatus;
+  rejectionReason?: string;
+  submittedAt: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  featured?: boolean;
+  archived?: boolean;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;

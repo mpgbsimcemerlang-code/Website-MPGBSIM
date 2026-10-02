@@ -282,6 +282,28 @@
         "date": { "type": "string" }
       },
       "required": ["title", "type", "url"]
+    },
+    "Alumni": {
+      "title": "Alumni",
+      "description": "Rekod Jejak Kepimpinan dan Legasi Alumni PGB MPGBSIM",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "title": { "type": "string" },
+        "photo": { "type": "string" },
+        "gender": { "type": "string", "enum": ["Lelaki", "Perempuan"] },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "state": { "type": "string" },
+        "lastPosition": { "type": "string" },
+        "lastSchool": { "type": "string" },
+        "careerStartYear": { "type": "number" },
+        "retirementYear": { "type": "number" },
+        "legacyQuote": { "type": "string" },
+        "verificationStatus": { "type": "string", "enum": ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED"] },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["fullName", "lastPosition", "lastSchool", "verificationStatus", "submittedAt"]
     }
   },
   "firestore": {
@@ -296,6 +318,10 @@
     "/siteSettings/{settingId}": {
       "schema": { "$ref": "#/entities/SiteSettings" },
       "description": "Konfigurasi kandungan CMS laman web rasmi"
+    },
+    "/alumni/{alumniId}": {
+      "schema": { "$ref": "#/entities/Alumni" },
+      "description": "Direktori rasmi dan rekod Jejak Legasi Alumni PGB MPGBSIM"
     },
     "/media/{mediaId}": {
       "schema": { "$ref": "#/entities/Media" },

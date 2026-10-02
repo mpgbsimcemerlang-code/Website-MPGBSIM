@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
+import { AdminAlumniManagement } from '../admin/AdminAlumniManagement';
 
 export const PortalAdminDashboard: React.FC = () => {
   const {
@@ -37,10 +38,19 @@ export const PortalAdminDashboard: React.FC = () => {
     reviewSubmission,
   } = useMemberPortal();
 
-  const { siteData, approveMemberApplication, rejectMemberApplication } = useAdminContent();
+  const {
+    siteData,
+    approveMemberApplication,
+    rejectMemberApplication,
+    approveAlumniRecord,
+    rejectAlumniRecord,
+    updateAlumniRecord,
+    deleteAlumniRecord,
+    toggleFeatureAlumniRecord,
+  } = useAdminContent();
 
   const [activeAdminTab, setActiveAdminTab] = useState<
-    'overview' | 'submissions' | 'practices' | 'applications' | 'audit' | 'roles'
+    'overview' | 'submissions' | 'practices' | 'applications' | 'alumni' | 'audit' | 'roles'
   >('overview');
   const [auditSearch, setAuditSearch] = useState('');
   const [appFeedback, setAppFeedback] = useState<string | null>(null);
@@ -120,6 +130,7 @@ export const PortalAdminDashboard: React.FC = () => {
             { id: 'submissions', label: `Submisi (${pendingSubmissionsCount})` },
             { id: 'applications', label: `Permohonan (${pendingAppsCount})` },
             { id: 'practices', label: 'Amalan Terbaik' },
+            { id: 'alumni', label: `Alumni PGB (${siteData.alumni?.length || 0})` },
             ...(isAdmin ? [{ id: 'audit', label: 'Audit Log' }] : []),
           ].map((tab) => (
             <button
@@ -575,6 +586,21 @@ export const PortalAdminDashboard: React.FC = () => {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* VIEW: ALUMNI MANAGEMENT */}
+      {activeAdminTab === 'alumni' && (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
+          <AdminAlumniManagement
+            alumniList={siteData.alumni || []}
+            onApprove={approveAlumniRecord}
+            onReject={rejectAlumniRecord}
+            onUpdate={updateAlumniRecord}
+            onDelete={deleteAlumniRecord}
+            onToggleFeature={toggleFeatureAlumniRecord}
+            isMediaAjk={isMediaAJK}
+          />
         </div>
       )}
 

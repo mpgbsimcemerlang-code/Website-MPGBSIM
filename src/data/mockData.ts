@@ -9,6 +9,7 @@ import {
   ResourceDocument,
   NetworkStats,
   EventRegistration,
+  AlumniRecord,
 } from '../types';
 import faizLeaderPhoto from '../assets/images/mohamad_faiz_azizan_leader.webp';
 
@@ -710,5 +711,259 @@ export const DEFAULT_EVENT_REGISTRATIONS: EventRegistration[] = [
     notes: 'Panel Meja Bulat Zon Selatan',
   },
 ];
+
+export const SAMPLE_ALUMNI_RECORDS: AlumniRecord[] = [
+  {
+    id: 'alm-01',
+    fullName: "Dato' Haji Ishak bin Ahmad",
+    title: "Dato' Hj.",
+    photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    gender: 'Lelaki',
+    email: 'ishak.ahmad@alumni.mpgbsim.org',
+    phone: '+60 19-320 4455',
+    state: 'Selangor',
+    lastPosition: 'Mantan Pengetua Cemerlang',
+    lastSchool: 'SMKA Maahad Hamidiah Kajang',
+    careerStartYear: 1988,
+    retirementYear: 2022,
+    leadershipHistory: [
+      {
+        id: 'lh-1',
+        schoolName: "Sekolah Rendah Islam Hira' Shah Alam",
+        position: 'Guru Besar',
+        startYear: 1995,
+        endYear: 2003,
+        state: 'Selangor',
+        highlights: 'Memelopori kurikulum integrasi sains dan tahfiz'
+      },
+      {
+        id: 'lh-2',
+        schoolName: 'SAM Bestari Subang Jaya',
+        position: 'Pengetua',
+        startYear: 2003,
+        endYear: 2012,
+        state: 'Selangor',
+        highlights: 'Pencapaian Anugerah Sekolah Harapan Negara'
+      },
+      {
+        id: 'lh-3',
+        schoolName: 'SMKA Maahad Hamidiah Kajang',
+        position: 'Pengetua Cemerlang',
+        startYear: 2012,
+        endYear: 2022,
+        state: 'Selangor',
+        highlights: 'Melahirkan 150+ huffaz cemerlang akademik'
+      }
+    ],
+    expertise: ['Kepimpinan Rabbani', 'Pengurusan Kewangan Sekolah', 'Pembangunan Insan', 'Tadbir Urus Islah'],
+    biography: 'Mengabdi selama lebih 34 tahun dalam persada kepimpinan pendidikan Islam tanah air. Beliau dikenali atas ketegasan integriti dan inovasi pengurusan sekolah Rabbani.',
+    currentOrganisation: 'Lembaga Penasihat Pendidikan Islam Selangor',
+    awards: ['Anugerah Tokoh Guru Selangor 2023', 'Pingat Jasa Kebangsaan (PJK)', 'Anugerah Pengetua Cemerlang Kebangsaan'],
+    achievements: [
+      'Pelopor Program Tahfiz Model Ulul Albab Zon Tengah',
+      'Meningkatkan peratusan gred A+ SPM ke 98% di SMKA Hamidiah',
+      'Penulis Buku "Model Tadbir Urus Sekolah Islam Rabbani"'
+    ],
+    contributions: 'Menyumbang dalam merangka Standard Kompetensi Pentadbir Sekolah Islam Malaysia.',
+    mpgbsimRole: 'Mantan Pengerusi Biro Akademik MPGBSIM (2014–2020)',
+    mpgbsimStartYear: 2010,
+    mpgbsimEndYear: 2022,
+    mpgbsimContribution: 'Menerajui penyediaan Modul Kepimpinan PGB dan penganjuran KOPIK Zon Tengah.',
+    legacyQuote: 'Pendidikan Islam bukan sekadar menyampaikan ilmu pengetahuan, tetapi membina jiwa Rabbani yang menjadi benteng ummah dan tiang negara.',
+    consent: {
+      allowPublicDisplay: true,
+      allowSchoolHistory: true,
+      allowExpertise: true,
+      allowQuote: true,
+      allowContact: false,
+    },
+    verificationStatus: 'APPROVED',
+    submittedAt: '2026-08-10T10:00:00.000Z',
+    verifiedAt: '2026-08-12T14:30:00.000Z',
+    verifiedBy: 'Pentadbir Rasmi MPGBSIM',
+    featured: true,
+  },
+  {
+    id: 'alm-02',
+    fullName: 'Datin Hajah Salmah binti Yusof',
+    title: 'Datin Hjh.',
+    photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
+    gender: 'Perempuan',
+    email: 'salmah.yusof@alumni.mpgbsim.org',
+    phone: '+60 12-881 3344',
+    state: 'Negeri Sembilan',
+    lastPosition: 'Mantan Guru Besar Cemerlang',
+    lastSchool: 'Sekolah Rendah Islam Musleh Seri Seremban',
+    careerStartYear: 1992,
+    retirementYear: 2024,
+    leadershipHistory: [
+      {
+        id: 'lh-4',
+        schoolName: 'Sekolah Rendah Islam Al-Amin Bangi',
+        position: 'Guru Besar',
+        startYear: 1998,
+        endYear: 2010,
+        state: 'Selangor',
+        highlights: 'Mengembangkan enrolmen murid daripada 200 ke 1,200 orang'
+      },
+      {
+        id: 'lh-5',
+        schoolName: 'SRI Musleh Seri Seremban',
+        position: 'Guru Besar Cemerlang',
+        startYear: 2010,
+        endYear: 2024,
+        state: 'Negeri Sembilan',
+        highlights: 'Anugerah Sekolah Cemerlang KBAT Kebangsaan'
+      }
+    ],
+    expertise: ['Pengurusan Kurikulum Integrasi', 'Pedagogi Awal Kanak-kanak', 'Pementoran Guru Baharu'],
+    biography: 'Berpengalaman luas dalam memperkasakan pendidikan dasar Islam dan pembangunan sahsiah awal anak-anak Musleh.',
+    currentOrganisation: 'Konsultan Bebas Kurikulum Pendidikan Islam',
+    awards: ['Anugerah Tokoh Pentadbir Musleh 2022', 'Pingat Khidmat Cemerlang'],
+    achievements: [
+      'Peneraju Modul Pembentukan Sahsiah Rabbani (PSR) Sekolah Rendah',
+      'Pengasuh Lebih 50 Guru Besar Baharu Sekolah Islam'
+    ],
+    contributions: 'Membimbing puluhan sekolah rendah Islam persendirian mencapai akreditasi KPM.',
+    mpgbsimRole: 'Mantan Ahli Jawatankuasa Kebangsaan MPGBSIM (2016–2024)',
+    mpgbsimStartYear: 2012,
+    mpgbsimEndYear: 2024,
+    mpgbsimContribution: 'Memimpin Kluster Pembangunan Guru Besar Sekolah Rendah Islam.',
+    legacyQuote: 'Setiap anak adalah amanah suci. Sentuhlah hati mereka dengan kasih sayang Islam sebelum membentuk akal mereka dengan keilmuan.',
+    consent: {
+      allowPublicDisplay: true,
+      allowSchoolHistory: true,
+      allowExpertise: true,
+      allowQuote: true,
+      allowContact: false,
+    },
+    verificationStatus: 'APPROVED',
+    submittedAt: '2026-08-15T09:15:00.000Z',
+    verifiedAt: '2026-08-16T11:00:00.000Z',
+    verifiedBy: 'Pentadbir Rasmi MPGBSIM',
+    featured: true,
+  },
+  {
+    id: 'alm-03',
+    fullName: 'Dr. Ustaz Haji Ahmad Tajuddin bin Zakaria',
+    title: 'Dr. Ustaz',
+    photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    gender: 'Lelaki',
+    email: 'tajuddin.zakaria@alumni.mpgbsim.org',
+    phone: '+60 13-900 7711',
+    state: 'Kedah',
+    lastPosition: 'Mantan Pengetua & Penasihat Kurikulum',
+    lastSchool: 'Kolej Islam Sultan Alam Shah (KISAS)',
+    careerStartYear: 1985,
+    retirementYear: 2021,
+    leadershipHistory: [
+      {
+        id: 'lh-6',
+        schoolName: 'Sekolah Menengah Agama Persekutuan Kajang',
+        position: 'Pengetua',
+        startYear: 1992,
+        endYear: 2005,
+        state: 'Selangor',
+        highlights: 'Juara Debat Bahasa Arab & Bahasa Melayu Kebangsaan'
+      },
+      {
+        id: 'lh-7',
+        schoolName: 'Kolej Islam Sultan Alam Shah (KISAS)',
+        position: 'Pengetua',
+        startYear: 2005,
+        endYear: 2021,
+        state: 'Selangor',
+        highlights: 'Kedudukan Top 3 SPM Sekolah Berasrama Penuh Kebangsaan'
+      }
+    ],
+    expertise: ['Pengajian Islam & Bahasa Arab', 'Transformasi Digital Sekolah', 'Penyelidikan Educational Leadership'],
+    biography: 'Tokoh ilmuwan dan pentadbir yang menyatukan tradisi keilmuan Islam klasik dengan teknologi pengurusan moden.',
+    currentOrganisation: 'Profesor Pentadbiran Pendidikan (Pensyarah Pelawat)',
+    awards: ['Anugerah Tokoh Maal Hijrah 2023', 'Pingat Mahkota Kedah'],
+    achievements: [
+      'Memelopori sistem digital rekod pencapaian murid KISAS Online',
+      'Penerbitan 12 artikel ilmiah kepimpinan pendidikan Islam'
+    ],
+    contributions: 'Penceramah utama Wacana Kepimpinan PGB Kebangsaan.',
+    mpgbsimRole: 'Penasihat Kehormat Alumni MPGBSIM',
+    mpgbsimStartYear: 2008,
+    mpgbsimEndYear: 2021,
+    mpgbsimContribution: 'Penggubal Kerangka Pembangunan Kepimpinan Eksekutif PGB.',
+    legacyQuote: 'Integriti dan kerohanian pengetua adalah cermin utama keberkatan sesebuah sekolah Islam. Jangan sekali-kali kompromi terhadap kualiti agama.',
+    consent: {
+      allowPublicDisplay: true,
+      allowSchoolHistory: true,
+      allowExpertise: true,
+      allowQuote: true,
+      allowContact: false,
+    },
+    verificationStatus: 'APPROVED',
+    submittedAt: '2026-08-20T16:20:00.000Z',
+    verifiedAt: '2026-08-21T09:45:00.000Z',
+    verifiedBy: 'Pentadbir Rasmi MPGBSIM',
+    featured: true,
+  },
+  {
+    id: 'alm-04',
+    fullName: 'Hajah Wan Azizah binti Wan Ismail',
+    title: 'Hjh.',
+    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
+    gender: 'Perempuan',
+    email: 'wanazizah.ismail@alumni.mpgbsim.org',
+    phone: '+60 19-911 2233',
+    state: 'Kelantan',
+    lastPosition: 'Mantan Pengetua Cemerlang',
+    lastSchool: 'SMKA Naim Lilbanat Kota Bharu',
+    careerStartYear: 1990,
+    retirementYear: 2023,
+    leadershipHistory: [
+      {
+        id: 'lh-8',
+        schoolName: 'Sekolah Rendah Islam Aman Kota Bharu',
+        position: 'Guru Besar',
+        startYear: 1998,
+        endYear: 2011,
+        state: 'Kelantan',
+        highlights: 'Membangunkan cawangan baharu sekolah menengah'
+      },
+      {
+        id: 'lh-9',
+        schoolName: 'SMKA Naim Lilbanat Kota Bharu',
+        position: 'Pengetua Cemerlang',
+        startYear: 2011,
+        endYear: 2023,
+        state: 'Kelantan',
+        highlights: 'Pencapaian Johan Tilawah & Hafazan Antarabangsa'
+      }
+    ],
+    expertise: ['Tarbiah & Sahsiah Murid', 'Pengurusan Hal Ehwal Murid', 'Kepimpinan Wanita Islam'],
+    biography: 'Pendidik berjiwa murni yang menitikberatkan jati diri muslimah dan keunggulan akhlak murid-murid perempuan.',
+    currentOrganisation: 'Ahli Jawatankuasa Syariah & Pendidikan Kelantan',
+    awards: ['Anugerah Tokoh Wanite Pendidikan Kelantan 2024'],
+    achievements: [
+      'Anugerah Sekolah Unggul Kementerian Pendidikan Malaysia',
+      'Melahirkan puluhan kepimpinan wanita dalam agensi pendidikan'
+    ],
+    contributions: 'Penceramah jemputan Bengkel Sahsiah Rabbani PGB.',
+    mpgbsimRole: 'Mantan Pengerusi Biro Hal Ehwal Wanita MPGBSIM (2015–2023)',
+    mpgbsimStartYear: 2012,
+    mpgbsimEndYear: 2023,
+    mpgbsimContribution: 'Memperkasa pementoran pentadbir wanita di sekolah-sekolah Islam.',
+    legacyQuote: 'Didiklah anak-anak dengan keteguhan iman dan ketrampilan ilmu agar mereka mampu berdiri teguh di badai zaman tanpa menggadaikan maruah agama.',
+    consent: {
+      allowPublicDisplay: true,
+      allowSchoolHistory: true,
+      allowExpertise: true,
+      allowQuote: true,
+      allowContact: false,
+    },
+    verificationStatus: 'APPROVED',
+    submittedAt: '2026-08-25T11:00:00.000Z',
+    verifiedAt: '2026-08-26T14:10:00.000Z',
+    verifiedBy: 'Pentadbir Rasmi MPGBSIM',
+    featured: false,
+  }
+];
+
 
 

@@ -132,7 +132,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // 17. Connection validation test path
+    // 17. Alumni PGB MPGBSIM
+    match /alumni/{alumniId} {
+      allow read, write: if true;
+    }
+
+    // 18. Connection validation test path
     match /test/{testId} {
       allow read: if true;
     }

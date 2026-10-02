@@ -13,6 +13,7 @@ import {
   MemberApplication,
   DashboardConfig,
   EventRegistration,
+  AlumniRecord,
 } from '../types';
 import {
   LATEST_NEWS_LIST,
@@ -26,6 +27,7 @@ import {
   SAMPLE_MEMBER_SCHOOLS,
   SAMPLE_MEMBER_APPLICATIONS,
   DEFAULT_EVENT_REGISTRATIONS,
+  SAMPLE_ALUMNI_RECORDS,
 } from '../data/mockData';
 
 import {
@@ -154,6 +156,7 @@ export interface SiteContentState {
   memberApplications: MemberApplication[];
   dashboardConfig?: DashboardConfig;
   eventRegistrations?: EventRegistration[];
+  alumni?: AlumniRecord[];
 }
 
 export interface AdminUser {
@@ -253,6 +256,13 @@ interface AdminContentContextType {
   ) => Promise<{ success: boolean; message: string; registrationId?: string }>;
   updateEventRegistrationStatus: (regId: string, status: 'confirmed' | 'attended' | 'cancelled') => Promise<void>;
   deleteEventRegistration: (regId: string, eventId: string) => Promise<void>;
+  // Alumni PGB Management
+  addAlumniRecord: (item: Omit<AlumniRecord, 'id' | 'submittedAt'> | AlumniRecord) => Promise<string>;
+  updateAlumniRecord: (id: string, item: Partial<AlumniRecord>) => Promise<void>;
+  deleteAlumniRecord: (id: string) => Promise<void>;
+  approveAlumniRecord: (id: string, verifiedBy?: string) => Promise<void>;
+  rejectAlumniRecord: (id: string, reason: string, verifiedBy?: string) => Promise<void>;
+  toggleFeatureAlumniRecord: (id: string) => Promise<void>;
   resetAllContent: () => void;
 }
 
@@ -559,6 +569,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           submissions: saved.submissions?.length ? saved.submissions : INITIAL_SUBMISSIONS,
           memberApplications: sanitizeMemberApplicationsList(saved.memberApplications?.length ? saved.memberApplications : SAMPLE_MEMBER_APPLICATIONS),
           dashboardConfig: { ...DEFAULT_DASHBOARD_CONFIG, ...(saved.dashboardConfig || {}) },
+          alumni: saved.alumni?.length ? saved.alumni : SAMPLE_ALUMNI_RECORDS,
         };
       }
     } catch (e) {
@@ -583,6 +594,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       submissions: INITIAL_SUBMISSIONS,
       memberApplications: sanitizeMemberApplicationsList(SAMPLE_MEMBER_APPLICATIONS),
       dashboardConfig: DEFAULT_DASHBOARD_CONFIG,
+      alumni: SAMPLE_ALUMNI_RECORDS,
     };
   });
 
@@ -1013,6 +1025,34 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       unsubscribes.push(unsubDashboard);
     } catch (e) {
       console.warn('Dashboard Settings listener setup:', e);
+    }
+
+    // 6c. Alumni listener (Jejak Kepimpinan & Legasi Alumni PGB)
+    try {
+      const unsubAlumni = onSnapshot(
+        collection(db, 'alumni'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: AlumniRecord[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+            });
+            list.sort(
+              (a, b) =>
+                new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
+            );
+            setSiteData((prev) => ({ ...prev, alumni: list }));
+          } else {
+            setSiteData((prev) => ({ ...prev, alumni: SAMPLE_ALUMNI_RECORDS }));
+          }
+        },
+        (err) => {
+          console.warn('Firestore Alumni listener notification:', err.message);
+        }
+      );
+      unsubscribes.push(unsubAlumni);
+    } catch (e) {
+      console.warn('Alumni listener setup:', e);
     }
 
     // 7. Submissions listener (Admin only)
@@ -2482,6 +2522,112 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  // Alumni CRUD Implementations
+  const addAlumniRecord = async (
+    item: Omit<AlumniRecord, 'id' | 'submittedAt'> | AlumniRecord
+  ): Promise<string> => {
+    const id = (item as AlumniRecord).id || `alm-${Date.now()}`;
+    const now = new Date().toISOString();
+    const newRecord: AlumniRecord = {
+      ...item,
+      id,
+      submittedAt: (item as AlumniRecord).submittedAt || now,
+      createdAt: (item as AlumniRecord).createdAt || now,
+      updatedAt: now,
+      verificationStatus: (item as AlumniRecord).verificationStatus || 'SUBMITTED',
+      consent: item.consent || {
+        allowPublicDisplay: true,
+        allowSchoolHistory: true,
+        allowExpertise: true,
+        allowQuote: true,
+        allowContact: false,
+      },
+      leadershipHistory: item.leadershipHistory || [],
+      expertise: item.expertise || [],
+      legacyQuote: item.legacyQuote || '',
+    };
+
+    setSiteData((prev) => {
+      const updated = [newRecord, ...(prev.alumni || [])];
+      return { ...prev, alumni: updated };
+    });
+
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      await setDoc(doc(db, 'alumni', id), newRecord);
+    } catch (e) {
+      console.warn('Firestore addAlumniRecord notice:', e);
+    }
+    return id;
+  };
+
+  const updateAlumniRecord = async (
+    id: string,
+    item: Partial<AlumniRecord>
+  ): Promise<void> => {
+    const now = new Date().toISOString();
+    const patch = { ...item, updatedAt: now };
+
+    setSiteData((prev) => {
+      const updated = (prev.alumni || []).map((a) => (a.id === id ? { ...a, ...patch } : a));
+      return { ...prev, alumni: updated };
+    });
+
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      await updateDoc(doc(db, 'alumni', id), patch);
+    } catch (e) {
+      console.warn('Firestore updateAlumniRecord notice:', e);
+    }
+  };
+
+  const deleteAlumniRecord = async (id: string): Promise<void> => {
+    setSiteData((prev) => ({
+      ...prev,
+      alumni: (prev.alumni || []).filter((a) => a.id !== id),
+    }));
+
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      await deleteDoc(doc(db, 'alumni', id));
+    } catch (e) {
+      console.warn('Firestore deleteAlumniRecord notice:', e);
+    }
+  };
+
+  const approveAlumniRecord = async (
+    id: string,
+    verifiedBy = 'Pentadbir Rasmi MPGBSIM'
+  ): Promise<void> => {
+    const now = new Date().toISOString();
+    await updateAlumniRecord(id, {
+      verificationStatus: 'APPROVED',
+      verifiedAt: now,
+      verifiedBy,
+    });
+  };
+
+  const rejectAlumniRecord = async (
+    id: string,
+    reason: string,
+    verifiedBy = 'Pentadbir Rasmi MPGBSIM'
+  ): Promise<void> => {
+    const now = new Date().toISOString();
+    await updateAlumniRecord(id, {
+      verificationStatus: 'REJECTED',
+      rejectionReason: reason,
+      verifiedAt: now,
+      verifiedBy,
+    });
+  };
+
+  const toggleFeatureAlumniRecord = async (id: string): Promise<void> => {
+    const target = (siteData.alumni || []).find((a) => a.id === id);
+    if (target) {
+      await updateAlumniRecord(id, { featured: !target.featured });
+    }
+  };
+
   const resetAllContent = () => {
     setSiteData({
       branding: DEFAULT_BRANDING,
@@ -2574,6 +2720,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         registerForEvent,
         updateEventRegistrationStatus,
         deleteEventRegistration,
+        addAlumniRecord,
+        updateAlumniRecord,
+        deleteAlumniRecord,
+        approveAlumniRecord,
+        rejectAlumniRecord,
+        toggleFeatureAlumniRecord,
         resetAllContent,
       }}
     >

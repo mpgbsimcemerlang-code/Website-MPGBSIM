@@ -21,6 +21,7 @@ import {
   BarChart3,
   Quote,
   FileText,
+  GraduationCap,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { AdminDashboardOverview } from './admin/AdminDashboardOverview';
@@ -33,6 +34,7 @@ import { AdminMediaManagement } from './admin/AdminMediaManagement';
 import { AdminSiteSettings } from './admin/AdminSiteSettings';
 import { AdminLeadershipManagement } from './admin/AdminLeadershipManagement';
 import { AdminStatsManagement } from './admin/AdminStatsManagement';
+import { AdminAlumniManagement } from './admin/AdminAlumniManagement';
 import { CMSHero } from './cms/CMSHero';
 import { CMSVisionMission } from './cms/CMSVisionMission';
 import { CMSStrategicFocus } from './cms/CMSStrategicFocus';
@@ -50,7 +52,19 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
   onClose,
   initialTab = 'dashboard',
 }) => {
-  const { adminUser, logoutAdmin, syncAllToFirestore, siteData, syncStatus, lastSyncedAt } = useAdminContent();
+  const {
+    adminUser,
+    logoutAdmin,
+    syncAllToFirestore,
+    siteData,
+    syncStatus,
+    lastSyncedAt,
+    approveAlumniRecord,
+    rejectAlumniRecord,
+    updateAlumniRecord,
+    deleteAlumniRecord,
+    toggleFeatureAlumniRecord,
+  } = useAdminContent();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -107,6 +121,12 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           label: 'Direktori Sekolah Ahli',
           icon: School,
           count: siteData.memberSchools?.length || 0,
+        },
+        {
+          id: 'alumni-pgb',
+          label: 'Alumni PGB MPGBSIM',
+          icon: GraduationCap,
+          count: siteData.alumni?.length || 0,
         },
       ],
     },
@@ -359,6 +379,16 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
               <AdminApplicationManagement onNavigateToSchools={() => setActiveTab('sekolah-ahli')} />
             )}
             {activeTab === 'sekolah-ahli' && <AdminSchoolManagement />}
+            {activeTab === 'alumni-pgb' && (
+              <AdminAlumniManagement
+                alumniList={siteData.alumni || []}
+                onApprove={approveAlumniRecord}
+                onReject={rejectAlumniRecord}
+                onUpdate={updateAlumniRecord}
+                onDelete={deleteAlumniRecord}
+                onToggleFeature={toggleFeatureAlumniRecord}
+              />
+            )}
             {activeTab === 'hero' && <CMSHero />}
             {activeTab === 'visi-misi' && <CMSVisionMission />}
             {activeTab === 'fokus-strategik' && <CMSStrategicFocus />}

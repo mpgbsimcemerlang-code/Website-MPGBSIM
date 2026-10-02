@@ -14,6 +14,7 @@ import { BestPracticeSection } from './components/BestPractice';
 import { UpcomingProgramsSection } from './components/UpcomingPrograms';
 import { SchoolNetworkSection } from './components/SchoolNetwork';
 import { LeadershipSection } from './components/LeadershipSection';
+import { AlumniPublicSection } from './components/alumni/AlumniPublicSection';
 import { QuoteSection } from './components/QuoteSection';
 import { ResourcesSection } from './components/ResourcesSection';
 import { CallToAction } from './components/CallToAction';
@@ -50,6 +51,7 @@ function AppContent() {
     setIsCMSOpen,
     isLoginModalOpen,
     setIsLoginModalOpen,
+    addAlumniRecord,
   } = useAdminContent();
 
   const { viewMode, setViewMode } = useMemberPortal();
@@ -175,6 +177,12 @@ function AppContent() {
 
         {/* KEPIMPINAN (Barisan Kepimpinan PGB Kebangsaan - Managed via CMS) */}
         <LeadershipSection leaders={siteData.leadership || []} />
+
+        {/* ALUMNI PGB MPGBSIM (Jejak Kepimpinan & Legasi Pendidikan) */}
+        <AlumniPublicSection
+          alumniList={siteData.alumni || []}
+          onAddAlumniRecord={addAlumniRecord}
+        />
 
         {/* 8. QUOTE */}
         <QuoteSection />
