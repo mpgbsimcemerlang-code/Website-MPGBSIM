@@ -713,18 +713,8 @@ export const PortalLoginView: React.FC = () => {
                           {showSchoolPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
-                      <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500">
-                        <span>Format laluan rasmi: <strong className="text-amber-400 font-mono">PGB#{schoolToAuth.code}</strong></span>
-                        <button
-                          type="button"
-                          onClick={() => setSchoolAuthPass(`PGB#${schoolToAuth.code}`)}
-                          className="text-amber-400 hover:underline cursor-pointer"
-                        >
-                          Isi Automatik
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        Sekiranya anda belum menerima kata laluan rasmi, hubungi Urus Setia MPGBSIM di mpgbsim.cemerlang@gmail.com.
+                      <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                        Sila masukkan kata laluan akaun sekolah anda. Sekiranya anda telah menukar kata laluan di profil, sila gunakan kata laluan baharu tersebut.
                       </p>
                     </div>
 
@@ -873,7 +863,7 @@ export const PortalLoginView: React.FC = () => {
                   type="button"
                   onClick={() => {
                     setEmailInput('abdulqayyumyaakop@imuslehmelaka.edu.my');
-                    setPasswordInput('PGB#MJAC011');
+                    setPasswordInput('');
                   }}
                   className="w-full p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-amber-400/50 text-left transition flex items-center justify-between group cursor-pointer"
                 >
@@ -885,8 +875,8 @@ export const PortalLoginView: React.FC = () => {
                       Sekolah Rendah Islam I Musleh (Kod: MJAC011)
                     </span>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 font-mono shrink-0">
-                    PGB#MJAC011
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-mono shrink-0">
+                    Isi Emel Ahli
                   </span>
                 </button>
               </div>

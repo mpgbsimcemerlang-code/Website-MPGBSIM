@@ -1171,23 +1171,6 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     // Verify password for registered school (check matched.password, custom password in Firestore, or defaults)
-    let customUserPasswordMatch = false;
-    try {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      usersSnap.forEach((uDoc) => {
-        const uData = uDoc.data();
-        if (
-          uData.email &&
-          (uData.email.toLowerCase() === input.toLowerCase() ||
-            (matched!.email && uData.email.toLowerCase() === matched!.email.toLowerCase()))
-        ) {
-          if (uData.portalPassword && uData.portalPassword === cleanPass) {
-            customUserPasswordMatch = true;
-          }
-        }
-      });
-    } catch (e) {}
-
     const isMuslehSchool =
       matched.id === 'sch-musleh-1' ||
       matched.code === 'MJAC011' ||
@@ -1195,18 +1178,72 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       matched.name.toLowerCase().includes('musleh') ||
       (matched.email && matched.email.toLowerCase().includes('imusleh'));
 
-    const expectedPassword = matched.password || `PGB#${matched.code?.toUpperCase()}` || 'MPGB2026!';
-    const isValidPass =
-      customUserPasswordMatch ||
-      cleanPass === matched.password ||
-      cleanPass === expectedPassword ||
-      (isMuslehSchool && (cleanPass === 'PGB#MJAC011' || cleanPass === 'PGB#MIA1009')) ||
-      cleanPass === 'MPGB2026!';
+    let customPasswordSet: string | null = null;
+
+    // 1. Check Firestore 'users' collection for custom password set by user
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      usersSnap.forEach((uDoc) => {
+        const uData = uDoc.data();
+        const uEmail = (uData.email || '').toLowerCase().trim();
+        const uCode = (uData.schoolCode || '').toLowerCase().trim();
+        const uMem = (uData.membershipNo || '').toLowerCase().trim();
+        const inputLower = input.toLowerCase().trim();
+
+        if (
+          uEmail === inputLower ||
+          uCode === inputLower ||
+          uMem.includes(inputLower) ||
+          (matched.email && uEmail === matched.email.toLowerCase().trim()) ||
+          (matched.code && uCode === matched.code.toLowerCase().trim()) ||
+          (isMuslehSchool && (uCode === 'mjac011' || uCode === 'mia1009' || uEmail.includes('imusleh')))
+        ) {
+          if (uData.portalPassword && uData.portalPassword.trim().length > 0) {
+            customPasswordSet = uData.portalPassword.trim();
+          }
+        }
+      });
+    } catch (e) {}
+
+    // 2. Check matched school object in 'schools' collection
+    if (!customPasswordSet && matched.password) {
+      const defaultFormats = [
+        `PGB#${matched.code?.toUpperCase()}`,
+        'PGB#MJAC011',
+        'PGB#MIA1009',
+        'MPGB2026!',
+      ];
+      if ((matched as any).passwordUpdatedAt || !defaultFormats.includes(matched.password)) {
+        customPasswordSet = matched.password.trim();
+      }
+    }
+
+    // 3. Perform strict password validation
+    let isValidPass = false;
+
+    if (customPasswordSet) {
+      // If user has changed their password, ONLY the new custom password is valid! Default formats like PGB#MJAC011 are REJECTED.
+      isValidPass = cleanPass === customPasswordSet;
+    } else {
+      // If no custom password has been set yet, allow initial default formats
+      const expectedPassword = matched.password || `PGB#${matched.code?.toUpperCase()}` || 'MPGB2026!';
+      isValidPass =
+        cleanPass === matched.password ||
+        cleanPass === expectedPassword ||
+        (isMuslehSchool && (cleanPass === 'PGB#MJAC011' || cleanPass === 'PGB#MIA1009')) ||
+        cleanPass === 'MPGB2026!';
+    }
 
     if (!isValidPass) {
-      throw new Error(
-        `Kata laluan tidak tepat bagi institusi ${matched.name}. Sila masukkan kata laluan akaun sekolah yang sah.`
-      );
+      if (customPasswordSet) {
+        throw new Error(
+          `Kata laluan tidak tepat. Anda telah menukar kata laluan akaun ini — format asal (PGB#${matched.code}) tidak lagi sah. Sila masukkan kata laluan baharu anda.`
+        );
+      } else {
+        throw new Error(
+          `Kata laluan tidak tepat bagi institusi ${matched.name}. Sila masukkan kata laluan akaun sekolah yang sah.`
+        );
+      }
     }
 
     // Authenticate as registered member school!
