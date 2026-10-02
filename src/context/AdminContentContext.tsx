@@ -945,7 +945,22 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
+
+            // Ensure canonical documents from RESOURCE_DOCS are seeded into Firestore if missing
+            RESOURCE_DOCS.forEach((res) => {
+              if (!list.some((existing) => existing.id === res.id || existing.title.toLowerCase().trim() === res.title.toLowerCase().trim())) {
+                setDoc(doc(db, 'resources', res.id), res, { merge: true }).catch(() => {});
+                list.push(res);
+              }
+            });
+
             setSiteData((prev) => ({ ...prev, resources: list }));
+          } else {
+            // Seed all default RESOURCE_DOCS into Firestore if collection is completely empty
+            RESOURCE_DOCS.forEach((res) => {
+              setDoc(doc(db, 'resources', res.id), res, { merge: true }).catch(() => {});
+            });
+            setSiteData((prev) => ({ ...prev, resources: RESOURCE_DOCS }));
           }
         },
         (err) => {
