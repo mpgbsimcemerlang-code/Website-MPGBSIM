@@ -689,10 +689,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             }
             setAnnouncements(list);
           } else if (!isSeeded && INITIAL_ANNOUNCEMENTS.length > 0) {
+            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
             INITIAL_ANNOUNCEMENTS.forEach((item) => {
               setDoc(doc(db, 'announcements', item.id), item, { merge: true }).catch(() => {});
             });
-            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
             setAnnouncements(INITIAL_ANNOUNCEMENTS);
           } else {
             setAnnouncements([]);
@@ -710,16 +710,25 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubDoc = onSnapshot(
         collection(db, 'documents'),
         (snapshot) => {
+          const isSeeded = localStorage.getItem('mpgbsim_documents_seeded') === 'true';
+
           if (!snapshot.empty) {
             const list: PortalDocument[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
+            if (!isSeeded) {
+              localStorage.setItem('mpgbsim_documents_seeded', 'true');
+            }
             setDocuments(list);
-          } else if (INITIAL_DOCUMENTS.length > 0) {
+          } else if (!isSeeded && INITIAL_DOCUMENTS.length > 0) {
+            localStorage.setItem('mpgbsim_documents_seeded', 'true');
             INITIAL_DOCUMENTS.forEach((item) => {
               setDoc(doc(db, 'documents', item.id), item, { merge: true }).catch(() => {});
             });
+            setDocuments(INITIAL_DOCUMENTS);
+          } else {
+            setDocuments([]);
           }
         },
         (err) => console.warn('Firestore documents listener notification:', err.message)

@@ -1067,10 +1067,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             setSiteData((prev) => ({ ...prev, alumni: list }));
           } else if (!isSeeded) {
             // Seed default SAMPLE_ALUMNI_RECORDS into Firestore ONCE on initial setup
+            localStorage.setItem('mpgbsim_alumni_seeded', 'true');
             SAMPLE_ALUMNI_RECORDS.forEach((rec) => {
               setDoc(doc(db, 'alumni', rec.id), rec, { merge: true }).catch(() => {});
             });
-            localStorage.setItem('mpgbsim_alumni_seeded', 'true');
             setSiteData((prev) => ({ ...prev, alumni: SAMPLE_ALUMNI_RECORDS }));
           } else {
             // Collection is empty because all alumni records were deleted by admin
@@ -1109,10 +1109,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             setSiteData((prev) => ({ ...prev, announcements: list }));
           } else if (!isSeeded) {
             // Seed default INITIAL_ANNOUNCEMENTS into Firestore ONCE on initial setup
+            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
             INITIAL_ANNOUNCEMENTS.forEach((item) => {
               setDoc(doc(db, 'announcements', item.id), item, { merge: true }).catch(() => {});
             });
-            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
             setSiteData((prev) => ({ ...prev, announcements: INITIAL_ANNOUNCEMENTS }));
           } else {
             setSiteData((prev) => ({ ...prev, announcements: [] }));
@@ -1177,7 +1177,6 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                   d.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
                   (d.schoolName && d.schoolName.toLowerCase().includes('musleh'))
                 ) {
-                  deleteDoc(doc(db, 'memberApplications', docSnap.id)).catch(() => {});
                   return;
                 }
                 list.push({
