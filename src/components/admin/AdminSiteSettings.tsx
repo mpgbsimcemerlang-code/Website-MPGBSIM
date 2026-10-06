@@ -46,7 +46,39 @@ export const AdminSiteSettings: React.FC = () => {
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep form in sync when siteData loads or updates from Firestore
+  React.useEffect(() => {
+    if (siteData.branding) {
+      setBrandingForm((prev) => ({
+        ...prev,
+        logoUrl: siteData.branding.logoUrl || prev.logoUrl,
+        orgName: siteData.branding.orgName || prev.orgName,
+        shortName: siteData.branding.shortName || prev.shortName,
+        motto: siteData.branding.motto || prev.motto,
+        subMotto: siteData.branding.subMotto || prev.subMotto,
+        secondaryContext: siteData.branding.secondaryContext || prev.secondaryContext,
+        establishedYear: siteData.branding.establishedYear || prev.establishedYear,
+        registrationNumber: siteData.branding.registrationNumber || prev.registrationNumber,
+      }));
+    }
+    if (siteData.contactInfo) {
+      setContactForm((prev) => ({
+        ...prev,
+        email: siteData.contactInfo.email || prev.email,
+        phone: siteData.contactInfo.phone || prev.phone,
+        whatsapp: siteData.contactInfo.whatsapp || prev.whatsapp,
+        address: siteData.contactInfo.address || prev.address,
+        operatingHours: siteData.contactInfo.operatingHours || prev.operatingHours,
+        socialFacebook: siteData.contactInfo.socialFacebook || prev.socialFacebook,
+        socialYoutube: siteData.contactInfo.socialYoutube || prev.socialYoutube,
+        socialTelegram: siteData.contactInfo.socialTelegram || prev.socialTelegram,
+        socialInstagram: siteData.contactInfo.socialInstagram || prev.socialInstagram,
+      }));
+    }
+  }, [siteData.branding, siteData.contactInfo]);
 
   const handleLogoUpload = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -66,20 +98,32 @@ export const AdminSiteSettings: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateBranding(brandingForm);
-    await updateContactInfo(contactForm);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setSaving(true);
+    try {
+      await updateBranding(brandingForm);
+      await updateContactInfo(contactForm);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
+    } catch (err) {
+      console.error('Ralat menyimpan tetapan:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSaveAndSyncCloud = async () => {
-    updateBranding(brandingForm);
-    await updateContactInfo(contactForm);
     setSyncing(true);
-    await syncAllToFirestore();
-    setSyncing(false);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    try {
+      await updateBranding(brandingForm);
+      await updateContactInfo(contactForm);
+      await syncAllToFirestore();
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
+    } catch (err) {
+      console.error('Ralat menyegerakkan ke cloud:', err);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -97,18 +141,19 @@ export const AdminSiteSettings: React.FC = () => {
           <button
             type="button"
             onClick={handleSaveAndSyncCloud}
-            disabled={syncing}
-            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition flex items-center gap-2 shadow-xs"
+            disabled={syncing || saving}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition flex items-center gap-2 shadow-xs disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            <span>{syncing ? 'Menyegerak...' : 'Simpan & Segerak Firestore'}</span>
+            <span>{syncing ? 'Menyegerak Cloud...' : 'Simpan & Segerak Firestore'}</span>
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition flex items-center gap-2 shadow-md shadow-teal-900/20"
+            disabled={saving || syncing}
+            className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition flex items-center gap-2 shadow-md shadow-teal-900/20 disabled:opacity-50 cursor-pointer"
           >
-            <Save className="w-3.5 h-3.5" />
-            <span>Simpan Tetapan</span>
+            <Save className={`w-3.5 h-3.5 ${saving ? 'animate-spin' : ''}`} />
+            <span>{saving ? 'Sedang Menyimpan...' : 'Simpan Tetapan'}</span>
           </button>
         </div>
       </div>

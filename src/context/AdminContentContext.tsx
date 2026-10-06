@@ -1559,21 +1559,30 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     ).catch(() => {});
   };
 
-  const updateBranding = (data: Partial<BrandingData>) => {
-    const updated = { ...siteData.branding, ...data };
-    setSiteData((prev) => ({
-      ...prev,
-      branding: updated,
-    }));
-    saveCmsContentToFirestore({ branding: updated });
-    setDoc(
-      doc(db, 'siteSettings', 'general'),
-      {
-        branding: updated,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    ).catch(() => {});
+  const updateBranding = async (data: Partial<BrandingData>) => {
+    let nextBranding: BrandingData = { ...siteData.branding, ...data };
+    setSiteData((prev) => {
+      nextBranding = { ...prev.branding, ...data };
+      const nextState = { ...prev, branding: nextBranding };
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
+    saveCmsContentToFirestore({ branding: nextBranding });
+    try {
+      await setDoc(
+        doc(db, 'siteSettings', 'general'),
+        {
+          branding: nextBranding,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore update branding notice:', e);
+    }
+    try {
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    } catch (e) {}
   };
 
   const updateVisionMission = (data: Partial<VisionMissionData>) => {
@@ -2337,16 +2346,19 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // 6. Contact Info & Settings
   const updateContactInfo = async (data: Partial<ContactInfoData>) => {
-    const updated = { ...siteData.contactInfo, ...data };
-    setSiteData((prev) => ({
-      ...prev,
-      contactInfo: updated,
-    }));
+    let nextContact: ContactInfoData = { ...siteData.contactInfo, ...data };
+    setSiteData((prev) => {
+      nextContact = { ...prev.contactInfo, ...data };
+      const nextState = { ...prev, contactInfo: nextContact };
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
+    saveCmsContentToFirestore({ contactInfo: nextContact });
     try {
       await setDoc(
         doc(db, 'siteSettings', 'general'),
         {
-          contactInfo: updated,
+          contactInfo: nextContact,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -2354,6 +2366,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {
       console.warn('Firestore update contact notice:', e);
     }
+    try {
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    } catch (e) {}
   };
 
   // 7. Submissions CRUD
