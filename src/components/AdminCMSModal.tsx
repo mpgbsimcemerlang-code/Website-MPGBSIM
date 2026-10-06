@@ -22,6 +22,7 @@ import {
   Quote,
   FileText,
   GraduationCap,
+  Megaphone,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { AdminDashboardOverview } from './admin/AdminDashboardOverview';
@@ -35,6 +36,7 @@ import { AdminSiteSettings } from './admin/AdminSiteSettings';
 import { AdminLeadershipManagement } from './admin/AdminLeadershipManagement';
 import { AdminStatsManagement } from './admin/AdminStatsManagement';
 import { AdminAlumniManagement } from './admin/AdminAlumniManagement';
+import { AdminAnnouncementsManagement } from './admin/AdminAnnouncementsManagement';
 import { CMSHero } from './cms/CMSHero';
 import { CMSVisionMission } from './cms/CMSVisionMission';
 import { CMSStrategicFocus } from './cms/CMSStrategicFocus';
@@ -180,6 +182,12 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     {
       group: 'Aktiviti & Pengumuman',
       items: [
+        {
+          id: 'pengumuman-portal',
+          label: 'Pusat Pengumuman & Pekeliling Ahli',
+          icon: Megaphone,
+          count: siteData.announcements?.length || 0,
+        },
         {
           id: 'berita',
           label: 'Pengurusan Berita',
@@ -395,6 +403,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
             {activeTab === 'kepimpinan' && <AdminLeadershipManagement />}
             {activeTab === 'statistik' && <AdminStatsManagement />}
             {activeTab === 'berita' && <AdminNewsManagement />}
+            {activeTab === 'pengumuman-portal' && <AdminAnnouncementsManagement />}
             {activeTab === 'program' && <AdminEventManagement />}
             {activeTab === 'amalan' && <AdminBestPracticeManagement />}
             {activeTab === 'galeri' && <AdminMediaManagement />}

@@ -14,6 +14,7 @@ import {
   DashboardConfig,
   EventRegistration,
   AlumniRecord,
+  AnnouncementItem,
 } from '../types';
 import {
   LATEST_NEWS_LIST,
@@ -29,6 +30,7 @@ import {
   DEFAULT_EVENT_REGISTRATIONS,
   SAMPLE_ALUMNI_RECORDS,
 } from '../data/mockData';
+import { INITIAL_ANNOUNCEMENTS } from '../data/portalMockData';
 
 import {
   persistSiteContent,
@@ -157,6 +159,7 @@ export interface SiteContentState {
   dashboardConfig?: DashboardConfig;
   eventRegistrations?: EventRegistration[];
   alumni?: AlumniRecord[];
+  announcements?: AnnouncementItem[];
 }
 
 export interface AdminUser {
@@ -1081,6 +1084,47 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       unsubscribes.push(unsubAlumni);
     } catch (e) {
       console.warn('Alumni listener setup:', e);
+    }
+
+    // 6d. Announcements listener
+    try {
+      const unsubAnnouncements = onSnapshot(
+        collection(db, 'announcements'),
+        (snapshot) => {
+          const isSeeded = localStorage.getItem('mpgbsim_announcements_seeded') === 'true';
+
+          if (!snapshot.empty) {
+            const list: AnnouncementItem[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+            });
+            list.sort((a, b) => {
+              if (a.pinned && !b.pinned) return -1;
+              if (!a.pinned && b.pinned) return 1;
+              return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+            });
+            if (!isSeeded) {
+              localStorage.setItem('mpgbsim_announcements_seeded', 'true');
+            }
+            setSiteData((prev) => ({ ...prev, announcements: list }));
+          } else if (!isSeeded) {
+            // Seed default INITIAL_ANNOUNCEMENTS into Firestore ONCE on initial setup
+            INITIAL_ANNOUNCEMENTS.forEach((item) => {
+              setDoc(doc(db, 'announcements', item.id), item, { merge: true }).catch(() => {});
+            });
+            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
+            setSiteData((prev) => ({ ...prev, announcements: INITIAL_ANNOUNCEMENTS }));
+          } else {
+            setSiteData((prev) => ({ ...prev, announcements: [] }));
+          }
+        },
+        (err) => {
+          console.warn('Firestore Announcements listener notification:', err.message);
+        }
+      );
+      unsubscribes.push(unsubAnnouncements);
+    } catch (e) {
+      console.warn('Announcements listener setup:', e);
     }
 
     // 7. Submissions listener (Admin only)
