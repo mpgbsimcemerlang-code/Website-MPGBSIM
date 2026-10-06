@@ -146,6 +146,8 @@ export const AdminAnnouncementsManagement: React.FC = () => {
     }
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formContent.trim()) {
@@ -153,6 +155,7 @@ export const AdminAnnouncementsManagement: React.FC = () => {
       return;
     }
 
+    setIsSaving(true);
     const payload: Partial<AnnouncementItem> = {
       title: formTitle.trim(),
       category: formCategory,
@@ -179,6 +182,8 @@ export const AdminAnnouncementsManagement: React.FC = () => {
       setIsEditorOpen(false);
     } catch (e: any) {
       alert('Ralat menyimpan pengumuman: ' + e.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -600,10 +605,17 @@ export const AdminAnnouncementsManagement: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold flex items-center gap-2 shadow-md cursor-pointer"
+                  disabled={isSaving}
+                  className="px-6 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
                 >
-                  <Send className="w-4 h-4" />
-                  <span>{editingId ? 'Kemaskini Pengumuman' : 'Terbitkan Pengumuman Baharu'}</span>
+                  <Send className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isSaving
+                      ? 'Sedang Menyimpan...'
+                      : editingId
+                      ? 'Kemaskini Pengumuman'
+                      : 'Terbitkan Pengumuman Baharu'}
+                  </span>
                 </button>
               </div>
             </form>

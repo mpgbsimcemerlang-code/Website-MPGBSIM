@@ -672,16 +672,30 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAnn = onSnapshot(
         collection(db, 'announcements'),
         (snapshot) => {
+          const isSeeded = localStorage.getItem('mpgbsim_announcements_seeded') === 'true';
+
           if (!snapshot.empty) {
             const list: AnnouncementItem[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
+            list.sort((a, b) => {
+              if (a.pinned && !b.pinned) return -1;
+              if (!a.pinned && b.pinned) return 1;
+              return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+            });
+            if (!isSeeded) {
+              localStorage.setItem('mpgbsim_announcements_seeded', 'true');
+            }
             setAnnouncements(list);
-          } else if (INITIAL_ANNOUNCEMENTS.length > 0) {
+          } else if (!isSeeded && INITIAL_ANNOUNCEMENTS.length > 0) {
             INITIAL_ANNOUNCEMENTS.forEach((item) => {
               setDoc(doc(db, 'announcements', item.id), item, { merge: true }).catch(() => {});
             });
+            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
+            setAnnouncements(INITIAL_ANNOUNCEMENTS);
+          } else {
+            setAnnouncements([]);
           }
         },
         (err) => console.warn('Firestore announcements listener notification:', err.message)
@@ -1613,16 +1627,29 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const createAnnouncement = async (announcementData: Omit<AnnouncementItem, 'id'>) => {
-    const id = `ann-${Date.now()}`;
-    const newAnn: AnnouncementItem = { ...announcementData, id };
-    setAnnouncements((prev) => [newAnn, ...prev]);
+    const id = (announcementData as any).id || `ann-${Date.now()}`;
+    const newAnn: AnnouncementItem = {
+      ...announcementData,
+      id,
+      date: announcementData.date || new Date().toISOString().split('T')[0],
+      status: announcementData.status || 'published',
+    };
+    setAnnouncements((prev) => {
+      const filtered = prev.filter((a) => a.id !== id);
+      return [newAnn, ...filtered];
+    });
     recordAuditLog('Cipta Pengumuman', `Mencipta pengumuman baharu: "${newAnn.title}"`);
 
     try {
-      await setDoc(doc(db, 'announcements', id), newAnn);
+      await setDoc(doc(db, 'announcements', id), newAnn, { merge: true });
+      localStorage.setItem('mpgbsim_announcements_seeded', 'true');
     } catch (e) {
-      // local
+      console.warn('Firestore createAnnouncement notice:', e);
     }
+    try {
+      window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    } catch (e) {}
   };
 
   const updateAnnouncement = async (id: string, updates: Partial<AnnouncementItem>) => {
@@ -1630,15 +1657,29 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     recordAuditLog('Kemas Kini Pengumuman', `Mengemas kini pengumuman ID: ${id}`);
 
     try {
-      await updateDoc(doc(db, 'announcements', id), updates);
+      await setDoc(doc(db, 'announcements', id), updates, { merge: true });
+      localStorage.setItem('mpgbsim_announcements_seeded', 'true');
+    } catch (e) {
+      console.warn('Firestore updateAnnouncement notice:', e);
+    }
+    try {
+      window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
     } catch (e) {}
   };
 
   const deleteAnnouncement = async (id: string) => {
+    localStorage.setItem('mpgbsim_announcements_seeded', 'true');
     setAnnouncements((prev) => prev.filter((a) => a.id !== id));
     recordAuditLog('Padam Pengumuman', `Memadam pengumuman ID: ${id}`);
     try {
       await deleteDoc(doc(db, 'announcements', id));
+    } catch (e) {
+      console.warn('Firestore deleteAnnouncement notice:', e);
+    }
+    try {
+      window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
     } catch (e) {}
   };
 
