@@ -59,7 +59,20 @@ export const UpcomingProgramsSection: React.FC<UpcomingProgramsProps> = ({
 
         {/* Programs Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {programs.map((prog) => {
+          {[...programs]
+            .sort((a, b) => {
+              const getTime = (p: ProgramEvent) => {
+                if (p.closingDate && /^\d{4}-\d{2}-\d{2}$/.test(p.closingDate)) {
+                  return new Date(p.closingDate).getTime();
+                }
+                const matchIso = (p.date || '').match(/(\d{4}-\d{2}-\d{2})/);
+                if (matchIso) return new Date(matchIso[1]).getTime();
+                const parsed = new Date(p.date || '').getTime();
+                return isNaN(parsed) ? 0 : parsed;
+              };
+              return getTime(a) - getTime(b);
+            })
+            .map((prog) => {
             const fillPercentage = Math.round((prog.spotsFilled / prog.spotsTotal) * 100);
 
             return (
@@ -150,6 +163,13 @@ export const UpcomingProgramsSection: React.FC<UpcomingProgramsProps> = ({
                         <Users className="w-4 h-4 text-slate-400 shrink-0" />
                         <span className="truncate">Sasaran: {prog.targetAudience}</span>
                       </div>
+
+                      {prog.closingDate && (
+                        <div className="flex items-center gap-2 sm:col-span-2 text-rose-800 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200 font-bold text-[11px]">
+                          <Clock className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                          <span>Tutup Pendaftaran: {prog.closingDate}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Capacity progress */}

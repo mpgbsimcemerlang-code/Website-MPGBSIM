@@ -91,16 +91,45 @@ export const AdminEventManagement: React.FC = () => {
 
   const programsList = siteData.programs || [];
 
-  // Filter events
-  const filteredEvents = programsList.filter((item) => {
-    const itemStatus = item.status || 'upcoming';
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.theme && item.theme.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      item.venue.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || itemStatus === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  const parseEventTimestamp = (prog: ProgramEvent): number => {
+    if (prog.closingDate && /^\d{4}-\d{2}-\d{2}$/.test(prog.closingDate)) {
+      return new Date(prog.closingDate).getTime();
+    }
+    const dateStr = prog.date || '';
+    const matchIso = dateStr.match(/(\d{4}-\d{2}-\d{2})/);
+    if (matchIso) {
+      return new Date(matchIso[1]).getTime();
+    }
+    const malayMonths: Record<string, string> = {
+      januari: '01', februari: '02', mac: '03', april: '04', mei: '05', jun: '06',
+      julai: '07', ogos: '08', september: '09', oktober: '10', november: '11', disember: '12'
+    };
+    const lowerStr = dateStr.toLowerCase();
+    for (const [mName, mNum] of Object.entries(malayMonths)) {
+      if (lowerStr.includes(mName)) {
+        const yearMatch = lowerStr.match(/\b(20\d\d)\b/);
+        const dayMatch = lowerStr.match(/\b(\d{1,2})\b/);
+        const year = yearMatch ? yearMatch[1] : '2026';
+        const day = dayMatch ? dayMatch[1].padStart(2, '0') : '01';
+        return new Date(`${year}-${mNum}-${day}`).getTime();
+      }
+    }
+    const parsed = new Date(dateStr).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // Filter & sort events chronologically from nearest/latest date onwards
+  const filteredEvents = programsList
+    .filter((item) => {
+      const itemStatus = item.status || 'upcoming';
+      const matchesSearch =
+        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.theme && item.theme.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        item.venue.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || itemStatus === filterStatus;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => parseEventTimestamp(a) - parseEventTimestamp(b));
 
   // Filter participant registrations
   const filteredRegistrations = (eventRegistrations || []).filter((reg) => {
@@ -526,6 +555,12 @@ export const AdminEventManagement: React.FC = () => {
                               <MapPin className="w-3.5 h-3.5 text-slate-400" />
                               <span className="truncate max-w-[200px]">{item.venue}</span>
                             </span>
+                            {item.closingDate && (
+                              <span className="flex items-center gap-1 font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                <Clock className="w-3.5 h-3.5 text-rose-600" />
+                                Tutup Pendaftaran: {item.closingDate}
+                              </span>
+                            )}
                           </div>
 
                           {/* Live Capacity Bar inside Card */}
@@ -1069,7 +1104,7 @@ export const AdminEventManagement: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Sasaran Peserta
@@ -1083,8 +1118,20 @@ export const AdminEventManagement: React.FC = () => {
                   />
                 </div>
                 <div>
+                  <label className="block font-bold text-rose-900 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span>Tutup Pendaftaran</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.closingDate || ''}
+                    onChange={(e) => setFormData({ ...formData, closingDate: e.target.value })}
+                    placeholder="cth: 10 Oktober 2026 atau 2026-10-10"
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-rose-300 focus:outline-hidden focus:ring-2 focus:ring-rose-600 bg-white font-medium text-slate-900 shadow-2xs"
+                  />
+                </div>
+                <div>
                   <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Jumlah Kapasiti Kuota *
+                    Jumlah Kuota *
                   </label>
                   <input
                     type="number"

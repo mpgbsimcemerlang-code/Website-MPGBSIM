@@ -52,14 +52,43 @@ export const PortalPrograms: React.FC = () => {
 
   const canManage = currentRole === 'ADMIN' || currentRole === 'MEDIA_AJK';
 
-  const filteredPrograms = programs.filter((p) => {
-    if (filterMode === 'Semua') return true;
-    if (filterMode === 'Didaftar') return registeredProgramIds.includes(p.id);
-    if (filterMode === 'Fizikal') return p.mode === 'Fizikal';
-    if (filterMode === 'Dalam Talian') return p.mode === 'Dalam Talian';
-    if (filterMode === 'Hibrid') return p.mode === 'Hibrid';
-    return true;
-  });
+  const parseEventTimestamp = (prog: ProgramEvent): number => {
+    if (prog.closingDate && /^\d{4}-\d{2}-\d{2}$/.test(prog.closingDate)) {
+      return new Date(prog.closingDate).getTime();
+    }
+    const dateStr = prog.date || '';
+    const matchIso = dateStr.match(/(\d{4}-\d{2}-\d{2})/);
+    if (matchIso) {
+      return new Date(matchIso[1]).getTime();
+    }
+    const malayMonths: Record<string, string> = {
+      januari: '01', februari: '02', mac: '03', april: '04', mei: '05', jun: '06',
+      julai: '07', ogos: '08', september: '09', oktober: '10', november: '11', disember: '12'
+    };
+    const lowerStr = dateStr.toLowerCase();
+    for (const [mName, mNum] of Object.entries(malayMonths)) {
+      if (lowerStr.includes(mName)) {
+        const yearMatch = lowerStr.match(/\b(20\d\d)\b/);
+        const dayMatch = lowerStr.match(/\b(\d{1,2})\b/);
+        const year = yearMatch ? yearMatch[1] : '2026';
+        const day = dayMatch ? dayMatch[1].padStart(2, '0') : '01';
+        return new Date(`${year}-${mNum}-${day}`).getTime();
+      }
+    }
+    const parsed = new Date(dateStr).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const filteredPrograms = programs
+    .filter((p) => {
+      if (filterMode === 'Semua') return true;
+      if (filterMode === 'Didaftar') return registeredProgramIds.includes(p.id);
+      if (filterMode === 'Fizikal') return p.mode === 'Fizikal';
+      if (filterMode === 'Dalam Talian') return p.mode === 'Dalam Talian';
+      if (filterMode === 'Hibrid') return p.mode === 'Hibrid';
+      return true;
+    })
+    .sort((a, b) => parseEventTimestamp(a) - parseEventTimestamp(b));
 
   const handleRegister = async (progId: string) => {
     const prog = programs.find((p) => p.id === progId);
@@ -257,6 +286,13 @@ export const PortalPrograms: React.FC = () => {
                       <span className="truncate">{prog.venue}</span>
                     </div>
                   </div>
+
+                  {prog.closingDate && (
+                    <div className="flex items-center gap-2 text-rose-800 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200 text-xs font-bold w-fit">
+                      <Clock className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span>Tarikh Tutup Pendaftaran: {prog.closingDate}</span>
+                    </div>
+                  )}
 
                   {/* Live Capacity Bar */}
                   {(() => {
