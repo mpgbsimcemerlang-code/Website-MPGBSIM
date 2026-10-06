@@ -29,6 +29,9 @@ import {
   Eye,
   Filter,
   MessageCircle,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { ProgramEvent, EventRegistration } from '../../types';
@@ -40,6 +43,7 @@ export const AdminEventManagement: React.FC = () => {
     addProgram,
     updateProgram,
     deleteProgram,
+    reorderPrograms,
     eventRegistrations,
     registerForEvent,
     updateEventRegistrationStatus,
@@ -118,7 +122,7 @@ export const AdminEventManagement: React.FC = () => {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // Filter & sort events chronologically from nearest/latest date onwards
+  // Filter & sort events primarily by order if set, then chronologically
   const filteredEvents = programsList
     .filter((item) => {
       const itemStatus = item.status || 'upcoming';
@@ -129,7 +133,34 @@ export const AdminEventManagement: React.FC = () => {
       const matchesStatus = filterStatus === 'all' || itemStatus === filterStatus;
       return matchesSearch && matchesStatus;
     })
-    .sort((a, b) => parseEventTimestamp(a) - parseEventTimestamp(b));
+    .sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      if (a.order !== undefined) return -1;
+      if (b.order !== undefined) return 1;
+      return parseEventTimestamp(a) - parseEventTimestamp(b);
+    });
+
+  const handleMoveProgramUp = async (eventItem: ProgramEvent) => {
+    const currentIndex = filteredEvents.findIndex((p) => p.id === eventItem.id);
+    if (currentIndex <= 0) return;
+    const newArr = [...filteredEvents];
+    const temp = newArr[currentIndex];
+    newArr[currentIndex] = newArr[currentIndex - 1];
+    newArr[currentIndex - 1] = temp;
+    await reorderPrograms(newArr);
+  };
+
+  const handleMoveProgramDown = async (eventItem: ProgramEvent) => {
+    const currentIndex = filteredEvents.findIndex((p) => p.id === eventItem.id);
+    if (currentIndex < 0 || currentIndex >= filteredEvents.length - 1) return;
+    const newArr = [...filteredEvents];
+    const temp = newArr[currentIndex];
+    newArr[currentIndex] = newArr[currentIndex + 1];
+    newArr[currentIndex + 1] = temp;
+    await reorderPrograms(newArr);
+  };
 
   // Filter participant registrations
   const filteredRegistrations = (eventRegistrations || []).filter((reg) => {
@@ -183,6 +214,7 @@ export const AdminEventManagement: React.FC = () => {
     fees: 'Percuma untuk Ahli MPGBSIM',
     posterUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800',
     status: 'upcoming',
+    order: (programsList.length || 0) + 1,
   };
 
   const [formData, setFormData] = useState<Omit<ProgramEvent, 'id'>>(initialFormState);
@@ -210,14 +242,17 @@ export const AdminEventManagement: React.FC = () => {
   };
 
   const handleOpenAdd = () => {
-    setFormData(initialFormState);
+    setFormData({
+      ...initialFormState,
+      order: (programsList.length || 0) + 1,
+    });
     setEditingId(null);
     setUploadError(null);
     setShowUrlFallback(false);
     setIsEditing(true);
   };
 
-  const handleOpenEdit = (item: ProgramEvent) => {
+  const handleOpenEdit = (item: ProgramEvent, index: number) => {
     setFormData({
       title: item.title,
       theme: item.theme,
@@ -234,6 +269,7 @@ export const AdminEventManagement: React.FC = () => {
       fees: item.fees,
       posterUrl: item.posterUrl || '',
       status: item.status || 'upcoming',
+      order: item.order !== undefined ? item.order : index + 1,
     });
     setEditingId(item.id);
     setUploadError(null);
@@ -491,7 +527,7 @@ export const AdminEventManagement: React.FC = () => {
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {filteredEvents.map((item) => {
+                {filteredEvents.map((item, index) => {
                   const status = item.status || 'upcoming';
                   const spotsTotal = item.spotsTotal || 100;
                   const spotsFilled = item.spotsFilled || 0;
@@ -515,6 +551,31 @@ export const AdminEventManagement: React.FC = () => {
                         />
                         <div className="flex-1 min-w-0 space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
+                            {/* Order Badge & Reorder Controls */}
+                            <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg text-slate-800 text-[10px] font-bold">
+                              <span>Susunan #{item.order || index + 1}</span>
+                              <div className="flex items-center gap-0.5 border-l border-slate-300 pl-1 ml-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveProgramUp(item)}
+                                  disabled={index === 0}
+                                  className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-30 text-slate-700 transition cursor-pointer"
+                                  title="Alih Ke Atas (Susun Dahulu)"
+                                >
+                                  <ArrowUp className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveProgramDown(item)}
+                                  disabled={index === filteredEvents.length - 1}
+                                  className="p-0.5 rounded hover:bg-slate-200 disabled:opacity-30 text-slate-700 transition cursor-pointer"
+                                  title="Alih Ke Bawah"
+                                >
+                                  <ArrowDown className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+
                             <span
                               className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                 status === 'upcoming'
@@ -609,7 +670,7 @@ export const AdminEventManagement: React.FC = () => {
                             {status === 'upcoming' ? 'Tukar Lepas' : 'Akan Datang'}
                           </button>
                           <button
-                            onClick={() => handleOpenEdit(item)}
+                            onClick={() => handleOpenEdit(item, index)}
                             className="p-2 rounded-lg text-slate-600 hover:text-teal-700 hover:bg-slate-100 transition cursor-pointer"
                             title="Sunting Acara"
                           >
@@ -977,18 +1038,35 @@ export const AdminEventManagement: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="py-4 space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nama Program / Acara *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="cth: Kolokium Kepimpinan Pengetua Sekolah Islam Kebangsaan 2026"
-                  className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Nama Program / Acara *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="cth: Kolokium Kepimpinan Pengetua Sekolah Islam Kebangsaan 2026"
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-teal-900 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <span>Kedudukan / Susunan *</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={formData.order || 1}
+                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 1 })}
+                    placeholder="1"
+                    className="w-full px-3.5 py-2 text-xs font-bold text-teal-900 rounded-xl border border-teal-300 bg-teal-50/50 focus:outline-hidden focus:ring-2 focus:ring-teal-600"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

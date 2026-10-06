@@ -209,6 +209,7 @@ interface AdminContentContextType {
   addProgram: (item: ProgramEvent) => Promise<void>;
   updateProgram: (id: string, item: Partial<ProgramEvent>) => Promise<void>;
   deleteProgram: (id: string) => Promise<void>;
+  reorderPrograms: (reordered: ProgramEvent[]) => Promise<void>;
   addPractice: (item: BestPracticeItem) => Promise<void>;
   updatePractice: (id: string, item: Partial<BestPracticeItem>) => Promise<void>;
   deletePractice: (id: string) => Promise<void>;
@@ -1702,6 +1703,27 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  const reorderPrograms = async (reordered: ProgramEvent[]) => {
+    const orderedList = reordered.map((item, idx) => ({
+      ...item,
+      order: idx + 1,
+    }));
+    setSiteData((prev) => ({
+      ...prev,
+      programs: orderedList,
+    }));
+    for (const item of orderedList) {
+      try {
+        await updateDoc(doc(db, 'events', item.id), {
+          order: item.order,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   // Event Registration & Live Capacity Management
   const registerForEvent = async (
     eventId: string,
@@ -2784,6 +2806,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         addProgram,
         updateProgram,
         deleteProgram,
+        reorderPrograms,
         addPractice,
         updatePractice,
         deletePractice,

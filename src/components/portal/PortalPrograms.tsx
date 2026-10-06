@@ -88,7 +88,14 @@ export const PortalPrograms: React.FC = () => {
       if (filterMode === 'Hibrid') return p.mode === 'Hibrid';
       return true;
     })
-    .sort((a, b) => parseEventTimestamp(a) - parseEventTimestamp(b));
+    .sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      if (a.order !== undefined) return -1;
+      if (b.order !== undefined) return 1;
+      return parseEventTimestamp(a) - parseEventTimestamp(b);
+    });
 
   const handleRegister = async (progId: string) => {
     const prog = programs.find((p) => p.id === progId);

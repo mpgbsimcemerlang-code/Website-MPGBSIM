@@ -185,6 +185,7 @@ export interface ProgramEvent {
   registrationLink?: string;
   status?: 'Upcoming' | 'Ongoing' | 'Completed' | 'upcoming' | 'past' | 'cancelled';
   registeredUserIds?: string[];
+  order?: number;
 }
 
 export interface EventRegistration {

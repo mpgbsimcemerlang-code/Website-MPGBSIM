@@ -61,6 +61,12 @@ export const UpcomingProgramsSection: React.FC<UpcomingProgramsProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {[...programs]
             .sort((a, b) => {
+              if (a.order !== undefined && b.order !== undefined) {
+                return a.order - b.order;
+              }
+              if (a.order !== undefined) return -1;
+              if (b.order !== undefined) return 1;
+
               const getTime = (p: ProgramEvent) => {
                 if (p.closingDate && /^\d{4}-\d{2}-\d{2}$/.test(p.closingDate)) {
                   return new Date(p.closingDate).getTime();
