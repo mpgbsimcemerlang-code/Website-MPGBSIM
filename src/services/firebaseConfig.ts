@@ -121,6 +121,13 @@ export const savePendingRegistration = async (
     console.warn('Firestore submission fallback:', firestoreErr);
   }
 
+  // Dispatch content update event so CMS and Admin Views reload applications in real-time
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    }
+  } catch (e) {}
+
   return {
     success: true,
     message: 'Permohonan keahlian berjaya dihantar ke Urus Setia MPGBSIM.',

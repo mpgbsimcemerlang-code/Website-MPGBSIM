@@ -430,17 +430,89 @@ const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[]
   }
 };
 
+const getPendingRegistrationsFromStorage = (): MemberApplication[] => {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('mpgbsim_pending_registrations') : null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item: any) => ({
+          id: item.id || item.refId || `MPGB-${Date.now()}`,
+          refId: item.refId || item.id || `MPGB-${Date.now()}`,
+          fullName: item.fullName || item.name || 'Pemohon',
+          icNumber: item.icNumber || '',
+          email: item.email || item.pgbEmail || '',
+          phoneNumber: item.phoneNumber || item.phone || item.pgbPhone || '',
+          pgbEmail: item.pgbEmail || item.email || '',
+          pgbPhone: item.pgbPhone || item.phone || item.phoneNumber || '',
+          schoolEmail: item.schoolEmail || '',
+          schoolPhone: item.schoolPhone || '',
+          designation: item.designation || item.position || 'Pengetua',
+          serviceStartYear: Number(item.serviceStartYear || item.pgbStartYear) || 2026,
+          pgbStartYear: Number(item.pgbStartYear || item.serviceStartYear) || 2026,
+          joinYear: Number(item.joinYear || item.schoolJoinYear) || new Date().getFullYear(),
+          schoolJoinYear: Number(item.schoolJoinYear || item.joinYear) || new Date().getFullYear(),
+          schoolName: item.schoolName || '',
+          schoolCode: item.schoolCode || '',
+          schoolType: item.schoolType || 'Sekolah Menengah',
+          state: item.state || 'Selangor',
+          district: item.district || '',
+          website: item.website || '',
+          studentCount: Number(item.studentCount) || 0,
+          teacherCount: Number(item.teacherCount) || 0,
+          logoUrl: item.logoUrl || '',
+          schoolPhotoUrl: item.schoolPhotoUrl || '',
+          pgbPhotoUrl: item.pgbPhotoUrl || '',
+          schoolDescription: item.schoolDescription || '',
+          address: item.address || '',
+          status: (item.status === 'approved' || item.status === 'Lulus') ? 'approved' : (item.status === 'rejected' || item.status === 'Ditolak') ? 'rejected' : 'pending',
+          submittedAt: item.submittedAt || new Date().toISOString(),
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn('getPendingRegistrationsFromStorage notice:', e);
+  }
+  return [];
+};
+
 const sanitizeMemberApplicationsList = (apps: MemberApplication[] = []): MemberApplication[] => {
-  return apps.filter((app) => {
-    // Exclude Sekolah Rendah Islam I Musleh because it is already an official registered member school in the directory
+  const pendingFromLocal = getPendingRegistrationsFromStorage();
+  const combined = [...pendingFromLocal, ...(apps || [])];
+  const map = new Map<string, MemberApplication>();
+
+  const normalizeStatus = (st?: string): 'pending' | 'approved' | 'rejected' => {
+    if (!st) return 'pending';
+    const lower = st.toLowerCase();
+    if (lower === 'approved' || lower === 'lulus' || lower === 'disahkan') return 'approved';
+    if (lower === 'rejected' || lower === 'ditolak') return 'rejected';
+    return 'pending';
+  };
+
+  combined.forEach((app) => {
+    if (!app || !app.id) return;
     const isAlreadyRegisteredMusleh =
       app.id === 'app-musleh-01' ||
       app.schoolCode === 'MJAC011' ||
       app.schoolCode === 'MIA1009' ||
       app.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
       (app.schoolName && app.schoolName.toLowerCase().includes('musleh'));
-    return !isAlreadyRegisteredMusleh;
+
+    if (isAlreadyRegisteredMusleh) return;
+
+    const existing = map.get(app.id);
+    const newStatus = normalizeStatus(app.status);
+    if (!existing || (existing.status === 'pending' && newStatus !== 'pending')) {
+      map.set(app.id, {
+        ...app,
+        status: newStatus,
+      });
+    }
   });
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
+  );
 };
 
 const sanitizeLeadershipList = (list: LeaderProfile[] = []): LeaderProfile[] => {
@@ -665,15 +737,16 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     const handleContentUpdated = () => {
       try {
         const saved = localStorage.getItem(STORAGE_KEYS.SITE_CONTENT);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.memberSchools && parsed.memberSchools.length > 0) {
-            setSiteData((prev) => ({
-              ...prev,
-              memberSchools: sanitizeMemberSchoolsList(parsed.memberSchools),
-            }));
-          }
-        }
+        const parsed = saved ? JSON.parse(saved) : {};
+        setSiteData((prev) => ({
+          ...prev,
+          memberSchools: parsed.memberSchools && parsed.memberSchools.length > 0
+            ? sanitizeMemberSchoolsList(parsed.memberSchools)
+            : prev.memberSchools,
+          memberApplications: sanitizeMemberApplicationsList(
+            parsed.memberApplications?.length ? parsed.memberApplications : prev.memberApplications
+          ),
+        }));
       } catch (e) {
         console.warn('Error handling content update event:', e);
       }
@@ -1128,95 +1201,101 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Announcements listener setup:', e);
     }
 
-    // 7. Submissions listener (Admin only)
-    if (adminUser) {
-      try {
-        const unsubSubmissions = onSnapshot(
-          collection(db, 'submissions'),
-          (snapshot) => {
-            if (!snapshot.empty) {
-              const list: ContactSubmission[] = [];
-              snapshot.forEach((docSnap) => {
-                const d = docSnap.data();
-                list.push({
-                  id: docSnap.id,
-                  name: d.name || 'Pengirim',
-                  email: d.email || '',
-                  phone: d.phone || '',
-                  subject: d.subject || 'Pertanyaan Umum',
-                  message: d.message || '',
-                  date: d.createdAt || new Date().toISOString(),
-                  status: d.status || 'unread',
-                });
+    // 7. Submissions listener
+    try {
+      const unsubSubmissions = onSnapshot(
+        collection(db, 'submissions'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: ContactSubmission[] = [];
+            snapshot.forEach((docSnap) => {
+              const d = docSnap.data();
+              list.push({
+                id: docSnap.id,
+                name: d.name || 'Pengirim',
+                email: d.email || '',
+                phone: d.phone || '',
+                subject: d.subject || 'Pertanyaan Umum',
+                message: d.message || '',
+                date: d.createdAt || new Date().toISOString(),
+                status: d.status || 'unread',
               });
-              setSiteData((prev) => ({ ...prev, submissions: list }));
-            }
-          },
-          (err) => {
-            console.warn('Firestore Submissions listener notification:', err.message);
+            });
+            setSiteData((prev) => ({ ...prev, submissions: list }));
           }
-        );
-        unsubscribes.push(unsubSubmissions);
-      } catch (e) {
-        console.warn('Submissions listener setup:', e);
-      }
+        },
+        (err) => {
+          console.warn('Firestore Submissions listener notification:', err.message);
+        }
+      );
+      unsubscribes.push(unsubSubmissions);
+    } catch (e) {
+      console.warn('Submissions listener setup:', e);
+    }
 
-      // 8. Member Applications listener (Admin only)
-      try {
-        const unsubApplications = onSnapshot(
-          collection(db, 'memberApplications'),
-          (snapshot) => {
-            if (!snapshot.empty) {
-              const list: MemberApplication[] = [];
-              snapshot.forEach((docSnap) => {
-                const d = docSnap.data();
-                // If it is Musleh, it is already a registered member school, clean it up from applications
-                if (
-                  docSnap.id === 'app-musleh-01' ||
-                  d.schoolCode === 'MJAC011' ||
-                  d.schoolCode === 'MIA1009' ||
-                  d.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-                  (d.schoolName && d.schoolName.toLowerCase().includes('musleh'))
-                ) {
-                  return;
-                }
-                list.push({
-                  id: docSnap.id,
-                  refId: d.refId || docSnap.id,
-                  fullName: d.fullName || 'Pemohon',
-                  icNumber: d.icNumber || '',
-                  email: d.email || '',
-                  phoneNumber: d.phoneNumber || '',
-                  designation: d.designation || 'Pengetua',
-                  serviceStartYear: Number(d.serviceStartYear) || 2026,
-                  schoolName: d.schoolName || '',
-                  schoolCode: d.schoolCode || '',
-                  schoolType: d.schoolType || 'Maahad Tahfiz',
-                  state: d.state || '',
-                  district: d.district || '',
-                  website: d.website || '',
-                  studentCount: Number(d.studentCount) || 0,
-                  teacherCount: Number(d.teacherCount) || 0,
-                  logoUrl: d.logoUrl || '',
-                  schoolDescription: d.schoolDescription || '',
-                  address: d.address || '',
-                  status: d.status || 'pending',
-                  submittedAt: d.submittedAt || new Date().toISOString(),
-                  approvedAt: d.approvedAt,
-                  approvedBy: d.approvedBy,
-                });
+    // 8. Member Applications listener
+    try {
+      const unsubApplications = onSnapshot(
+        collection(db, 'memberApplications'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: MemberApplication[] = [];
+            snapshot.forEach((docSnap) => {
+              const d = docSnap.data();
+              if (
+                docSnap.id === 'app-musleh-01' ||
+                d.schoolCode === 'MJAC011' ||
+                d.schoolCode === 'MIA1009' ||
+                d.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+                (d.schoolName && d.schoolName.toLowerCase().includes('musleh'))
+              ) {
+                return;
+              }
+              list.push({
+                id: docSnap.id,
+                refId: d.refId || docSnap.id,
+                fullName: d.fullName || d.name || 'Pemohon',
+                icNumber: d.icNumber || '',
+                email: d.email || d.pgbEmail || '',
+                phoneNumber: d.phoneNumber || d.phone || d.pgbPhone || '',
+                pgbEmail: d.pgbEmail || d.email || '',
+                pgbPhone: d.pgbPhone || d.phone || d.phoneNumber || '',
+                schoolEmail: d.schoolEmail || '',
+                schoolPhone: d.schoolPhone || '',
+                designation: d.designation || d.position || 'Pengetua',
+                serviceStartYear: Number(d.serviceStartYear || d.pgbStartYear) || 2026,
+                pgbStartYear: Number(d.pgbStartYear || d.serviceStartYear) || 2026,
+                joinYear: Number(d.joinYear || d.schoolJoinYear) || new Date().getFullYear(),
+                schoolJoinYear: Number(d.schoolJoinYear || d.joinYear) || new Date().getFullYear(),
+                schoolName: d.schoolName || '',
+                schoolCode: d.schoolCode || '',
+                schoolType: d.schoolType || 'Maahad Tahfiz',
+                state: d.state || '',
+                district: d.district || '',
+                website: d.website || '',
+                studentCount: Number(d.studentCount) || 0,
+                teacherCount: Number(d.teacherCount) || 0,
+                logoUrl: d.logoUrl || '',
+                schoolPhotoUrl: d.schoolPhotoUrl || '',
+                pgbPhotoUrl: d.pgbPhotoUrl || '',
+                schoolDescription: d.schoolDescription || '',
+                address: d.address || '',
+                status: d.status || 'pending',
+                submittedAt: d.submittedAt || new Date().toISOString(),
+                approvedAt: d.approvedAt,
+                approvedBy: d.approvedBy,
               });
-              setSiteData((prev) => ({ ...prev, memberApplications: sanitizeMemberApplicationsList(list) }));
-            }
-          },
-          (err) => {
-            console.warn('Firestore MemberApplications listener notification:', err.message);
+            });
+            setSiteData((prev) => ({ ...prev, memberApplications: sanitizeMemberApplicationsList(list) }));
           }
-        );
-        unsubscribes.push(unsubApplications);
-      } catch (e) {
-        console.warn('MemberApplications listener setup:', e);
-      }
+        },
+        (err) => {
+          console.warn('Firestore MemberApplications listener notification:', err.message);
+        }
+      );
+      unsubscribes.push(unsubApplications);
+    } catch (e) {
+      console.warn('MemberApplications listener setup:', e);
     }
 
     return () => {
@@ -1226,7 +1305,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         } catch {}
       });
     };
-  }, [adminUser]);
+  }, []);
 
   // Google Sign-In with unauthorized-domain detection and detailed guidance
   const loginWithGoogle = async (): Promise<{
@@ -2214,10 +2293,22 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // 4b. Member Applications Management
   const addMemberApplication = async (item: MemberApplication) => {
-    setSiteData((prev) => ({
-      ...prev,
-      memberApplications: [item, ...(prev.memberApplications || [])],
-    }));
+    const updatedApps = sanitizeMemberApplicationsList([item, ...(siteData.memberApplications || [])]);
+    setSiteData((prev) => {
+      const next = {
+        ...prev,
+        memberApplications: updatedApps,
+      };
+      persistSiteContent(next).catch(() => {});
+      return next;
+    });
+
+    try {
+      const existing = JSON.parse(localStorage.getItem('mpgbsim_pending_registrations') || '[]');
+      existing.unshift(item);
+      localStorage.setItem('mpgbsim_pending_registrations', JSON.stringify(existing.slice(0, 50)));
+    } catch (e) {}
+
     try {
       await setDoc(doc(db, 'memberApplications', item.id), {
         ...item,
@@ -2227,6 +2318,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {
       console.warn('Firestore write memberApplication notice:', e);
     }
+
+    window.dispatchEvent(new Event('mpgbsim_content_updated'));
   };
 
   const approveMemberApplication = async (id: string): Promise<{ success: boolean; message: string }> => {
