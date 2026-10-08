@@ -1017,27 +1017,14 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubResources = onSnapshot(
         collection(db, 'resources'),
         (snapshot) => {
-          const isSeeded = localStorage.getItem('mpgbsim_resources_seeded') === 'true';
-
           if (!snapshot.empty) {
             const list: ResourceDocument[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            if (!isSeeded) {
-              localStorage.setItem('mpgbsim_resources_seeded', 'true');
-            }
             setSiteData((prev) => ({ ...prev, resources: list }));
-          } else if (!isSeeded) {
-            // Seed default RESOURCE_DOCS into Firestore ONLY ONCE on initial setup
-            RESOURCE_DOCS.forEach((res) => {
-              setDoc(doc(db, 'resources', res.id), res, { merge: true }).catch(() => {});
-            });
-            localStorage.setItem('mpgbsim_resources_seeded', 'true');
-            setSiteData((prev) => ({ ...prev, resources: RESOURCE_DOCS }));
           } else {
-            // Collection is empty because all resources were deleted by admin
-            setSiteData((prev) => ({ ...prev, resources: [] }));
+            setSiteData((prev) => ({ ...prev, resources: RESOURCE_DOCS }));
           }
         },
         (err) => {
@@ -1124,8 +1111,6 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAlumni = onSnapshot(
         collection(db, 'alumni'),
         (snapshot) => {
-          const isSeeded = localStorage.getItem('mpgbsim_alumni_seeded') === 'true';
-
           if (!snapshot.empty) {
             const list: AlumniRecord[] = [];
             snapshot.forEach((docSnap) => {
@@ -1135,20 +1120,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               (a, b) =>
                 new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
             );
-            if (!isSeeded) {
-              localStorage.setItem('mpgbsim_alumni_seeded', 'true');
-            }
             setSiteData((prev) => ({ ...prev, alumni: list }));
-          } else if (!isSeeded) {
-            // Seed default SAMPLE_ALUMNI_RECORDS into Firestore ONCE on initial setup
-            localStorage.setItem('mpgbsim_alumni_seeded', 'true');
-            SAMPLE_ALUMNI_RECORDS.forEach((rec) => {
-              setDoc(doc(db, 'alumni', rec.id), rec, { merge: true }).catch(() => {});
-            });
-            setSiteData((prev) => ({ ...prev, alumni: SAMPLE_ALUMNI_RECORDS }));
           } else {
-            // Collection is empty because all alumni records were deleted by admin
-            setSiteData((prev) => ({ ...prev, alumni: [] }));
+            setSiteData((prev) => ({ ...prev, alumni: SAMPLE_ALUMNI_RECORDS }));
           }
         },
         (err) => {
@@ -1165,8 +1139,6 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAnnouncements = onSnapshot(
         collection(db, 'announcements'),
         (snapshot) => {
-          const isSeeded = localStorage.getItem('mpgbsim_announcements_seeded') === 'true';
-
           if (!snapshot.empty) {
             const list: AnnouncementItem[] = [];
             snapshot.forEach((docSnap) => {
@@ -1177,19 +1149,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               if (!a.pinned && b.pinned) return 1;
               return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
             });
-            if (!isSeeded) {
-              localStorage.setItem('mpgbsim_announcements_seeded', 'true');
-            }
             setSiteData((prev) => ({ ...prev, announcements: list }));
-          } else if (!isSeeded) {
-            // Seed default INITIAL_ANNOUNCEMENTS into Firestore ONCE on initial setup
-            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
-            INITIAL_ANNOUNCEMENTS.forEach((item) => {
-              setDoc(doc(db, 'announcements', item.id), item, { merge: true }).catch(() => {});
-            });
-            setSiteData((prev) => ({ ...prev, announcements: INITIAL_ANNOUNCEMENTS }));
           } else {
-            setSiteData((prev) => ({ ...prev, announcements: [] }));
+            setSiteData((prev) => ({ ...prev, announcements: INITIAL_ANNOUNCEMENTS }));
           }
         },
         (err) => {

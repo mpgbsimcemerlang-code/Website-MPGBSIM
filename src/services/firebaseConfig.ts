@@ -80,24 +80,8 @@ export const savePendingRegistration = async (
   data: MemberRegistrationForm
 ): Promise<{ success: boolean; message: string; refId: string }> => {
   const refId = `MPGB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const submissionData = {
-    ...data,
-    id: refId,
-    refId,
-    submittedAt: new Date().toISOString(),
-    status: 'Dalam Semakan',
-  };
 
-  // Local fallback
-  try {
-    const existing = JSON.parse(localStorage.getItem(STORAGE_KEYS.REGISTRATIONS) || '[]');
-    existing.push(submissionData);
-    localStorage.setItem(STORAGE_KEYS.REGISTRATIONS, JSON.stringify(existing));
-  } catch (e) {
-    console.warn('Local storage write warning:', e);
-  }
-
-  // Firestore write
+  // Firestore write (Authoritative Single Source of Truth)
   try {
     await setDoc(doc(db, 'memberApplications', refId), {
       ...data,
@@ -118,7 +102,8 @@ export const savePendingRegistration = async (
       createdAt: new Date().toISOString(),
     });
   } catch (firestoreErr) {
-    console.warn('Firestore submission fallback:', firestoreErr);
+    console.error('Ralat pangkalan data Firestore semasa menghantar permohonan keahlian:', firestoreErr);
+    throw new Error('Gagal menyimpan permohonan ke Cloud Firestore. Sila cuba lagi.');
   }
 
   // Dispatch content update event so CMS and Admin Views reload applications in real-time
@@ -139,24 +124,8 @@ export const saveContactInquiry = async (
   data: ContactInquiry
 ): Promise<{ success: boolean; message: string; refCode: string }> => {
   const refCode = `INQ-${Date.now().toString().slice(-6)}`;
-  const item = {
-    ...data,
-    id: refCode,
-    refCode,
-    date: new Date().toISOString(),
-    status: 'unread' as const,
-  };
 
-  // Local fallback
-  try {
-    const existing = JSON.parse(localStorage.getItem(STORAGE_KEYS.INQUIRIES) || '[]');
-    existing.unshift(item);
-    localStorage.setItem(STORAGE_KEYS.INQUIRIES, JSON.stringify(existing.slice(0, 50)));
-  } catch (e) {
-    console.warn('Local storage inquiry warning:', e);
-  }
-
-  // Cloud Firestore write
+  // Cloud Firestore write (Authoritative Single Source of Truth)
   try {
     await setDoc(doc(db, 'submissions', refCode), {
       name: data.name,
@@ -169,7 +138,8 @@ export const saveContactInquiry = async (
       createdAt: new Date().toISOString(),
     });
   } catch (firestoreErr) {
-    console.warn('Firestore inquiry fallback:', firestoreErr);
+    console.error('Ralat pangkalan data Firestore semasa menghantar pertanyaan:', firestoreErr);
+    throw new Error('Gagal menyimpan pertanyaan ke Cloud Firestore. Sila cuba lagi.');
   }
 
   return {
