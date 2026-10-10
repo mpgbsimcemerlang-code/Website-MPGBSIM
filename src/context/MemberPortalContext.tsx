@@ -25,7 +25,6 @@ import {
   INITIAL_NOTIFICATIONS,
   INITIAL_AUDIT_LOGS,
 } from '../data/portalMockData';
-import { SAMPLE_MEMBER_SCHOOLS } from '../data/mockData';
 import {
   auth,
   db,
@@ -172,13 +171,7 @@ const STORAGE_KEYS = {
 export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
   const schoolsMap = new Map<string, MemberSchool>();
 
-  // 1. Initial base defaults from mock data
-  SAMPLE_MEMBER_SCHOOLS.forEach((sch) => {
-    schoolsMap.set(sch.id, sch);
-    if (sch.code) schoolsMap.set(`code:${sch.code.toUpperCase()}`, sch);
-  });
-
-  // 2. Fetch directly from the same Firestore collection used by Admin CMS ('schools')
+  // 1. Fetch directly from the same Firestore collection used by Admin CMS ('schools')
   try {
     const snap = await getDocs(collection(db, 'schools'));
     if (!snap.empty) {
@@ -243,10 +236,10 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
   try {
     const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.CURRENT_USER) : null;
     const portalUser = portalUserRaw ? JSON.parse(portalUserRaw) : null;
-    const { repairedSchools } = repairSchoolIntegrity(rawList.length > 0 ? rawList : SAMPLE_MEMBER_SCHOOLS, portalUser);
-    return repairedSchools.length > 0 ? repairedSchools : SAMPLE_MEMBER_SCHOOLS;
+    const { repairedSchools } = repairSchoolIntegrity(rawList, portalUser);
+    return repairedSchools;
   } catch (e) {
-    return SAMPLE_MEMBER_SCHOOLS;
+    return rawList;
   }
 };
 
@@ -1023,7 +1016,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         matchedSchool =
           registeredSchools.find(
             (s) => s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh')
-          ) || SAMPLE_MEMBER_SCHOOLS.find((s) => s.code === 'MJAC011');
+          );
       }
 
       const role: UserRole = isSuper ? 'ADMIN' : 'MEMBER';
@@ -1184,7 +1177,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       input.toLowerCase() === 'mia1009' ||
       input.toLowerCase().includes('imusleh')
     )) {
-      matched = SAMPLE_MEMBER_SCHOOLS.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1');
+      matched = registeredSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1' || s.name.toLowerCase().includes('musleh'));
     }
 
     if (!matched) {

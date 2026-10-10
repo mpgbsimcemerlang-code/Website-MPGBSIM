@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool } from '../../types';
-import { PORTAL_SCHOOL_TYPES } from '../../data/mockData';
+import { PORTAL_SCHOOL_TYPES } from '../../data/constants';
 import { DiagnosticReport } from '../../utils/schoolDiagnostic';
 
 export const AdminSchoolManagement: React.FC = () => {

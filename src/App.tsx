@@ -29,13 +29,6 @@ import { AdminCMSModal } from './components/AdminCMSModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminFloatingControl } from './components/AdminFloatingControl';
 
-// Data
-import {
-  STRATEGIC_FOCUS_LIST,
-  SAMPLE_MEMBER_SCHOOLS,
-  LEADERSHIP_TEAM,
-  RESOURCE_DOCS,
-} from './data/mockData';
 import { StrategicFocus, NewsItem, BestPracticeItem, ProgramEvent } from './types';
 
 import { MemberPortalProvider, useMemberPortal } from './context/MemberPortalContext';

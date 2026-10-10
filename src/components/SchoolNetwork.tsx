@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NetworkStats, MemberSchool } from '../types';
-import { MALAYSIA_STATES, SCHOOL_TYPES } from '../data/mockData';
+import { MALAYSIA_STATES, SCHOOL_TYPES } from '../data/constants';
 import { useAdminContent } from '../context/AdminContentContext';
 import {
   School,

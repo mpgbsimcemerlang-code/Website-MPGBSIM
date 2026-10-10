@@ -33,7 +33,7 @@ import { Logo } from '../Logo';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool, MemberApplication } from '../../types';
-import { MALAYSIA_STATES, PORTAL_SCHOOL_TYPES } from '../../data/mockData';
+import { MALAYSIA_STATES, PORTAL_SCHOOL_TYPES } from '../../data/constants';
 import { MemberRegistrationForm, savePendingRegistration } from '../../services/firebaseConfig';
 
 export const PortalLoginView: React.FC = () => {

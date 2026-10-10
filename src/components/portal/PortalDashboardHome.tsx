@@ -30,7 +30,6 @@ import {
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { BestPracticeItem, MemberSchool } from '../../types';
-import { SAMPLE_MEMBER_SCHOOLS } from '../../data/mockData';
 
 interface PortalDashboardHomeProps {
   onOpenAnnouncementModal?: (ann: any) => void;
@@ -78,7 +77,6 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
     if (isMusleh) {
       return (
         (siteData.memberSchools || []).find((s) => s.code === 'MJAC011') ||
-        SAMPLE_MEMBER_SCHOOLS.find((s) => s.code === 'MJAC011') ||
         null
       );
     }
