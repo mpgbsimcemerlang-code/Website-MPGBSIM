@@ -16,26 +16,9 @@ import {
   AlumniRecord,
   AnnouncementItem,
 } from '../types';
-import {
-  LATEST_NEWS_LIST,
-  STRATEGIC_FOCUS_LIST,
-  BEST_PRACTICES_LIST,
-  UPCOMING_PROGRAMS_LIST,
-  INITIAL_NETWORK_STATS,
-  LEADERSHIP_TEAM,
-  MEDIA_GALLERY_LIST,
-  RESOURCE_DOCS,
-  SAMPLE_MEMBER_SCHOOLS,
-  SAMPLE_MEMBER_APPLICATIONS,
-  DEFAULT_EVENT_REGISTRATIONS,
-  SAMPLE_ALUMNI_RECORDS,
-} from '../data/mockData';
-import { INITIAL_ANNOUNCEMENTS } from '../data/portalMockData';
 
 import {
   persistSiteContent,
-  getInitialSiteContentSync,
-  getFullSiteContentAsync,
   purgeObsoleteLocalStorage,
   saveToIndexedDB,
   safeLocalStorageSet,
@@ -175,6 +158,8 @@ interface AdminContentContextType {
   isAdmin: boolean;
   adminUser: AdminUser | null;
   isFirebaseConnected: boolean;
+  isLoading: boolean;
+  error: string | null;
   syncStatus: 'synced' | 'syncing' | 'offline' | 'error';
   lastSyncedAt: string | null;
   loginAdmin: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
@@ -398,6 +383,14 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
 const DUMMY_MOCK_SCHOOL_IDS = new Set(['sch-1', 'sch-2', 'sch-3', 'sch-4', 'sch-5', 'sch-6', 'sch-7', 'sch-8']);
 const DUMMY_MOCK_SCHOOL_CODES = new Set(['WRA0001', 'ABA2004', 'BEA4002', 'BIA3012', 'DEA1021', 'JIA5019', 'CIA6008', 'KEA7001']);
 
+const DEFAULT_NETWORK_STATS: NetworkStats = {
+  schoolsCount: 0,
+  statesCount: 0,
+  principalsCount: 0,
+  studentsBenefited: '0',
+  isPlaceholder: false,
+};
+
 const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[] => {
   try {
     // Strictly restrict directory to official Sekolah Rendah Islam I Musleh
@@ -414,7 +407,7 @@ const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[]
     const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem('mpgbsim_portal_user_v1') : null;
     const portalUser = portalUserRaw ? JSON.parse(portalUserRaw) : null;
     const { repairedSchools } = repairSchoolIntegrity(
-      muslehSchools.length > 0 ? muslehSchools : SAMPLE_MEMBER_SCHOOLS,
+      muslehSchools,
       portalUser
     );
     const finalClean = repairedSchools.filter(
@@ -423,10 +416,10 @@ const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[]
         s.code?.toUpperCase() === 'MJAC011' ||
         s.name.toLowerCase().includes('musleh')
     );
-    return finalClean.length > 0 ? finalClean : SAMPLE_MEMBER_SCHOOLS;
+    return finalClean.length > 0 ? finalClean : (schools || []);
   } catch (e) {
     console.warn('sanitizeMemberSchoolsList notice:', e);
-    return SAMPLE_MEMBER_SCHOOLS;
+    return schools || [];
   }
 };
 
@@ -516,7 +509,7 @@ const sanitizeMemberApplicationsList = (apps: MemberApplication[] = []): MemberA
 };
 
 const sanitizeLeadershipList = (list: LeaderProfile[] = []): LeaderProfile[] => {
-  const baseList = !list || list.length === 0 ? LEADERSHIP_TEAM : list;
+  const baseList = list || [];
   const mapped = baseList.map((l, index) => {
     const isFaiz = l.id === 'lead-1' || l.name?.toLowerCase().includes('faiz');
     const avatar = isFaiz
@@ -537,29 +530,6 @@ const sanitizeLeadershipList = (list: LeaderProfile[] = []): LeaderProfile[] => 
 
   return mapped.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
 };
-
-const INITIAL_SUBMISSIONS: ContactSubmission[] = [
-  {
-    id: 'INQ-882101',
-    name: 'Ustaz Fairuz bin Ariffin',
-    email: 'fairuz@sri-hidayah.edu.my',
-    phone: '+60 12-987 6543',
-    subject: 'Permohonan Pendaftaran Sekolah Ahli Baharu',
-    message: 'Salam hormat Urus Setia MPGBSIM. Pihak kami ingin mendaftarkan SRI Al-Hidayah sebagai ahli bersekutu bagi sesi 2026. Mohon pencerahan prosedur dokumentasi.',
-    date: '2026-09-20T10:15:00Z',
-    status: 'unread',
-  },
-  {
-    id: 'INQ-881944',
-    name: 'Dr. Noraini binti Sulaiman',
-    email: 'noraini.s@sabk-melaka.edu.my',
-    phone: '+60 13-445 2211',
-    subject: 'Cadangan Kolaborasi Modul Tahfiz Huffaz Cemerlang',
-    message: 'Tahniah atas penganjuran kolokium baru-baru ini. Sekolah kami berminat berkongsi modul amalan terbaik tahfiz sains untuk diterbitkan dalam portal.',
-    date: '2026-09-18T14:30:00Z',
-    status: 'read',
-  },
-];
 
 const STORAGE_KEYS = {
   ADMIN_SESSION: 'mpgbsim_admin_session_v3',
@@ -622,58 +592,31 @@ const sanitizeContactInfo = (c?: Partial<ContactInfoData> | null): ContactInfoDa
 };
 
 export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [siteData, setSiteData] = useState<SiteContentState>(() => {
-    try {
-      const saved = getInitialSiteContentSync();
-      if (saved) {
-        return {
-          branding: sanitizeBranding(saved.branding),
-          hero: sanitizeHero(saved.hero),
-          visionMission: sanitizeVisionMission(saved.visionMission),
-          strategicFocus: Array.isArray(saved.strategicFocus) ? saved.strategicFocus : STRATEGIC_FOCUS_LIST,
-          stats: saved.stats || INITIAL_NETWORK_STATS,
-          memberSchools: sanitizeMemberSchoolsList(Array.isArray(saved.memberSchools) ? saved.memberSchools : SAMPLE_MEMBER_SCHOOLS),
-          news: Array.isArray(saved.news) ? saved.news : LATEST_NEWS_LIST,
-          programs: Array.isArray(saved.programs) ? saved.programs : UPCOMING_PROGRAMS_LIST,
-          practices: Array.isArray(saved.practices) ? saved.practices : BEST_PRACTICES_LIST,
-          leadership: sanitizeLeadershipList(Array.isArray(saved.leadership) ? saved.leadership : LEADERSHIP_TEAM),
-          media: Array.isArray(saved.media) ? saved.media : MEDIA_GALLERY_LIST,
-          quote: { ...DEFAULT_QUOTE, ...saved.quote },
-          resources: Array.isArray(saved.resources) ? saved.resources : RESOURCE_DOCS,
-          cta: { ...DEFAULT_CTA, ...saved.cta },
-          contactInfo: sanitizeContactInfo(saved.contactInfo),
-          submissions: Array.isArray(saved.submissions) ? saved.submissions : INITIAL_SUBMISSIONS,
-          memberApplications: sanitizeMemberApplicationsList(Array.isArray(saved.memberApplications) ? saved.memberApplications : SAMPLE_MEMBER_APPLICATIONS),
-          dashboardConfig: { ...DEFAULT_DASHBOARD_CONFIG, ...(saved.dashboardConfig || {}) },
-          alumni: Array.isArray(saved.alumni) ? saved.alumni : SAMPLE_ALUMNI_RECORDS,
-        };
-      }
-    } catch (e) {
-      console.warn('Gagal memuatkan data simpanan tempatan:', e);
-    }
-    return {
-      branding: DEFAULT_BRANDING,
-      hero: DEFAULT_HERO,
-      visionMission: DEFAULT_VISION_MISSION,
-      strategicFocus: STRATEGIC_FOCUS_LIST,
-      stats: INITIAL_NETWORK_STATS,
-      memberSchools: sanitizeMemberSchoolsList(SAMPLE_MEMBER_SCHOOLS),
-      news: LATEST_NEWS_LIST,
-      programs: UPCOMING_PROGRAMS_LIST,
-      practices: BEST_PRACTICES_LIST,
-      leadership: sanitizeLeadershipList(LEADERSHIP_TEAM),
-      media: MEDIA_GALLERY_LIST,
-      quote: DEFAULT_QUOTE,
-      resources: RESOURCE_DOCS,
-      cta: DEFAULT_CTA,
-      contactInfo: DEFAULT_CONTACT_INFO,
-      submissions: INITIAL_SUBMISSIONS,
-      memberApplications: sanitizeMemberApplicationsList(SAMPLE_MEMBER_APPLICATIONS),
-      dashboardConfig: DEFAULT_DASHBOARD_CONFIG,
-      alumni: SAMPLE_ALUMNI_RECORDS,
-    };
+  const [siteData, setSiteData] = useState<SiteContentState>({
+    branding: DEFAULT_BRANDING,
+    hero: DEFAULT_HERO,
+    visionMission: DEFAULT_VISION_MISSION,
+    strategicFocus: [],
+    stats: DEFAULT_NETWORK_STATS,
+    memberSchools: [],
+    news: [],
+    programs: [],
+    practices: [],
+    leadership: [],
+    media: [],
+    quote: DEFAULT_QUOTE,
+    resources: [],
+    cta: DEFAULT_CTA,
+    contactInfo: DEFAULT_CONTACT_INFO,
+    submissions: [],
+    memberApplications: [],
+    dashboardConfig: DEFAULT_DASHBOARD_CONFIG,
+    alumni: [],
+    announcements: [],
   });
 
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(true);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline' | 'error'>('synced');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -698,39 +641,6 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       setSyncStatus('error');
     }
   };
-
-  // Hydrate full content from IndexedDB on initial mount
-  useEffect(() => {
-    let isMounted = true;
-    getFullSiteContentAsync().then((idbData) => {
-      if (isMounted && idbData) {
-        setSiteData((prev) => ({
-          branding: sanitizeBranding(idbData.branding ? { ...prev.branding, ...idbData.branding } : prev.branding),
-          hero: sanitizeHero(idbData.hero ? { ...prev.hero, ...idbData.hero } : prev.hero),
-          visionMission: sanitizeVisionMission(idbData.visionMission ? { ...prev.visionMission, ...idbData.visionMission } : prev.visionMission),
-          strategicFocus: idbData.strategicFocus?.length ? idbData.strategicFocus : prev.strategicFocus,
-          stats: idbData.stats || prev.stats,
-          memberSchools: sanitizeMemberSchoolsList(idbData.memberSchools?.length ? idbData.memberSchools : prev.memberSchools),
-          news: idbData.news?.length ? idbData.news : prev.news,
-          programs: idbData.programs?.length ? idbData.programs : prev.programs,
-          practices: idbData.practices?.length ? idbData.practices : prev.practices,
-          leadership: sanitizeLeadershipList(idbData.leadership?.length ? idbData.leadership : prev.leadership),
-          media: idbData.media?.length ? idbData.media : prev.media,
-          quote: { ...prev.quote, ...(idbData.quote || {}) },
-          resources: idbData.resources?.length ? idbData.resources : prev.resources,
-          cta: { ...prev.cta, ...(idbData.cta || {}) },
-          contactInfo: sanitizeContactInfo(idbData.contactInfo ? { ...prev.contactInfo, ...idbData.contactInfo } : prev.contactInfo),
-          submissions: idbData.submissions?.length ? idbData.submissions : prev.submissions,
-          memberApplications: sanitizeMemberApplicationsList(idbData.memberApplications?.length ? idbData.memberApplications : prev.memberApplications),
-        }));
-      }
-    }).catch((err) => {
-      console.warn('Pemuatan simpanan tempatan notis:', err);
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   // Listen for portal profile updates or external storage synchronization
   useEffect(() => {
@@ -779,7 +689,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // Event Registrations state (Pendaftaran Acara & Rekod Kehadiran)
-  const [eventRegistrations, setEventRegistrations] = useState<EventRegistration[]>(DEFAULT_EVENT_REGISTRATIONS);
+  const [eventRegistrations, setEventRegistrations] = useState<EventRegistration[]>([]);
 
   // Sync to IndexedDB + safe localStorage whenever siteData changes
   useEffect(() => {
@@ -859,9 +769,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             setSyncStatus('synced');
             setLastSyncedAt(new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' }));
           }
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore CMS Content listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore: ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubCmsContent);
@@ -874,16 +788,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubNews = onSnapshot(
         collection(db, 'news'),
         (snapshot) => {
+          const list: NewsItem[] = [];
           if (!snapshot.empty) {
-            const list: NewsItem[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            setSiteData((prev) => ({ ...prev, news: sortNewsByPublishedDate(list) }));
           }
+          setSiteData((prev) => ({ ...prev, news: sortNewsByPublishedDate(list) }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore News listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Berita): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubNews);
@@ -896,16 +814,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubEvents = onSnapshot(
         collection(db, 'events'),
         (snapshot) => {
+          const list: ProgramEvent[] = [];
           if (!snapshot.empty) {
-            const list: ProgramEvent[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            setSiteData((prev) => ({ ...prev, programs: list }));
           }
+          setSiteData((prev) => ({ ...prev, programs: list }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Events listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Program): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubEvents);
@@ -918,8 +840,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubEventRegs = onSnapshot(
         collection(db, 'eventRegistrations'),
         (snapshot) => {
+          const list: EventRegistration[] = [];
           if (!snapshot.empty) {
-            const list: EventRegistration[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
@@ -927,13 +849,15 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               (a, b) =>
                 new Date(b.registeredAt || 0).getTime() - new Date(a.registeredAt || 0).getTime()
             );
-            setEventRegistrations(list);
-          } else {
-            setEventRegistrations(DEFAULT_EVENT_REGISTRATIONS);
           }
+          setEventRegistrations(list);
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore eventRegistrations listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Pendaftaran Acara): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubEventRegs);
@@ -946,16 +870,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubPractices = onSnapshot(
         collection(db, 'bestPractices'),
         (snapshot) => {
+          const list: BestPracticeItem[] = [];
           if (!snapshot.empty) {
-            const list: BestPracticeItem[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            setSiteData((prev) => ({ ...prev, practices: list }));
           }
+          setSiteData((prev) => ({ ...prev, practices: list }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Practices listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Amalan Terbaik): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubPractices);
@@ -968,21 +896,25 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubSchools = onSnapshot(
         collection(db, 'schools'),
         (snapshot) => {
+          const rawList: MemberSchool[] = [];
           if (!snapshot.empty) {
-            const rawList: MemberSchool[] = [];
             snapshot.forEach((docSnap) => {
               rawList.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            const list = sanitizeMemberSchoolsList(rawList);
-            setSiteData((prev) => ({
-              ...prev,
-              memberSchools: list,
-            }));
-            setSyncStatus('synced');
           }
+          const list = sanitizeMemberSchoolsList(rawList);
+          setSiteData((prev) => ({
+            ...prev,
+            memberSchools: list,
+          }));
+          setSyncStatus('synced');
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Schools listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Sekolah Ahli): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubSchools);
@@ -995,16 +927,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubMedia = onSnapshot(
         collection(db, 'media'),
         (snapshot) => {
+          const list: MediaItem[] = [];
           if (!snapshot.empty) {
-            const list: MediaItem[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            setSiteData((prev) => ({ ...prev, media: list }));
           }
+          setSiteData((prev) => ({ ...prev, media: list }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Media listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Media): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubMedia);
@@ -1017,18 +953,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubResources = onSnapshot(
         collection(db, 'resources'),
         (snapshot) => {
+          const list: ResourceDocument[] = [];
           if (!snapshot.empty) {
-            const list: ResourceDocument[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            setSiteData((prev) => ({ ...prev, resources: list }));
-          } else {
-            setSiteData((prev) => ({ ...prev, resources: RESOURCE_DOCS }));
           }
+          setSiteData((prev) => ({ ...prev, resources: list }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Resources listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Dokumen): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubResources);
@@ -1041,16 +979,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubLeadership = onSnapshot(
         collection(db, 'leadership'),
         (snapshot) => {
+          const list: LeaderProfile[] = [];
           if (!snapshot.empty) {
-            const list: LeaderProfile[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
-            setSiteData((prev) => ({ ...prev, leadership: sanitizeLeadershipList(list) }));
           }
+          setSiteData((prev) => ({ ...prev, leadership: sanitizeLeadershipList(list) }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Leadership listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Kepimpinan): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubLeadership);
@@ -1071,9 +1013,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               contactInfo: { ...prev.contactInfo, ...(data.contactInfo || {}) },
             }));
           }
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Settings listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Tetapan): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubSettings);
@@ -1096,9 +1042,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               },
             }));
           }
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Dashboard Settings listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Dashboard): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubDashboard);
@@ -1111,8 +1061,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAlumni = onSnapshot(
         collection(db, 'alumni'),
         (snapshot) => {
+          const list: AlumniRecord[] = [];
           if (!snapshot.empty) {
-            const list: AlumniRecord[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
@@ -1120,13 +1070,15 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               (a, b) =>
                 new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
             );
-            setSiteData((prev) => ({ ...prev, alumni: list }));
-          } else {
-            setSiteData((prev) => ({ ...prev, alumni: SAMPLE_ALUMNI_RECORDS }));
           }
+          setSiteData((prev) => ({ ...prev, alumni: list }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Alumni listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Alumni): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubAlumni);
@@ -1139,8 +1091,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAnnouncements = onSnapshot(
         collection(db, 'announcements'),
         (snapshot) => {
+          const list: AnnouncementItem[] = [];
           if (!snapshot.empty) {
-            const list: AnnouncementItem[] = [];
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
@@ -1149,13 +1101,15 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               if (!a.pinned && b.pinned) return 1;
               return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
             });
-            setSiteData((prev) => ({ ...prev, announcements: list }));
-          } else {
-            setSiteData((prev) => ({ ...prev, announcements: INITIAL_ANNOUNCEMENTS }));
           }
+          setSiteData((prev) => ({ ...prev, announcements: list }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Announcements listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Pengumuman): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubAnnouncements);
@@ -1168,8 +1122,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubSubmissions = onSnapshot(
         collection(db, 'submissions'),
         (snapshot) => {
+          const list: ContactSubmission[] = [];
           if (!snapshot.empty) {
-            const list: ContactSubmission[] = [];
             snapshot.forEach((docSnap) => {
               const d = docSnap.data();
               list.push({
@@ -1183,11 +1137,15 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                 status: d.status || 'unread',
               });
             });
-            setSiteData((prev) => ({ ...prev, submissions: list }));
           }
+          setSiteData((prev) => ({ ...prev, submissions: list }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore Submissions listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Peti Mesej): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubSubmissions);
@@ -1200,8 +1158,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubApplications = onSnapshot(
         collection(db, 'memberApplications'),
         (snapshot) => {
+          const list: MemberApplication[] = [];
           if (!snapshot.empty) {
-            const list: MemberApplication[] = [];
             snapshot.forEach((docSnap) => {
               const d = docSnap.data();
               if (
@@ -1248,11 +1206,15 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                 approvedBy: d.approvedBy,
               });
             });
-            setSiteData((prev) => ({ ...prev, memberApplications: sanitizeMemberApplicationsList(list) }));
           }
+          setSiteData((prev) => ({ ...prev, memberApplications: sanitizeMemberApplicationsList(list) }));
+          setIsLoading(false);
         },
         (err) => {
           console.warn('Firestore MemberApplications listener notification:', err.message);
+          setError(`Gagal menyambung ke Firestore (Permohonan Ahli): ${err.message}`);
+          setSyncStatus('error');
+          setIsLoading(false);
         }
       );
       unsubscribes.push(unsubApplications);
@@ -2501,7 +2463,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const addLeader = async (item: LeaderProfile): Promise<void> => {
     let nextList: LeaderProfile[] = [];
     setSiteData((prev) => {
-      const currentList = Array.isArray(prev.leadership) && prev.leadership.length > 0 ? prev.leadership : LEADERSHIP_TEAM;
+      const currentList = Array.isArray(prev.leadership) ? prev.leadership : [];
       const leaderWithOrder = { ...item, order: item.order !== undefined ? item.order : currentList.length };
       nextList = sanitizeLeadershipList([...currentList, leaderWithOrder]);
       const nextState = { ...prev, leadership: nextList };
@@ -2515,7 +2477,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const updateLeader = async (id: string, updatedLeader: Partial<LeaderProfile>): Promise<void> => {
     let nextList: LeaderProfile[] = [];
     setSiteData((prev) => {
-      const currentList = Array.isArray(prev.leadership) && prev.leadership.length > 0 ? prev.leadership : LEADERSHIP_TEAM;
+      const currentList = Array.isArray(prev.leadership) ? prev.leadership : [];
       nextList = sanitizeLeadershipList(currentList.map((l) => (l.id === id ? { ...l, ...updatedLeader } : l)));
       const nextState = { ...prev, leadership: nextList };
       persistSiteContent(nextState).catch(() => {});
@@ -2528,7 +2490,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const deleteLeader = async (id: string): Promise<void> => {
     let nextList: LeaderProfile[] = [];
     setSiteData((prev) => {
-      const currentList = Array.isArray(prev.leadership) && prev.leadership.length > 0 ? prev.leadership : LEADERSHIP_TEAM;
+      const currentList = Array.isArray(prev.leadership) ? prev.leadership : [];
       const filtered = currentList.filter((l) => l.id !== id);
       nextList = sanitizeLeadershipList(filtered.map((l, idx) => ({ ...l, order: idx })));
       const nextState = { ...prev, leadership: nextList };
@@ -2808,20 +2770,23 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       branding: DEFAULT_BRANDING,
       hero: DEFAULT_HERO,
       visionMission: DEFAULT_VISION_MISSION,
-      strategicFocus: STRATEGIC_FOCUS_LIST,
-      stats: INITIAL_NETWORK_STATS,
-      memberSchools: SAMPLE_MEMBER_SCHOOLS,
-      news: LATEST_NEWS_LIST,
-      programs: UPCOMING_PROGRAMS_LIST,
-      practices: BEST_PRACTICES_LIST,
-      leadership: LEADERSHIP_TEAM,
-      media: MEDIA_GALLERY_LIST,
+      strategicFocus: [],
+      stats: DEFAULT_NETWORK_STATS,
+      memberSchools: [],
+      news: [],
+      programs: [],
+      practices: [],
+      leadership: [],
+      media: [],
       quote: DEFAULT_QUOTE,
-      resources: RESOURCE_DOCS,
+      resources: [],
       cta: DEFAULT_CTA,
       contactInfo: DEFAULT_CONTACT_INFO,
-      submissions: INITIAL_SUBMISSIONS,
-      memberApplications: sanitizeMemberApplicationsList(SAMPLE_MEMBER_APPLICATIONS),
+      submissions: [],
+      memberApplications: [],
+      dashboardConfig: DEFAULT_DASHBOARD_CONFIG,
+      alumni: [],
+      announcements: [],
     });
     localStorage.removeItem(STORAGE_KEYS.SITE_CONTENT);
     purgeObsoleteLocalStorage();
@@ -2835,6 +2800,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         isAdmin: !!adminUser,
         adminUser,
         isFirebaseConnected,
+        isLoading,
+        error,
         syncStatus,
         lastSyncedAt,
         loginAdmin,
