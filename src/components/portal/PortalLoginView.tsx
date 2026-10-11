@@ -28,6 +28,7 @@ import {
   Camera,
   Trash2,
   Calendar,
+  Loader2,
 } from 'lucide-react';
 import { Logo } from '../Logo';
 import { useMemberPortal } from '../../context/MemberPortalContext';
@@ -104,6 +105,7 @@ export const PortalLoginView: React.FC = () => {
   });
   const [regSubmitting, setRegSubmitting] = useState(false);
   const [regSuccess, setRegSuccess] = useState<string | null>(null);
+  const [regError, setRegError] = useState<string | null>(null);
 
   // Registered schools list from CMS / context
   const registeredSchools = siteData.memberSchools || [];
@@ -241,108 +243,150 @@ export const PortalLoginView: React.FC = () => {
     });
   };
 
+  const compressImageFile = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.75): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = (err) => reject(err);
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = (err) => reject(err);
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(reader.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (regSubmitting) return;
+
     setRegSubmitting(true);
     setRegSuccess(null);
+    setRegError(null);
 
-    const serviceYear = Number(regForm.serviceStartYear) || new Date().getFullYear();
-    const joinYear = Number(regForm.joinYear) || Number(regForm.schoolJoinYear) || new Date().getFullYear();
-    const res = await savePendingRegistration({
-      ...regForm,
-      phoneNumber: regForm.phone,
-      designation: regForm.position as any,
-      serviceStartYear: serviceYear,
-      pgbStartYear: serviceYear,
-      joinYear,
-      schoolJoinYear: joinYear,
-      studentCount: Number(regForm.studentCount) || 0,
-      teacherCount: Number(regForm.teacherCount) || 0,
-    });
-    if (res.success && res.refId) {
-      const application: MemberApplication = {
-        id: res.refId,
-        refId: res.refId,
-        fullName: regForm.fullName,
-        icNumber: regForm.icNumber || '',
-        email: regForm.email,
+    try {
+      const serviceYear = Number(regForm.serviceStartYear) || new Date().getFullYear();
+      const joinYear = Number(regForm.joinYear) || Number(regForm.schoolJoinYear) || new Date().getFullYear();
+      
+      const res = await savePendingRegistration({
+        ...regForm,
         phoneNumber: regForm.phone,
-        pgbEmail: regForm.email,
-        pgbPhone: regForm.phone,
-        schoolEmail: regForm.schoolEmail || '',
-        schoolPhone: regForm.schoolPhone || '',
-        designation: regForm.position,
+        designation: regForm.position as any,
         serviceStartYear: serviceYear,
         pgbStartYear: serviceYear,
         joinYear,
         schoolJoinYear: joinYear,
-        schoolName: regForm.schoolName,
-        schoolCode: regForm.schoolCode || '',
-        schoolType: regForm.schoolType,
-        state: regForm.state,
-        district: regForm.district || '',
         studentCount: Number(regForm.studentCount) || 0,
         teacherCount: Number(regForm.teacherCount) || 0,
-        logoUrl: regForm.logoUrl,
-        schoolPhotoUrl: regForm.schoolPhotoUrl,
-        pgbPhotoUrl: regForm.pgbPhotoUrl,
-        address: regForm.address,
-        website: regForm.website,
-        status: 'pending',
-        submittedAt: new Date().toISOString(),
-      };
-      await addMemberApplication(application);
-      setRegSuccess(
-        `Permohonan keahlian bagi ${regForm.schoolName} berjaya dihantar dengan No. Rujukan: ${res.refId}. Urus Setia MPGBSIM akan menyemak dokumen anda dalam tempoh 1-3 hari bekerja.`
-      );
-    } else {
-      alert('Ralat semasa menghantar permohonan. Sila cuba lagi.');
+      });
+
+      if (res && res.success && res.refId) {
+        const application: MemberApplication = {
+          id: res.refId,
+          refId: res.refId,
+          fullName: regForm.fullName,
+          icNumber: regForm.icNumber || '',
+          email: regForm.email,
+          phoneNumber: regForm.phone,
+          pgbEmail: regForm.email,
+          pgbPhone: regForm.phone,
+          schoolEmail: regForm.schoolEmail || '',
+          schoolPhone: regForm.schoolPhone || '',
+          designation: regForm.position,
+          serviceStartYear: serviceYear,
+          pgbStartYear: serviceYear,
+          joinYear,
+          schoolJoinYear: joinYear,
+          schoolName: regForm.schoolName,
+          schoolCode: regForm.schoolCode || '',
+          schoolType: regForm.schoolType,
+          state: regForm.state,
+          district: regForm.district || '',
+          studentCount: Number(regForm.studentCount) || 0,
+          teacherCount: Number(regForm.teacherCount) || 0,
+          logoUrl: regForm.logoUrl,
+          schoolPhotoUrl: regForm.schoolPhotoUrl,
+          pgbPhotoUrl: regForm.pgbPhotoUrl,
+          address: regForm.address,
+          website: regForm.website,
+          status: 'pending',
+          submittedAt: new Date().toISOString(),
+        };
+
+        try {
+          await addMemberApplication(application);
+        } catch (ctxErr) {
+          console.warn('Member application added to Firestore but context sync warning:', ctxErr);
+        }
+
+        setRegSuccess(
+          `Permohonan keahlian bagi ${regForm.schoolName} berjaya dihantar dengan No. Rujukan: ${res.refId}. Urus Setia MPGBSIM akan menyemak dokumen anda dalam tempoh 1-3 hari bekerja.`
+        );
+      } else {
+        setRegError('Ralat semasa menghantar permohonan. Sila semak semula maklumat anda.');
+      }
+    } catch (err: any) {
+      console.error('Registration submit error:', err);
+      setRegError(err?.message || 'Ralat semasa menghantar permohonan keahlian. Sila semak sambungan Internet anda dan cuba lagi.');
+    } finally {
+      setRegSubmitting(false);
     }
-    setRegSubmitting(false);
   };
 
-  const handlePgbPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePgbPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert('Saiz gambar PGB melebihi 3MB. Sila pilih fail imej yang lebih kecil.');
-        return;
+      try {
+        const compressed = await compressImageFile(file, 600, 600, 0.75);
+        setRegForm((prev) => ({ ...prev, pgbPhotoUrl: compressed }));
+      } catch (err) {
+        console.warn('Gagal memampatkan foto PGB:', err);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setRegForm((prev) => ({ ...prev, pgbPhotoUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
-  const handleSchoolPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSchoolPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Saiz foto institusi melebihi 5MB. Sila pilih fail imej yang lebih kecil.');
-        return;
+      try {
+        const compressed = await compressImageFile(file, 800, 800, 0.75);
+        setRegForm((prev) => ({ ...prev, schoolPhotoUrl: compressed }));
+      } catch (err) {
+        console.warn('Gagal memampatkan foto sekolah:', err);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setRegForm((prev) => ({ ...prev, schoolPhotoUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Saiz logo melebihi 2MB.');
-        return;
+      try {
+        const compressed = await compressImageFile(file, 400, 400, 0.85);
+        setRegForm((prev) => ({ ...prev, logoUrl: compressed }));
+      } catch (err) {
+        console.warn('Gagal memampatkan logo:', err);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setRegForm((prev) => ({ ...prev, logoUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -914,6 +958,29 @@ export const PortalLoginView: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleRegisterSubmit} className="space-y-4 text-xs">
+                {regSubmitting && (
+                  <div className="p-4 rounded-2xl bg-teal-950/90 border border-teal-500/50 text-teal-200 flex items-center gap-3.5 animate-pulse shadow-xl">
+                    <Loader2 className="w-6 h-6 animate-spin text-teal-400 shrink-0" />
+                    <div>
+                      <p className="font-bold text-xs sm:text-sm text-white">Menghantar Permohonan Keahlian...</p>
+                      <p className="text-[11px] text-teal-300">
+                        Sila tunggu sebentar sementara maklumat dan fail anda disimpan secara rasmi ke pangkalan data Cloud Firestore MPGBSIM.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {regError && (
+                  <div className="p-4 rounded-2xl bg-rose-950/90 border border-rose-800 text-rose-200 flex items-start gap-3 shadow-lg">
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-xs sm:text-sm text-white">Gagal Menghantar Permohonan</p>
+                      <p className="text-[11px] text-rose-200 leading-relaxed">{regError}</p>
+                    </div>
+                  </div>
+                )}
+
+                <fieldset disabled={regSubmitting} className="space-y-4 disabled:opacity-70">
                 {/* 1. Maklumat Pengetua / Guru Besar (PGB) */}
                 <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
@@ -1357,14 +1424,24 @@ export const PortalLoginView: React.FC = () => {
                     </div>
                   </div>
                 </div>
+                </fieldset>
 
                 <button
                   type="submit"
                   disabled={regSubmitting}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                 >
-                  <SendIcon className="w-4 h-4" />
-                  <span>{regSubmitting ? 'Menghantar Permohonan...' : 'Hantar Permohonan Keahlian MPGBSIM'}</span>
+                  {regSubmitting ? (
+                    <>
+                      <Loader2 className="w-4.5 h-4.5 animate-spin text-white" />
+                      <span>Menghantar Permohonan Keahlian...</span>
+                    </>
+                  ) : (
+                    <>
+                      <SendIcon className="w-4 h-4" />
+                      <span>Hantar Permohonan Keahlian MPGBSIM</span>
+                    </>
+                  )}
                 </button>
               </form>
             )}

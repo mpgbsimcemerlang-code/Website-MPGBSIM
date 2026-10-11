@@ -70,6 +70,21 @@ export interface ContactInquiry {
   message: string;
 }
 
+export const sanitizeForFirestore = <T extends Record<string, any>>(obj: T): T => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const result: any = Array.isArray(obj) ? [] : {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      continue;
+    } else if (value !== null && typeof value === 'object' && !(value instanceof Date) && !(value instanceof Timestamp)) {
+      result[key] = sanitizeForFirestore(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+};
+
 const STORAGE_KEYS = {
   REGISTRATIONS: 'mpgbsim_pending_registrations',
   INQUIRIES: 'mpgbsim_inquiries',
@@ -81,26 +96,29 @@ export const savePendingRegistration = async (
 ): Promise<{ success: boolean; message: string; refId: string }> => {
   const refId = `MPGB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+  const appData = sanitizeForFirestore({
+    ...data,
+    id: refId,
+    refId,
+    submittedAt: new Date().toISOString(),
+    status: 'pending',
+  });
+
+  const subData = sanitizeForFirestore({
+    name: data.fullName || '',
+    email: data.email || '',
+    phone: data.phoneNumber || data.phone || '',
+    subject: `Permohonan Keahlian PGB: ${data.schoolName || ''} (${data.schoolType || ''})`,
+    category: 'Keahlian',
+    message: `Jawatan: ${data.designation || data.position || 'PGB'}, Tahun Menjadi PGB: ${data.serviceStartYear || data.pgbStartYear || new Date().getFullYear()}, Tahun Menjadi Ahli MPGBSIM: ${data.joinYear || data.schoolJoinYear || new Date().getFullYear()}, Sekolah: ${data.schoolName || ''} (${data.schoolCode || 'Tiada Kod'}), Jenis: ${data.schoolType || ''}, Negeri: ${data.state || ''}, Emel Sekolah: ${data.schoolEmail || '-'}, Tel Sekolah: ${data.schoolPhone || '-'}, Emel PGB: ${data.email || ''}, Tel PGB: ${data.phoneNumber || data.phone || '-'}, Murid: ${data.studentCount || 0}, Guru: ${data.teacherCount || 0}, No KP: ${data.icNumber || '-'}`,
+    status: 'unread',
+    createdAt: new Date().toISOString(),
+  });
+
   // Firestore write (Authoritative Single Source of Truth)
   try {
-    await setDoc(doc(db, 'memberApplications', refId), {
-      ...data,
-      id: refId,
-      refId,
-      submittedAt: new Date().toISOString(),
-      status: 'pending',
-    });
-
-    await setDoc(doc(db, 'submissions', refId), {
-      name: data.fullName,
-      email: data.email,
-      phone: data.phoneNumber || data.phone || '',
-      subject: `Permohonan Keahlian PGB: ${data.schoolName} (${data.schoolType})`,
-      category: 'Keahlian',
-      message: `Jawatan: ${data.designation || data.position}, Tahun Menjadi PGB: ${data.serviceStartYear || data.pgbStartYear || new Date().getFullYear()}, Tahun Menjadi Ahli MPGBSIM: ${data.joinYear || data.schoolJoinYear || new Date().getFullYear()}, Sekolah: ${data.schoolName} (${data.schoolCode || 'Tiada Kod'}), Jenis: ${data.schoolType}, Negeri: ${data.state}, Emel Sekolah: ${data.schoolEmail || '-'}, Tel Sekolah: ${data.schoolPhone || '-'}, Emel PGB: ${data.email}, Tel PGB: ${data.phoneNumber || data.phone || '-'}, Murid: ${data.studentCount}, Guru: ${data.teacherCount}, No KP: ${data.icNumber || '-'}`,
-      status: 'unread',
-      createdAt: new Date().toISOString(),
-    });
+    await setDoc(doc(db, 'memberApplications', refId), appData);
+    await setDoc(doc(db, 'submissions', refId), subData);
   } catch (firestoreErr) {
     console.error('Ralat pangkalan data Firestore semasa menghantar permohonan keahlian:', firestoreErr);
     throw new Error('Gagal menyimpan permohonan ke Cloud Firestore. Sila cuba lagi.');
@@ -125,18 +143,20 @@ export const saveContactInquiry = async (
 ): Promise<{ success: boolean; message: string; refCode: string }> => {
   const refCode = `INQ-${Date.now().toString().slice(-6)}`;
 
+  const inqData = sanitizeForFirestore({
+    name: data.name || '',
+    email: data.email || '',
+    phone: data.phone || '',
+    subject: data.subject || `Pertanyaan [${data.category || 'Umum'}]`,
+    category: data.category || 'Umum',
+    message: data.message || '',
+    status: 'unread',
+    createdAt: new Date().toISOString(),
+  });
+
   // Cloud Firestore write (Authoritative Single Source of Truth)
   try {
-    await setDoc(doc(db, 'submissions', refCode), {
-      name: data.name,
-      email: data.email,
-      phone: data.phone || '',
-      subject: data.subject || `Pertanyaan [${data.category}]`,
-      category: data.category,
-      message: data.message,
-      status: 'unread',
-      createdAt: new Date().toISOString(),
-    });
+    await setDoc(doc(db, 'submissions', refCode), inqData);
   } catch (firestoreErr) {
     console.error('Ralat pangkalan data Firestore semasa menghantar pertanyaan:', firestoreErr);
     throw new Error('Gagal menyimpan pertanyaan ke Cloud Firestore. Sila cuba lagi.');

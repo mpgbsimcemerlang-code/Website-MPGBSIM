@@ -14,7 +14,6 @@ import {
   getFirestore,
   doc,
   getDoc,
-  getDocFromServer,
   collection,
   getDocs,
   setDoc,
@@ -69,13 +68,13 @@ export function isAuthorizedAdminEmail(email?: string | null): boolean {
   );
 }
 
-// Connection test constraint from skill
+// Connection test check with safe offline handling
 export async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    await getDoc(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is currently offline.');
+    if (error instanceof Error && (error.message.includes('offline') || error.message.includes('unavailable'))) {
+      console.warn('Firebase client is currently offline or connecting...');
     }
   }
 }
