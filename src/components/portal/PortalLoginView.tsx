@@ -29,6 +29,7 @@ import {
   Trash2,
   Calendar,
   Loader2,
+  Clock,
 } from 'lucide-react';
 import { Logo } from '../Logo';
 import { useMemberPortal } from '../../context/MemberPortalContext';
@@ -36,6 +37,8 @@ import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool, MemberApplication } from '../../types';
 import { MALAYSIA_STATES, PORTAL_SCHOOL_TYPES } from '../../data/constants';
 import { MemberRegistrationForm, savePendingRegistration } from '../../services/firebaseConfig';
+import { useRateLimiter } from '../../utils/rateLimiter';
+import { RateLimitNotice } from './RateLimitNotice';
 
 export const PortalLoginView: React.FC = () => {
   const {
@@ -106,6 +109,9 @@ export const PortalLoginView: React.FC = () => {
   const [regSubmitting, setRegSubmitting] = useState(false);
   const [regSuccess, setRegSuccess] = useState<string | null>(null);
   const [regError, setRegError] = useState<string | null>(null);
+
+  // Client-side rate-limiting to protect Firestore write quotas
+  const regRateLimiter = useRateLimiter('member_registration');
 
   // Registered schools list from CMS / context
   const registeredSchools = siteData.memberSchools || [];
@@ -280,6 +286,11 @@ export const PortalLoginView: React.FC = () => {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regSubmitting) return;
+
+    if (!regRateLimiter.verifyCanSubmit()) {
+      setRegError(regRateLimiter.errorMessage || 'Sila tunggu sebelum menghantar semula borang pendaftaran.');
+      return;
+    }
 
     setRegSubmitting(true);
     setRegSuccess(null);
@@ -980,7 +991,14 @@ export const PortalLoginView: React.FC = () => {
                   </div>
                 )}
 
-                <fieldset disabled={regSubmitting} className="space-y-4 disabled:opacity-70">
+                {/* Client-side Rate Limiting Protection Banner */}
+                <RateLimitNotice
+                  isLimited={regRateLimiter.isLimited}
+                  retryAfterSeconds={regRateLimiter.retryAfterSeconds}
+                  message={regRateLimiter.errorMessage}
+                />
+
+                <fieldset disabled={regSubmitting || regRateLimiter.isLimited} className="space-y-4 disabled:opacity-70">
                 {/* 1. Maklumat Pengetua / Guru Besar (PGB) */}
                 <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
@@ -1428,13 +1446,18 @@ export const PortalLoginView: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={regSubmitting}
+                  disabled={regSubmitting || regRateLimiter.isLimited}
                   className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs sm:text-sm shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                 >
                   {regSubmitting ? (
                     <>
                       <Loader2 className="w-4.5 h-4.5 animate-spin text-white" />
                       <span>Menghantar Permohonan Keahlian...</span>
+                    </>
+                  ) : regRateLimiter.isLimited ? (
+                    <>
+                      <Clock className="w-4.5 h-4.5 animate-spin text-amber-300" />
+                      <span>Sila Tunggu {regRateLimiter.retryAfterSeconds}s (Kawalan Kuota Aktif)</span>
                     </>
                   ) : (
                     <>

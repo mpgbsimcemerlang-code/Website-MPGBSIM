@@ -26,9 +26,11 @@ export const BestPracticeSection: React.FC<BestPracticeProps> = ({
 
   const categories = ['Semua', 'Tahfiz & Kurikulum', 'Kepimpinan Digital', 'Pembangunan Sahsiah', 'Kelestarian & Wakaf'];
 
+  const safePractices = Array.isArray(practices) ? practices : [];
+
   const filteredPractices = selectedCategory === 'Semua'
-    ? practices
-    : practices.filter((p) => p.category === selectedCategory);
+    ? safePractices
+    : safePractices.filter((p) => p && p.category === selectedCategory);
 
   return (
     <section id="best-practice" className="py-20 bg-slate-50 border-b border-slate-200 scroll-mt-20">
@@ -127,7 +129,7 @@ export const BestPracticeSection: React.FC<BestPracticeProps> = ({
 
                 {/* Key Outcomes Checklist */}
                 <div className="space-y-1.5 text-xs text-slate-600 mb-2">
-                  {bp.keyOutcomes.map((outcome, idx) => (
+                  {(bp.keyOutcomes || []).map((outcome, idx) => (
                     <div key={idx} className="flex items-start gap-2">
                       <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
                       <span>{outcome}</span>

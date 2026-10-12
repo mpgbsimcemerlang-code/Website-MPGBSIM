@@ -11,6 +11,7 @@ import {
   orderBy,
   Timestamp,
 } from '../firebase';
+import { checkAndRecordRateLimit } from '../utils/rateLimiter';
 
 export interface FirebaseSchemaOverview {
   collections: {
@@ -94,6 +95,12 @@ const STORAGE_KEYS = {
 export const savePendingRegistration = async (
   data: MemberRegistrationForm
 ): Promise<{ success: boolean; message: string; refId: string }> => {
+  // Client-side rate-limiting check to prevent spamming/quota exhaustion
+  const rateLimit = checkAndRecordRateLimit('member_registration');
+  if (!rateLimit.allowed) {
+    throw new Error(rateLimit.message);
+  }
+
   const refId = `MPGB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const appData = sanitizeForFirestore({
@@ -141,6 +148,12 @@ export const savePendingRegistration = async (
 export const saveContactInquiry = async (
   data: ContactInquiry
 ): Promise<{ success: boolean; message: string; refCode: string }> => {
+  // Client-side rate-limiting check
+  const rateLimit = checkAndRecordRateLimit('general_submission');
+  if (!rateLimit.allowed) {
+    throw new Error(rateLimit.message);
+  }
+
   const refCode = `INQ-${Date.now().toString().slice(-6)}`;
 
   const inqData = sanitizeForFirestore({

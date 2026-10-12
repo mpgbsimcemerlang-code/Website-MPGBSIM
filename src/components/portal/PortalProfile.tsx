@@ -36,6 +36,8 @@ import {
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { Logo } from '../Logo';
+import QRCode from 'qrcode';
+import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
 
 const normalizeSchoolCategory = (t?: string): string => {
   if (!t) return 'Sekolah Menengah';
@@ -102,6 +104,8 @@ export const PortalProfile: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isDigitalCardModalOpen, setIsDigitalCardModalOpen] = useState(false);
+  const [cardQrCodeUrl, setCardQrCodeUrl] = useState<string>('');
 
   // Password Change States
   const [oldPassword, setOldPassword] = useState('');
@@ -425,6 +429,24 @@ export const PortalProfile: React.FC = () => {
     ? 'MPGB-2026-MJAC011'
     : (currentUser?.membershipNo?.replace('MIA1009', 'MJAC011') || `MPGB-2026-${effectiveCardCode}`);
 
+  useEffect(() => {
+    const payload = JSON.stringify({
+      org: 'MPGBSIM',
+      id: membershipNumber,
+      name: fullName,
+      position,
+      school,
+      state,
+      status: 'AKTIF',
+    });
+
+    QRCode.toDataURL(payload, { width: 150, margin: 1, color: { dark: '#064e3b', light: '#ffffff' } }, (err, url) => {
+      if (!err && url) {
+        setCardQrCodeUrl(url);
+      }
+    });
+  }, [membershipNumber, fullName, position, school, state]);
+
   return (
     <div className="space-y-8 pb-12">
       {/* Header */}
@@ -443,21 +465,21 @@ export const PortalProfile: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
+            onClick={() => setIsDigitalCardModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+            title="Muat Turun & Papar Kad Keahlian Digital (QR Code)"
+          >
+            <Download className="w-4 h-4 text-slate-950" />
+            <span>Muat Turun Kad Digital (QR Code)</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setIsPrintModalOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
             title="Cetak & Muat Turun Rekod Profil Kepimpinan Rasmi (PDF)"
           >
             <Printer className="w-4 h-4 text-amber-300" />
             <span>Cetak Profil (PDF)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
-            title="Cetak Kad Digital Keahlian"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Cetak Kad Digital</span>
           </button>
         </div>
       </div>
@@ -577,12 +599,29 @@ export const PortalProfile: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-2 rounded-xl bg-white text-slate-900 flex flex-col items-center justify-center">
-                <QrCode className="w-10 h-10" />
-                <span className="text-[8px] font-mono font-bold mt-0.5">DISAHKAN</span>
+              <div
+                onClick={() => setIsDigitalCardModalOpen(true)}
+                className="p-1.5 rounded-xl bg-white text-slate-900 flex flex-col items-center justify-center shrink-0 border border-amber-400/40 cursor-pointer hover:scale-105 transition shadow-sm"
+                title="Klik untuk membuka Kad Keahlian Digital penuh & muat turun PNG"
+              >
+                {cardQrCodeUrl ? (
+                  <img src={cardQrCodeUrl} alt="QR Code Ahli" className="w-12 h-12 object-contain" />
+                ) : (
+                  <QrCode className="w-10 h-10" />
+                )}
+                <span className="text-[7px] font-mono font-bold mt-0.5">DISAHKAN</span>
               </div>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDigitalCardModalOpen(true)}
+            className="w-full py-3 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-slate-950" />
+            <span>Muat Turun Kad Keahlian Digital (QR Code)</span>
+          </button>
 
           <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
             <span className="font-bold flex items-center gap-1.5">
@@ -1632,6 +1671,12 @@ export const PortalProfile: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Digital Membership Card Modal */}
+      <DigitalMembershipCardModal
+        isOpen={isDigitalCardModalOpen}
+        onClose={() => setIsDigitalCardModalOpen(false)}
+      />
     </div>
   );
 };

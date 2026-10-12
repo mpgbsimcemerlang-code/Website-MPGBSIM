@@ -12,6 +12,7 @@ import {
   Flame,
   ShieldCheck,
   RefreshCw,
+  Trash2,
   ExternalLink,
   UserCheck,
   Layout,
@@ -66,6 +67,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     updateAlumniRecord,
     deleteAlumniRecord,
     toggleFeatureAlumniRecord,
+    purgeMockData,
   } = useAdminContent();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -95,6 +97,13 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     setIsSyncing(true);
     await syncAllToFirestore();
     setIsSyncing(false);
+  };
+
+  const handlePurgeMockData = () => {
+    if (window.confirm('Adakah anda pasti mahu membuang semua data contoh (mock data)? Data yang anda masukkan sendiri tidak akan terjejas.')) {
+      purgeMockData();
+      alert('Semua data contoh telah berjaya dibuang! Portal & Laman Web kini hanya memaparkan data rasmi yang anda masukkan.');
+    }
   };
 
   const applications = siteData.memberApplications || [];
@@ -261,6 +270,15 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handlePurgeMockData}
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition border border-amber-200 cursor-pointer"
+              title="Padam semua data contoh (mock data) dan kekalkan hanya data rasmi yang anda masukkan"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-amber-600" />
+              <span>Buang Data Contoh</span>
+            </button>
+
             <button
               onClick={handleManualSync}
               disabled={isSyncing}

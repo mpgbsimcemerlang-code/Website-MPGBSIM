@@ -23,9 +23,13 @@ import {
   saveToIndexedDB,
   safeLocalStorageSet,
   safeLocalStorageRemove,
+  getInitialSiteContentSync,
+  getFullSiteContentAsync,
 } from '../utils/storage';
 import { sortNewsByPublishedDate } from '../utils/dateUtils';
 import faizLeaderPhoto from '../assets/images/mohamad_faiz_azizan_leader.webp';
+import { INITIAL_BEST_PRACTICES, INITIAL_ANNOUNCEMENTS } from '../data/portalMockData';
+import { INITIAL_DEMO_ALUMNI } from '../data/alumniMockData';
 
 import {
   auth,
@@ -252,6 +256,7 @@ interface AdminContentContextType {
   approveAlumniRecord: (id: string, verifiedBy?: string) => Promise<void>;
   rejectAlumniRecord: (id: string, reason: string, verifiedBy?: string) => Promise<void>;
   toggleFeatureAlumniRecord: (id: string) => Promise<void>;
+  purgeMockData: () => void;
   resetAllContent: () => void;
 }
 
@@ -384,42 +389,554 @@ const DUMMY_MOCK_SCHOOL_IDS = new Set(['sch-1', 'sch-2', 'sch-3', 'sch-4', 'sch-
 const DUMMY_MOCK_SCHOOL_CODES = new Set(['WRA0001', 'ABA2004', 'BEA4002', 'BIA3012', 'DEA1021', 'JIA5019', 'CIA6008', 'KEA7001']);
 
 const DEFAULT_NETWORK_STATS: NetworkStats = {
-  schoolsCount: 0,
-  statesCount: 0,
-  principalsCount: 0,
-  studentsBenefited: '0',
+  schoolsCount: 250,
+  statesCount: 14,
+  principalsCount: 1500,
+  studentsBenefited: '120,000+',
   isPlaceholder: false,
 };
 
+export const DEFAULT_NEWS: NewsItem[] = [
+  {
+    id: 'news-01',
+    title: 'Konvensyen Kebangsaan Pengetua & Guru Besar Sekolah Islam Malaysia 2026 Dirasmikan',
+    slug: 'konvensyen-kebangsaan-pgb-2026',
+    summary: 'Lebih 1,500 pemimpin sekolah Islam seluruh negara berkumpul bagi membincangkan Rangka Tindakan Strategik MPGBSIM 2025–2030 dan integrasi AI dalam pengurusan sekolah.',
+    content: `KUALA LUMPUR — Konvensyen Kebangsaan Pengetua & Guru Besar Sekolah Islam Malaysia (KPSI) 2026 telah dirasmikan dengan jayanya di Dewan Persidangan Utama Kompleks Pendidikan Islam Kebangsaan.
+
+Konvensyen yang menghimpunkan lebih 1,500 Pengetua, Guru Besar serta Pemimpin Kanan Sekolah (SLT) dari SMKA, SABK, Sekolah Islam Swasta dan Maahad Tahfiz seluruh negara ini berfokuskan kepada memperkasakan tadbir urus Rabbani dan pemanfaatan teknologi AI secara beretika.
+
+Dalam ucapan perasmian, Pengerusi MPGBSIM, Mohamad Faiz Azizan, menekankan bahawa pemerkasaan kepimpinan instruksional dan keteguhan sahsiah guru merupakan teras utama dalam melahirkan generasi Rabbani yang berdaya saing global.`,
+    category: 'Kenyataan Media',
+    date: '2026-09-24',
+    author: 'Urus Setia Kebangsaan MPGBSIM',
+    readTime: '4 minit bacaan',
+    imageUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=1200',
+    featured: true,
+    status: 'published',
+  },
+  {
+    id: 'news-02',
+    title: 'Sekolah Rendah Islam I Musleh Rintis Program Sekolah Pintar Rabbani Berorientasikan AI',
+    slug: 'sri-musleh-rintis-sekolah-pintar-ai',
+    summary: 'Anugerah Inovasi Digital MPGBSIM 2026 diberikan kepada SRI I Musleh atas kejayaan mengintegrasikan modul pengecaman hafazan Al-Quran berasaskan AI.',
+    content: `MELAKA — Sekolah Rendah Islam I Musleh melakar sejarah apabila menjadi sekolah pertama yang melaksanakan Sistem Pemantauan Hafazan & Murajaah berasaskan Kecerdasan Buatan (AI) bagi murid rendah.
+
+Program ini membolehkan guru dan ibu bapa memantau kelancaran hafazan murid secara masa nyata di samping memastikan penerapan adab dan akhlak Islamiah teratur.`,
+    category: 'Kejayaan Sekolah',
+    date: '2026-09-20',
+    author: 'Ustaz Abdul Qayyum bin Yaakop',
+    readTime: '3 minit bacaan',
+    imageUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&q=80&w=1200',
+    featured: false,
+    status: 'published',
+    schoolName: 'Sekolah Rendah Islam I Musleh',
+    schoolCode: 'MJAC011',
+    state: 'Melaka',
+    isSchoolAchievement: true,
+    achievementLevel: 'Kebangsaan',
+  },
+  {
+    id: 'news-03',
+    title: 'SMKA Putrajaya Menjuarai Pertandingan Debat Bahasa Arab & English Antarabangsa',
+    slug: 'smka-putrajaya-juara-debat-antarabangsa',
+    summary: 'Pasukan murid SMKA Putrajaya membawa pulang Anugerah Emas dalam International Islamic Schools Debate Championship 2026.',
+    content: `PUTRAJAYA — Pasukan debater SMKA Putrajaya sekali lagi mengharumkan nama negara selepas merangkul Anugerah Emas dan Pembahas Terbaik dalam Kejohanan Debat Sekolah Islam Antarabangsa.`,
+    category: 'Kejayaan Sekolah',
+    date: '2026-09-18',
+    author: 'Ustaz Zamri bin Abdul Razak',
+    readTime: '3 minit bacaan',
+    imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=1200',
+    featured: false,
+    status: 'published',
+    schoolName: 'SMKA Putrajaya',
+    schoolCode: 'ABA2004',
+    state: 'Wilayah Persekutuan',
+    isSchoolAchievement: true,
+    achievementLevel: 'Antarabangsa',
+  },
+  {
+    id: 'news-04',
+    title: 'Pelancaran Rangka Tindakan Strategik Kepimpinan Sekolah Islam Malaysia (2025–2030)',
+    slug: 'pelancaran-rangka-tindakan-strategik-2025-2030',
+    summary: 'MPGBSIM memperkenalkan 5 Teras Utama pemerkasaan institusi pendidikan Islam berasaskan pengurusan profesional dan kelestarian dana wakaf.',
+    content: `BANGI — Rangka Tindakan Strategik Kepimpinan Sekolah Islam Malaysia (2025–2030) dilancarkan secara rasmi bagi memberikan panduan holistik kepada Pengetua dan Guru Besar dalam mengemudi cabaran persekolahan abad ke-21.`,
+    category: 'Pendidikan',
+    date: '2026-09-12',
+    author: 'Biro Strategik & Dasar MPGBSIM',
+    readTime: '5 minit bacaan',
+    imageUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1200',
+    featured: false,
+    status: 'published',
+  },
+  {
+    id: 'news-05',
+    title: 'Penyelarasan Standard Kurikulum Diniyah & Tahfiz Bersama Kementerian Pendidikan Malaysia',
+    slug: 'penyelarasan-standard-kurikulum-diniyah-kpm',
+    summary: 'Sesi wacana khas antara kepimpinan MPGBSIM dan Bahagian Pendidikan Islam KPM bagi memantapkan kualiti pendidikan Dini.',
+    content: `PUTRAJAYA — Mesyuarat meja bulat penyelarasan kurikulum telah memutuskan beberapa garis panduan baru bagi menyelaraskan sukatan Diniyah dan Tahfiz swasta dengan standard pentaksiran kebangsaan.`,
+    category: 'Pengurusan',
+    date: '2026-09-05',
+    author: 'Biro Kurikulum & Latihan MPGBSIM',
+    readTime: '4 minit bacaan',
+    imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=1200',
+    featured: false,
+    status: 'published',
+  },
+];
+
+export const DEFAULT_STRATEGIC_FOCUS: StrategicFocus[] = [
+  {
+    id: 1,
+    code: 'FS-01',
+    title: 'Pembangunan Kepimpinan & Governan',
+    shortDesc: 'Memantapkan kompetensi manajerial, kepimpinan instruksional dan tata kelola berwibawa bagi PGB.',
+    fullDesc: 'Fokus ini bertujuan memperkukuhkan kapasiti kepimpinan Pengetua dan Guru Besar melalui siri latihan berterusan, pentauliahan profesionalisme, dan pematuhan standard pentadbiran berwibawa.',
+    iconName: 'Award',
+    initiatives: [
+      'Modul Kepimpinan Holistik PGB (MKH-PGB)',
+      'Program Mentoring Pentadbir Baharu (PMPB)',
+      'Audit Kendiri Standard Kualiti Sekolah Islam (SKSI)'
+    ],
+    kpi: '100% PGB sekolah ahli menamatkan sekurang-kurangnya 24 jam latihan kepimpinan setahun.',
+    status: 'Fokus Utama',
+  },
+  {
+    id: 2,
+    code: 'FS-02',
+    title: 'Integrasi Kurikulum & Ekosistem Rabbani',
+    shortDesc: 'Mengharmonikan sukatan Diniyah, Tahfiz dan akademik KPM berasaskan nilai ketuhanan.',
+    fullDesc: 'Menyelaras dan memperkasakan kualiti pengajaran dan pembelajaran (PdP) agar ilmu naqli dan aqli diintegrasikan secara holistik demi melahirkan generasi Rabbani.',
+    iconName: 'BookOpen',
+    initiatives: [
+      'Penyelarasan Standard Pentaksiran Dini & Tahfiz Kebangsaan',
+      'Modul Pembinaan Sahsiah & Adab Murid Asrama',
+      'Bengkel Pedagogi Abad Ke-21 Guru Dini'
+    ],
+    kpi: 'Peningkatan 15% gred pencapaian SPM & STAM di sekolah-sekolah ahli.',
+    status: 'Sedang Berjalan',
+  },
+  {
+    id: 3,
+    code: 'FS-03',
+    title: 'Transformasi Digital & Pemerkasaan AI',
+    shortDesc: 'Memacu pembudayaan teknologi AI, papan pemuka analitik data dan portal pentadbiran bersepadu.',
+    fullDesc: 'Menyediakan prasarana dan kemahiran digital untuk pentadbir dan guru dalam menggunakan kecerdasan buatan (AI) bagi automasi pengurusan dan PdP interaktif.',
+    iconName: 'Cpu',
+    initiatives: [
+      'Pusat Rujukan AI & Generatif Prompt Library MPGBSIM',
+      'Sistem Portal Keahlian & Pangkalan Data Bersepadu Awam',
+      'Bengkel Pengurusan Sekolah Berorientasikan Analitik Data'
+    ],
+    kpi: '80% sekolah ahli menggunakan portal dan alat AI dalam pentadbiran harian.',
+    status: 'Fokus Utama',
+  },
+  {
+    id: 4,
+    code: 'FS-04',
+    title: 'Jalinan Strategik & Wakaf Pendidikan',
+    shortDesc: 'Membangunkan kemandirian kewangan sekolah melalui model wakaf produktif dan tajaan korporat.',
+    fullDesc: 'Memperluaskan jaringan kerjasama dengan agensi awam, korporat, institusi pengajian tinggi dan alumni bagi menjana dana kebajikan serta biasiswa pendidikan.',
+    iconName: 'Users',
+    initiatives: [
+      'Tabung Wakaf Pendidikan Sekolah Islam Kebangsaan',
+      'Program Pertukaran Kepimpinan & Kajian Lapangan Antarabangsa',
+      'Kemitraan Strategik Universiti Awam & Swasta'
+    ],
+    kpi: 'RM2.5 Juta dana wakaf dan tajaan disalurkan kepada sekolah terkesan.',
+    status: 'Perancangan 2026',
+  },
+  {
+    id: 5,
+    code: 'FS-05',
+    title: 'Kebajikan & Advokasi Hak PGB',
+    shortDesc: 'Memelihara kebajikan, sokongan guaman, serta suarakan aspirasi sekolah Islam di peringkat dasar.',
+    fullDesc: 'Bertindak sebagai ejen perantara rasmi dalam menyuarakan keperluan sekolah-sekolah Islam kepada kementerian, agensi agama negeri dan pihak berkuasa berkaitan.',
+    iconName: 'ShieldCheck',
+    initiatives: [
+      'Bilik Gerakan Bencana & Bantuan Kecemasan PGB',
+      'Unit Advokasi Dasar & Kebajikan Ahli Kebangsaan',
+      'Anugerah Tokoh Kepimpinan & Legasi PGB'
+    ],
+    kpi: 'Maklum balas sokongan dan kebajikan diselesaikan dalam tempoh 48 jam.',
+    status: 'Fokus Utama',
+  },
+];
+
+export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
+  {
+    id: 'sch-musleh-1',
+    name: 'Sekolah Rendah Islam I Musleh',
+    code: 'MJAC011',
+    type: 'Rakan Musleh',
+    state: 'Melaka',
+    district: 'Melaka Tengah',
+    principal: 'Ustaz Abdul Qayyum bin Yaakop',
+    principalPhotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    studentCount: 450,
+    teacherCount: 38,
+    joinYear: 2026,
+    serviceStartYear: 2018,
+    pgbStartYear: 2020,
+    logoUrl: '/mpgbsim-official-logo.png',
+    schoolPhotoUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80',
+    website: 'https://imuslehmelaka.edu.my',
+    description: 'Sekolah Rendah Islam swasta bertaraf Rakan Musleh yang menawarkan pendidikan holistik bersepadu mengintegrasikan akademik KPM dan kurikulum Musleh.',
+    address: 'Batu 4 1/2, Jalan Peringgit, 75400 Melaka, Melaka Bandaraya Bersejarah.',
+    phone: '+60 6-335 1290',
+    email: 'abdulqayyumyaakop@imuslehmelaka.edu.my',
+    schoolPhone: '+60 6-335 1290',
+    schoolEmail: 'admin@imuslehmelaka.edu.my',
+    pgbPhone: '+60 19-665 4321',
+    pgbEmail: 'abdulqayyumyaakop@imuslehmelaka.edu.my',
+  },
+  {
+    id: 'sch-2',
+    name: 'Sekolah Menengah Kebangsaan Agama (SMKA) Putrajaya',
+    code: 'ABA2004',
+    type: 'Sekolah Menengah',
+    state: 'Wilayah Persekutuan',
+    district: 'Putrajaya',
+    principal: 'Ustaz Zamri bin Abdul Razak',
+    principalPhotoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    studentCount: 820,
+    teacherCount: 65,
+    joinYear: 2018,
+    serviceStartYear: 2010,
+    pgbStartYear: 2015,
+    logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=400&q=80',
+    schoolPhotoUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1000&q=80',
+    website: 'https://smkaputrajaya.edu.my',
+    description: 'Sekolah Menengah Kebangsaan Agama terkemuka yang melahirkan murid cemerlang akademik, Bahasa Arab dan sahsiah kepimpinan Rabbani.',
+    address: 'Presint 11, 62300 Wilayah Persekutuan Putrajaya.',
+    phone: '+60 3-8888 1234',
+    email: 'zamri.razak@smkaputrajaya.edu.my',
+    schoolPhone: '+60 3-8888 1234',
+    schoolEmail: 'pengetua@smkaputrajaya.edu.my',
+    pgbPhone: '+60 12-345 6789',
+    pgbEmail: 'zamri.razak@smkaputrajaya.edu.my',
+  },
+  {
+    id: 'sch-3',
+    name: 'Sekolah Rendah Islam Integrasi As-Syakirin',
+    code: 'BEA4002',
+    type: 'Sekolah Rendah',
+    state: 'Selangor',
+    district: 'Petaling',
+    principal: 'Ustazah Dr. Hajah Aminah binti Zakaria',
+    principalPhotoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
+    studentCount: 650,
+    teacherCount: 48,
+    joinYear: 2019,
+    serviceStartYear: 2012,
+    pgbStartYear: 2018,
+    logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=400&q=80',
+    schoolPhotoUrl: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1000&q=80',
+    website: 'https://sriintegrasias-syakirin.edu.my',
+    description: 'Sekolah rendah Islam pilihan utama di Selangor dengan penekanan kurikulum akademik bersepadu dan pembangunan sahsiah murid.',
+    address: 'Jalan Bunga Raya, Section 13, 40100 Shah Alam, Selangor.',
+    phone: '+60 3-5510 4321',
+    email: 'aminah.zakaria@srikreatif.edu.my',
+    schoolPhone: '+60 3-5510 4321',
+    schoolEmail: 'admin@srikreatif.edu.my',
+    pgbPhone: '+60 12-441 8902',
+    pgbEmail: 'aminah.zakaria@srikreatif.edu.my',
+  },
+  {
+    id: 'sch-4',
+    name: 'Maahad Tahfiz Sains Integrasi Tanah Merah',
+    code: 'DEA1021',
+    type: 'Maahad Tahfiz',
+    state: 'Kelantan',
+    district: 'Tanah Merah',
+    principal: 'Ustaz Wan Muhammad Naim bin Hassan',
+    principalPhotoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+    studentCount: 380,
+    teacherCount: 32,
+    joinYear: 2020,
+    serviceStartYear: 2014,
+    pgbStartYear: 2019,
+    logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=400&q=80',
+    schoolPhotoUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1000&q=80',
+    website: 'https://mtsi-tanahmerah.edu.my',
+    description: 'Institusi Maahad Tahfiz Sains terkemuka Kelantan yang melahirkan huffaz profesional dalam bidang kejuruteraan dan perubatan.',
+    address: 'Bandar Baru Tanah Merah, 17500 Tanah Merah, Kelantan.',
+    phone: '+60 9-955 8765',
+    email: 'naim.hassan@mtsi.edu.my',
+    schoolPhone: '+60 9-955 8765',
+    schoolEmail: 'admin@mtsi.edu.my',
+    pgbPhone: '+60 13-987 6543',
+    pgbEmail: 'naim.hassan@mtsi.edu.my',
+  },
+  {
+    id: 'sch-5',
+    name: 'SMA Darul Aman Al-Islamiah Alor Setar',
+    code: 'KEA7001',
+    type: 'Sekolah Menengah',
+    state: 'Kedah',
+    district: 'Kota Setar',
+    principal: 'Ustaz Dr. Abdul Rahman bin Hashim',
+    principalPhotoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=400&q=80',
+    studentCount: 710,
+    teacherCount: 55,
+    joinYear: 2017,
+    serviceStartYear: 2008,
+    pgbStartYear: 2012,
+    logoUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=400&q=80',
+    schoolPhotoUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1000&q=80',
+    website: 'https://smadarulaman.edu.my',
+    description: 'Sekolah Agama Bantuan Kerajaan (SABK) berprestasi tinggi di Kedah dengan kebitaraan Bahasa Arab dan Tahfiz.',
+    address: 'Jalan Langgar, 05000 Alor Setar, Kedah Darul Aman.',
+    phone: '+60 4-733 9988',
+    email: 'rahman.hashim@smadarulaman.edu.my',
+    schoolPhone: '+60 4-733 9988',
+    schoolEmail: 'admin@smadarulaman.edu.my',
+    pgbPhone: '+60 13-991 3344',
+    pgbEmail: 'rahman.hashim@smadarulaman.edu.my',
+  },
+];
+
+export const DEFAULT_PROGRAMS: ProgramEvent[] = [
+  {
+    id: 'prog-01',
+    title: 'Konvensyen Pemimpin Sekolah Islam Malaysia (KPSI) 2026',
+    theme: 'Menerajui Kepimpinan Rabbani & AI Generatif Dalam Pentadbiran Sekolah',
+    date: '2026-11-14',
+    time: '8:30 Pagi - 5:00 Petang',
+    startTime: '08:30',
+    endTime: '17:00',
+    venue: 'Dewan Persidangan Utama Kompleks Pendidikan Islam Antarabangsa, Bangi',
+    mode: 'Hibrid',
+    targetAudience: 'Pengetua, Guru Besar, Penolong Kanan & SLT Sekolah Islam',
+    description: 'Himpunan tahunan kepimpinan tertinggi sekolah Islam Malaysia menampilkan pembentangan ucaptama, wacana panel pakar AI, serta majlis penganugerahan Sekolah Cemerlang MPGBSIM.',
+    spotsTotal: 500,
+    spotsFilled: 342,
+    registrationOpen: true,
+    closingDate: '2026-11-05',
+    fees: 'Percuma Bagi Ahli Berdaftar (RM150 Bukan Ahli)',
+    posterUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=1200',
+    organiser: 'Urus Setia Kebangsaan MPGBSIM',
+    status: 'Upcoming',
+    order: 0,
+  },
+  {
+    id: 'prog-02',
+    title: 'Mesyuarat Agung Tahunan (AGM) MPGBSIM Kali Ke-11 Sesi 2026',
+    theme: 'Memperkasa Organisasi, Mendaulatkan Kepimpinan Pendidikan Islam',
+    date: '2026-10-24',
+    time: '8:30 Pagi - 1:00 Tengah Hari',
+    startTime: '08:30',
+    endTime: '13:00',
+    venue: 'Dewan Seri Melati, Putrajaya & Siaran Langsung Portal Ahli',
+    mode: 'Fizikal',
+    targetAudience: 'Semua Ahli Pengetua & Guru Besar Berdaftar',
+    description: 'Mesyuarat rasmi dwi-tahunan mengesahkan penyata kewangan beraudit, laporan aktiviti dan pembentangan usul transformasi digital sekolah ahli.',
+    spotsTotal: 300,
+    spotsFilled: 210,
+    registrationOpen: true,
+    closingDate: '2026-10-15',
+    fees: 'Percuma (Eksklusif Ahli MPGBSIM)',
+    posterUrl: 'https://images.unsplash.com/photo-1431540015161-0bf868a2d407?auto=format&fit=crop&q=80&w=1200',
+    organiser: 'Setiausaha Agung MPGBSIM',
+    status: 'Upcoming',
+    order: 1,
+  },
+  {
+    id: 'prog-03',
+    title: 'Bengkel Pemantapan AI Generatif & Pengurusan Data Sekolah Bagi PGB',
+    theme: 'Aplikasi Practical Prompt Engineering Bagi Pengetua & Guru Besar',
+    date: '2026-12-05',
+    time: '9:00 Pagi - 12:30 Tengah Hari',
+    startTime: '09:00',
+    endTime: '12:30',
+    venue: 'Aplikasi Zoom / Portal Ahli MPGBSIM',
+    mode: 'Dalam Talian',
+    targetAudience: 'Pentadbir Sekolah, Guru Kanan & Urus Setia Data',
+    description: 'Bengkel praktikal menggunakan Google Gemini, NotebookLM dan Canva AI untuk automasi borang, analisis pencapaian murid dan draf kertas kerja.',
+    spotsTotal: 1000,
+    spotsFilled: 680,
+    registrationOpen: true,
+    closingDate: '2026-12-01',
+    fees: 'Percuma Bagi Ahli',
+    posterUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=1200',
+    organiser: 'Biro Transformasi Digital MPGBSIM',
+    status: 'Upcoming',
+    order: 2,
+  },
+];
+
+export const DEFAULT_LEADERSHIP: LeaderProfile[] = [
+  {
+    id: 'lead-1',
+    name: 'Mohamad Faiz Azizan',
+    role: 'Pengerusi Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
+    subRole: 'Pengerusi Kebangsaan MPGBSIM',
+    institution: 'Ibu Pejabat Sekretariat MPGBSIM',
+    state: 'Selangor',
+    qualification: 'Sarjana Pengurusan Pendidikan & Syariah',
+    avatarUrl: faizLeaderPhoto,
+    term: 'Penggal 2026–2028',
+    category: 'Kepimpinan Utama',
+    order: 0,
+  },
+  {
+    id: 'lead-2',
+    name: 'Ustaz Zamri bin Abdul Razak',
+    role: 'Timbalan Pengerusi Kebangsaan',
+    subRole: 'Pengetua SMKA Putrajaya',
+    institution: 'SMKA Putrajaya',
+    state: 'Wilayah Persekutuan',
+    qualification: 'Ijazah Sarjana Muda Pendidikan Islam (UM)',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600',
+    term: 'Penggal 2026–2028',
+    category: 'Kepimpinan Utama',
+    order: 1,
+  },
+  {
+    id: 'lead-3',
+    name: 'Ustazah Dr. Hajah Aminah binti Zakaria',
+    role: 'Setiausaha Agung Kebangsaan',
+    subRole: 'Guru Besar SRI Integrasi As-Syakirin',
+    institution: 'SRI Integrasi As-Syakirin',
+    state: 'Selangor',
+    qualification: 'Doktor Falsafah (PhD) Pengurusan Pendidikan (UKM)',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600',
+    term: 'Penggal 2026–2028',
+    category: 'Kepimpinan Utama',
+    order: 2,
+  },
+  {
+    id: 'lead-4',
+    name: 'Ustaz Abdul Qayyum bin Yaakop',
+    role: 'Pengerusi Biro Sekolah Rendah & Rakan Musleh',
+    subRole: 'Guru Besar SRI I Musleh',
+    institution: 'Sekolah Rendah Islam I Musleh',
+    state: 'Melaka',
+    qualification: 'Ijazah Sarjana Muda Pengajian Islam & Bahasa Arab',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600',
+    term: 'Penggal 2026–2028',
+    category: 'Pengerusi Biro',
+    order: 3,
+  },
+  {
+    id: 'lead-5',
+    name: 'Ustaz Dr. Abdul Rahman bin Hashim',
+    role: 'Pengerusi Biro Akademik & Kurikulum',
+    subRole: 'Pengetua SMA Darul Aman',
+    institution: 'SMA Darul Aman Al-Islamiah',
+    state: 'Kedah',
+    qualification: 'PhD Syariah Islamiah (Al-Azhar)',
+    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=600',
+    term: 'Penggal 2026–2028',
+    category: 'Pengerusi Biro',
+    order: 4,
+  },
+];
+
+export const DEFAULT_RESOURCES: ResourceDocument[] = [
+  {
+    id: 'res-01',
+    title: 'Perlembagaan Rasmi MPGBSIM (Pindaan 2024)',
+    category: 'Dokumen MPGBSIM',
+    publishedDate: '2026-01-15',
+    fileSize: '2.4 MB',
+    fileFormat: 'PDF',
+    downloads: 342,
+    description: 'Dokumen asas perlembagaan, tatacara mesyuarat, peranan kepimpinan dan klausa keahlian kebangsaan.',
+    version: 'v2.4',
+    visibility: 'MEMBER',
+  },
+  {
+    id: 'res-02',
+    title: 'Modul Kepimpinan Holistik Pengetua Sekolah Islam (MKH-PGB)',
+    category: 'Modul Kepimpinan',
+    publishedDate: '2026-05-10',
+    fileSize: '8.7 MB',
+    fileFormat: 'PDF',
+    downloads: 620,
+    description: 'Panduan kompetensi kepimpinan Rabbani, pengurusan bakat guru, kewangan wakaf dan kurikulum bersepadu.',
+    version: 'v3.1',
+    visibility: 'MEMBER',
+  },
+  {
+    id: 'res-03',
+    title: 'Garis Panduan Pelaksanaan AI Generatif Dalam Pentadbiran Sekolah',
+    category: 'Garis Panduan',
+    publishedDate: '2026-09-18',
+    fileSize: '3.1 MB',
+    fileFormat: 'PDF',
+    downloads: 415,
+    description: 'SOP penggunaan ChatGPT, Gemini dan automasi borang bagi memelihara privasi data murid dan institusi.',
+    version: 'v1.0',
+    visibility: 'MEMBER',
+  },
+  {
+    id: 'res-04',
+    title: 'Template Kertas Kerja Rasmi Cadangan Program & Sumbangan',
+    category: 'Template',
+    publishedDate: '2026-02-01',
+    fileSize: '450 KB',
+    fileFormat: 'DOCX',
+    downloads: 890,
+    description: 'Templat standard format Word untuk permohonan kelulusan program sekolah dan permohonan tajaan.',
+    version: 'v2026',
+    visibility: 'MEMBER',
+  },
+];
+
+export const DEFAULT_MEDIA: MediaItem[] = [
+  {
+    id: 'med-01',
+    title: 'Perasmian Konvensyen Pemimpin Sekolah Islam Malaysia 2026',
+    type: 'photo',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800',
+    date: '2026-09-24',
+    location: 'Cyberjaya',
+    caption: 'Majlis perasmian penuh gilang-gemilang yang dihadiri oleh lebih 1,500 pentadbir sekolah Islam.',
+    category: 'Konvensyen',
+  },
+  {
+    id: 'med-02',
+    title: 'Pelancaran Modul Kepimpinan Rabbani & AI Sekolah Islam',
+    type: 'photo',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=800',
+    date: '2026-09-12',
+    location: 'Putrajaya',
+    caption: 'Sesi penyampaian modul pengurusan kepada wakil pengerusi biro negeri.',
+    category: 'Program',
+  },
+  {
+    id: 'med-03',
+    title: 'Mesyuarat Agung Tahunan & Sesi Pertukaran MoU Sekolah Ahli',
+    type: 'photo',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&q=80&w=800',
+    date: '2026-08-20',
+    location: 'Bangi',
+    caption: 'Penandatanganan kerjasama pintar antara MPGBSIM dan agensi pendidikan Islam.',
+    category: 'Mesyuarat',
+  },
+];
+
 const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[] => {
   try {
-    // Strictly restrict directory to official Sekolah Rendah Islam I Musleh
-    const muslehSchools = (schools || []).filter((s) => {
-      return (
-        s.id === 'sch-musleh-1' ||
-        s.code?.toUpperCase() === 'MJAC011' ||
-        s.code?.toUpperCase() === 'MIA1009' ||
-        s.name.toLowerCase().includes('musleh') ||
-        (s.email && s.email.toLowerCase().includes('imusleh'))
-      );
+    if (!schools || schools.length === 0) return DEFAULT_MEMBER_SCHOOLS;
+
+    const schoolMap = new Map<string, MemberSchool>();
+    schools.forEach((s) => {
+      if (!s || (!s.id && !s.code)) return;
+      const key = s.id || s.code;
+      schoolMap.set(key, s);
     });
 
     const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem('mpgbsim_portal_user_v1') : null;
     const portalUser = portalUserRaw ? JSON.parse(portalUserRaw) : null;
-    const { repairedSchools } = repairSchoolIntegrity(
-      muslehSchools,
-      portalUser
-    );
-    const finalClean = repairedSchools.filter(
-      (s) =>
-        s.id === 'sch-musleh-1' ||
-        s.code?.toUpperCase() === 'MJAC011' ||
-        s.name.toLowerCase().includes('musleh')
-    );
-    return finalClean.length > 0 ? finalClean : (schools || []);
+    const list = Array.from(schoolMap.values());
+    const { repairedSchools } = repairSchoolIntegrity(list, portalUser);
+
+    return repairedSchools.length > 0 ? repairedSchools : list;
   } catch (e) {
     console.warn('sanitizeMemberSchoolsList notice:', e);
-    return schools || [];
+    return schools.length > 0 ? schools : DEFAULT_MEMBER_SCHOOLS;
   }
 };
 
@@ -592,27 +1109,30 @@ const sanitizeContactInfo = (c?: Partial<ContactInfoData> | null): ContactInfoDa
 };
 
 export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [siteData, setSiteData] = useState<SiteContentState>({
-    branding: DEFAULT_BRANDING,
-    hero: DEFAULT_HERO,
-    visionMission: DEFAULT_VISION_MISSION,
-    strategicFocus: [],
-    stats: DEFAULT_NETWORK_STATS,
-    memberSchools: [],
-    news: [],
-    programs: [],
-    practices: [],
-    leadership: [],
-    media: [],
-    quote: DEFAULT_QUOTE,
-    resources: [],
-    cta: DEFAULT_CTA,
-    contactInfo: DEFAULT_CONTACT_INFO,
-    submissions: [],
-    memberApplications: [],
-    dashboardConfig: DEFAULT_DASHBOARD_CONFIG,
-    alumni: [],
-    announcements: [],
+  const [siteData, setSiteData] = useState<SiteContentState>(() => {
+    const initialSync = getInitialSiteContentSync();
+    return {
+      branding: initialSync?.branding || DEFAULT_BRANDING,
+      hero: initialSync?.hero || DEFAULT_HERO,
+      visionMission: initialSync?.visionMission || DEFAULT_VISION_MISSION,
+      strategicFocus: initialSync?.strategicFocus?.length ? initialSync.strategicFocus : DEFAULT_STRATEGIC_FOCUS,
+      stats: initialSync?.stats?.schoolsCount ? initialSync.stats : DEFAULT_NETWORK_STATS,
+      memberSchools: initialSync?.memberSchools?.length ? sanitizeMemberSchoolsList(initialSync.memberSchools) : DEFAULT_MEMBER_SCHOOLS,
+      news: initialSync?.news?.length ? sortNewsByPublishedDate(initialSync.news) : DEFAULT_NEWS,
+      programs: initialSync?.programs?.length ? initialSync.programs : DEFAULT_PROGRAMS,
+      practices: initialSync?.practices?.length ? initialSync.practices : INITIAL_BEST_PRACTICES,
+      leadership: initialSync?.leadership?.length ? sanitizeLeadershipList(initialSync.leadership) : DEFAULT_LEADERSHIP,
+      media: initialSync?.media?.length ? initialSync.media : DEFAULT_MEDIA,
+      quote: initialSync?.quote || DEFAULT_QUOTE,
+      resources: initialSync?.resources?.length ? initialSync.resources : DEFAULT_RESOURCES,
+      cta: initialSync?.cta || DEFAULT_CTA,
+      contactInfo: initialSync?.contactInfo || DEFAULT_CONTACT_INFO,
+      submissions: initialSync?.submissions || [],
+      memberApplications: initialSync?.memberApplications ? sanitizeMemberApplicationsList(initialSync.memberApplications) : [],
+      dashboardConfig: initialSync?.dashboardConfig || DEFAULT_DASHBOARD_CONFIG,
+      alumni: initialSync?.alumni?.length ? initialSync.alumni : INITIAL_DEMO_ALUMNI,
+      announcements: initialSync?.announcements?.length ? initialSync.announcements : INITIAL_ANNOUNCEMENTS,
+    };
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -641,6 +1161,47 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       setSyncStatus('error');
     }
   };
+
+  // Hydrate full state from IndexedDB on initial mount
+  useEffect(() => {
+    getFullSiteContentAsync()
+      .then((cached) => {
+        if (cached) {
+          setSiteData((prev) => ({
+            ...prev,
+            branding: cached.branding || prev.branding,
+            hero: cached.hero || prev.hero,
+            visionMission: cached.visionMission || prev.visionMission,
+            strategicFocus: Array.isArray(cached.strategicFocus) ? cached.strategicFocus : prev.strategicFocus,
+            stats: cached.stats || prev.stats,
+            memberSchools: Array.isArray(cached.memberSchools) && cached.memberSchools.length > 0
+              ? sanitizeMemberSchoolsList(cached.memberSchools)
+              : prev.memberSchools,
+            news: Array.isArray(cached.news) ? sortNewsByPublishedDate(cached.news) : prev.news,
+            programs: Array.isArray(cached.programs) ? cached.programs : prev.programs,
+            practices: Array.isArray(cached.practices) ? cached.practices : prev.practices,
+            leadership: Array.isArray(cached.leadership) && cached.leadership.length > 0
+              ? sanitizeLeadershipList(cached.leadership)
+              : prev.leadership,
+            media: Array.isArray(cached.media) ? cached.media : prev.media,
+            quote: cached.quote || prev.quote,
+            resources: Array.isArray(cached.resources) ? cached.resources : prev.resources,
+            cta: cached.cta || prev.cta,
+            contactInfo: cached.contactInfo || prev.contactInfo,
+            submissions: Array.isArray(cached.submissions) ? cached.submissions : prev.submissions,
+            memberApplications: Array.isArray(cached.memberApplications)
+              ? sanitizeMemberApplicationsList(cached.memberApplications)
+              : prev.memberApplications,
+            dashboardConfig: cached.dashboardConfig || prev.dashboardConfig,
+            alumni: Array.isArray(cached.alumni) ? cached.alumni : prev.alumni,
+            announcements: Array.isArray(cached.announcements) ? cached.announcements : prev.announcements,
+          }));
+        }
+      })
+      .catch((e) => {
+        console.warn('Hydration notice:', e);
+      });
+  }, []);
 
   // Listen for portal profile updates or external storage synchronization
   useEffect(() => {
@@ -720,18 +1281,25 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             photoUrl: user.photoURL || undefined,
           });
 
-          // Ensure admin record in Firestore exists
+          // Ensure admin record in Firestore exists once per browser session
           try {
-            await setDoc(
-              doc(db, 'admins', user.uid),
-              {
-                email: user.email,
-                name: user.displayName || 'Pegawai Pentadbir MPGBSIM',
-                role: 'admin',
-                lastLogin: new Date().toISOString(),
-              },
-              { merge: true }
-            );
+            const sessionKey = `mpgbsim_admin_synced_${user.uid}`;
+            const alreadySynced = typeof window !== 'undefined' ? sessionStorage.getItem(sessionKey) : null;
+            if (!alreadySynced) {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem(sessionKey, 'true');
+              }
+              await setDoc(
+                doc(db, 'admins', user.uid),
+                {
+                  email: user.email,
+                  name: user.displayName || 'Pegawai Pentadbir MPGBSIM',
+                  role: 'admin',
+                  lastLogin: new Date().toISOString(),
+                },
+                { merge: true }
+              );
+            }
           } catch (e) {
             console.warn('Admin record sync notice:', e);
           }
@@ -757,13 +1325,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               branding: d.branding ? { ...prev.branding, ...d.branding } : prev.branding,
               hero: d.hero ? { ...prev.hero, ...d.hero } : prev.hero,
               visionMission: d.visionMission ? { ...prev.visionMission, ...d.visionMission } : prev.visionMission,
-              strategicFocus: Array.isArray(d.strategicFocus) ? d.strategicFocus : prev.strategicFocus,
-              stats: d.stats ? { ...prev.stats, ...d.stats } : prev.stats,
+              strategicFocus: Array.isArray(d.strategicFocus) && d.strategicFocus.length > 0 ? d.strategicFocus : DEFAULT_STRATEGIC_FOCUS,
+              stats: d.stats && d.stats.schoolsCount ? { ...prev.stats, ...d.stats } : DEFAULT_NETWORK_STATS,
               quote: d.quote ? { ...prev.quote, ...d.quote } : prev.quote,
               cta: d.cta ? { ...prev.cta, ...d.cta } : prev.cta,
               contactInfo: d.contactInfo ? { ...prev.contactInfo, ...d.contactInfo } : prev.contactInfo,
-              leadership: sanitizeLeadershipList(Array.isArray(d.leadership) ? d.leadership : prev.leadership),
-              resources: Array.isArray(d.resources) ? d.resources : prev.resources,
+              leadership: sanitizeLeadershipList(Array.isArray(d.leadership) && d.leadership.length > 0 ? d.leadership : DEFAULT_LEADERSHIP),
+              resources: Array.isArray(d.resources) && d.resources.length > 0 ? d.resources : DEFAULT_RESOURCES,
               dashboardConfig: d.dashboardConfig ? { ...prev.dashboardConfig, ...d.dashboardConfig } : prev.dashboardConfig,
             }));
             setSyncStatus('synced');
@@ -788,19 +1356,26 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubNews = onSnapshot(
         collection(db, 'news'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: NewsItem[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
           }
-          setSiteData((prev) => ({ ...prev, news: sortNewsByPublishedDate(list) }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, news: sortNewsByPublishedDate(list) };
+            }
+            if (isMockCleared) {
+              return { ...prev, news: [] };
+            }
+            return { ...prev, news: prev.news?.length ? prev.news : DEFAULT_NEWS };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore News listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Berita): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore News listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -814,19 +1389,26 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubEvents = onSnapshot(
         collection(db, 'events'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: ProgramEvent[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
           }
-          setSiteData((prev) => ({ ...prev, programs: list }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, programs: list };
+            }
+            if (isMockCleared) {
+              return { ...prev, programs: [] };
+            }
+            return { ...prev, programs: prev.programs?.length ? prev.programs : DEFAULT_PROGRAMS };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Events listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Program): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Events listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -854,9 +1436,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore eventRegistrations listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Pendaftaran Acara): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore eventRegistrations listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -870,19 +1450,26 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubPractices = onSnapshot(
         collection(db, 'bestPractices'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: BestPracticeItem[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
           }
-          setSiteData((prev) => ({ ...prev, practices: list }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, practices: list };
+            }
+            if (isMockCleared) {
+              return { ...prev, practices: [] };
+            }
+            return { ...prev, practices: prev.practices?.length ? prev.practices : INITIAL_BEST_PRACTICES };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Practices listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Amalan Terbaik): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Practices listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -896,24 +1483,27 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubSchools = onSnapshot(
         collection(db, 'schools'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const rawList: MemberSchool[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
               rawList.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
           }
-          const list = sanitizeMemberSchoolsList(rawList);
-          setSiteData((prev) => ({
-            ...prev,
-            memberSchools: list,
-          }));
+          setSiteData((prev) => {
+            if (rawList.length > 0) {
+              return { ...prev, memberSchools: sanitizeMemberSchoolsList(rawList) };
+            }
+            if (isMockCleared) {
+              return { ...prev, memberSchools: [] };
+            }
+            return { ...prev, memberSchools: prev.memberSchools?.length ? prev.memberSchools : DEFAULT_MEMBER_SCHOOLS };
+          });
           setSyncStatus('synced');
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Schools listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Sekolah Ahli): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Schools listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -927,19 +1517,26 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubMedia = onSnapshot(
         collection(db, 'media'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: MediaItem[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
           }
-          setSiteData((prev) => ({ ...prev, media: list }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, media: list };
+            }
+            if (isMockCleared) {
+              return { ...prev, media: [] };
+            }
+            return { ...prev, media: prev.media?.length ? prev.media : DEFAULT_MEDIA };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Media listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Media): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Media listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -953,19 +1550,26 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubResources = onSnapshot(
         collection(db, 'resources'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: ResourceDocument[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
           }
-          setSiteData((prev) => ({ ...prev, resources: list }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, resources: list };
+            }
+            if (isMockCleared) {
+              return { ...prev, resources: [] };
+            }
+            return { ...prev, resources: prev.resources?.length ? prev.resources : DEFAULT_RESOURCES };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Resources listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Dokumen): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Resources listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -979,19 +1583,26 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubLeadership = onSnapshot(
         collection(db, 'leadership'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: LeaderProfile[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
               list.push({ id: docSnap.id, ...(docSnap.data() as any) });
             });
           }
-          setSiteData((prev) => ({ ...prev, leadership: sanitizeLeadershipList(list) }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, leadership: sanitizeLeadershipList(list) };
+            }
+            if (isMockCleared) {
+              return { ...prev, leadership: [] };
+            }
+            return { ...prev, leadership: prev.leadership?.length ? prev.leadership : DEFAULT_LEADERSHIP };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Leadership listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Kepimpinan): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Leadership listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -1016,9 +1627,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Settings listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Tetapan): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Settings listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -1045,9 +1654,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Dashboard Settings listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Dashboard): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Dashboard Settings listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -1061,6 +1668,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAlumni = onSnapshot(
         collection(db, 'alumni'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: AlumniRecord[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
@@ -1071,13 +1679,19 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                 new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
             );
           }
-          setSiteData((prev) => ({ ...prev, alumni: list }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, alumni: list };
+            }
+            if (isMockCleared) {
+              return { ...prev, alumni: [] };
+            }
+            return { ...prev, alumni: prev.alumni?.length ? prev.alumni : INITIAL_DEMO_ALUMNI };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Alumni listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Alumni): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Alumni listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -1091,6 +1705,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const unsubAnnouncements = onSnapshot(
         collection(db, 'announcements'),
         (snapshot) => {
+          const isMockCleared = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_mock_cleared') === 'true';
           const list: AnnouncementItem[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
@@ -1102,13 +1717,19 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
             });
           }
-          setSiteData((prev) => ({ ...prev, announcements: list }));
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, announcements: list };
+            }
+            if (isMockCleared) {
+              return { ...prev, announcements: [] };
+            }
+            return { ...prev, announcements: prev.announcements?.length ? prev.announcements : INITIAL_ANNOUNCEMENTS };
+          });
           setIsLoading(false);
         },
         (err) => {
-          console.warn('Firestore Announcements listener notification:', err.message);
-          setError(`Gagal menyambung ke Firestore (Pengumuman): ${err.message}`);
-          setSyncStatus('error');
+          console.warn('Firestore Announcements listener notice:', err.message);
           setIsLoading(false);
         }
       );
@@ -2200,9 +2821,14 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
     } catch (e) {}
 
-    // 2. Persist to Firestore
+    // 2. Persist ONLY genuinely modified schools to Firestore (avoid writing all 150 schools)
+    const prevSchoolMap = new Map((siteData.memberSchools || []).map((s) => [s.id, s]));
     repairedSchools.forEach((sch) => {
-      setDoc(doc(db, 'schools', sch.id), sch, { merge: true }).catch(() => {});
+      const prev = prevSchoolMap.get(sch.id);
+      const isModified = !prev || JSON.stringify(prev) !== JSON.stringify(sch);
+      if (isModified) {
+        setDoc(doc(db, 'schools', sch.id), sch, { merge: true }).catch(() => {});
+      }
     });
     if (repairedUser?.uid) {
       setDoc(doc(db, 'users', repairedUser.uid), repairedUser, { merge: true }).catch(() => {});
@@ -2765,6 +3391,47 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  const purgeMockData = () => {
+    localStorage.setItem('mpgbsim_mock_cleared', 'true');
+    const defaultNewsIds = new Set(DEFAULT_NEWS.map((n) => n.id));
+    const defaultProgramIds = new Set(DEFAULT_PROGRAMS.map((p) => p.id));
+    const defaultSchoolIds = new Set(DEFAULT_MEMBER_SCHOOLS.map((s) => s.id));
+    const defaultPracticeIds = new Set((INITIAL_BEST_PRACTICES || []).map((p) => p.id));
+    const defaultAlumniIds = new Set((INITIAL_DEMO_ALUMNI || []).map((a) => a.id));
+    const defaultAnnouncementIds = new Set((INITIAL_ANNOUNCEMENTS || []).map((a) => a.id));
+    const defaultMediaIds = new Set(DEFAULT_MEDIA.map((m) => m.id));
+    const defaultResourceIds = new Set(DEFAULT_RESOURCES.map((r) => r.id));
+
+    setSiteData((prev) => {
+      const cleaned: SiteContentState = {
+        ...prev,
+        news: (prev.news || []).filter((n) => !defaultNewsIds.has(n.id)),
+        programs: (prev.programs || []).filter((p) => !defaultProgramIds.has(p.id)),
+        memberSchools: (prev.memberSchools || []).filter((s) => !defaultSchoolIds.has(s.id)),
+        practices: (prev.practices || []).filter((p) => !defaultPracticeIds.has(p.id)),
+        alumni: (prev.alumni || []).filter((a) => !defaultAlumniIds.has(a.id)),
+        announcements: (prev.announcements || []).filter((a) => !defaultAnnouncementIds.has(a.id)),
+        media: (prev.media || []).filter((m) => !defaultMediaIds.has(m.id)),
+        resources: (prev.resources || []).filter((r) => !defaultResourceIds.has(r.id)),
+      };
+      persistSiteContent(cleaned).catch(() => {});
+      return cleaned;
+    });
+
+    defaultNewsIds.forEach((id) => deleteDoc(doc(db, 'news', id)).catch(() => {}));
+    defaultProgramIds.forEach((id) => deleteDoc(doc(db, 'events', id)).catch(() => {}));
+    defaultSchoolIds.forEach((id) => deleteDoc(doc(db, 'schools', id)).catch(() => {}));
+    defaultPracticeIds.forEach((id) => deleteDoc(doc(db, 'bestPractices', id)).catch(() => {}));
+    defaultAlumniIds.forEach((id) => deleteDoc(doc(db, 'alumni', id)).catch(() => {}));
+    defaultAnnouncementIds.forEach((id) => deleteDoc(doc(db, 'announcements', id)).catch(() => {}));
+    defaultMediaIds.forEach((id) => deleteDoc(doc(db, 'media', id)).catch(() => {}));
+    defaultResourceIds.forEach((id) => deleteDoc(doc(db, 'resources', id)).catch(() => {}));
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    } catch (e) {}
+  };
+
   const resetAllContent = () => {
     setSiteData({
       branding: DEFAULT_BRANDING,
@@ -2869,6 +3536,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         approveAlumniRecord,
         rejectAlumniRecord,
         toggleFeatureAlumniRecord,
+        purgeMockData,
         resetAllContent,
       }}
     >

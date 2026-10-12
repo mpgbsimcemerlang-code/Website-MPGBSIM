@@ -116,7 +116,6 @@ export const AdminSiteSettings: React.FC = () => {
     try {
       await updateBranding(brandingForm);
       await updateContactInfo(contactForm);
-      await syncAllToFirestore();
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 3500);
     } catch (err) {

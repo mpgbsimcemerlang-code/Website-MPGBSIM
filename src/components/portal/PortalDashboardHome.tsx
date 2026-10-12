@@ -26,10 +26,13 @@ import {
   User,
   GraduationCap,
   Trophy,
+  QrCode,
+  Download,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { BestPracticeItem, MemberSchool } from '../../types';
+import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
 
 interface PortalDashboardHomeProps {
   onOpenAnnouncementModal?: (ann: any) => void;
@@ -54,6 +57,8 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
   const { siteData } = useAdminContent();
   const programs = siteData.programs || [];
+
+  const [isDigitalCardModalOpen, setIsDigitalCardModalOpen] = React.useState(false);
 
   // Match the member's registered school from the live website directory (siteData.memberSchools)
   const currentSchoolData: MemberSchool | null = React.useMemo(() => {
@@ -247,6 +252,27 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>Keahlian Sah & Aktif</span>
               </div>
+            </div>
+
+            {/* Quick Action: Digital Membership Card Download */}
+            <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDigitalCardModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              >
+                <QrCode className="w-4 h-4 text-slate-950" />
+                <span>Muat Turun Kad Keahlian Digital (QR Code)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPortalTab('profil')}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-2 border border-slate-700 transition cursor-pointer"
+              >
+                <User className="w-4 h-4 text-teal-400" />
+                <span>Sunting Profil Kepimpinan</span>
+              </button>
             </div>
           </div>
 
@@ -889,6 +915,12 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           </div>
         </div>
       </section>
+
+      {/* Digital Membership Card Modal */}
+      <DigitalMembershipCardModal
+        isOpen={isDigitalCardModalOpen}
+        onClose={() => setIsDigitalCardModalOpen(false)}
+      />
     </div>
   );
 };

@@ -27,7 +27,8 @@ import {
   Upload,
   Camera,
   RefreshCw,
-  X
+  X,
+  Loader2,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -38,6 +39,8 @@ import {
   toInputDateFormat,
   formatToMalayDate,
 } from '../../utils/dateUtils';
+import { useRateLimiter } from '../../utils/rateLimiter';
+import { RateLimitNotice } from './RateLimitNotice';
 
 // Preset HD Images for quick selection by PGB
 const PRESET_NEWS_IMAGES = [
@@ -114,6 +117,9 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [successInfo, setSuccessInfo] = useState<{ title: string; id: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Client-side rate-limiter for school news submissions
+  const newsRateLimiter = useRateLimiter('school_news_submission');
 
   // In-App Delete Confirmation State
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
@@ -307,6 +313,11 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
       return;
     }
 
+    if (!newsRateLimiter.verifyCanSubmit()) {
+      setErrorMessage(newsRateLimiter.errorMessage || 'Sila tunggu sebelum menghantar berita sekolah seterusnya.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (editingNewsId) {
@@ -327,6 +338,7 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
           updatedAt: new Date().toISOString(),
         });
 
+        newsRateLimiter.triggerSubmission();
         setSuccessInfo({ title: title.trim(), id: editingNewsId });
         setShowSuccessBanner(true);
         handleCancelEdit();
@@ -347,6 +359,7 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
           date: publishedDate.trim() || formatToMalayDate(new Date()),
         });
 
+        newsRateLimiter.triggerSubmission();
         setSuccessInfo({ title: createdItem.title, id: createdItem.id });
         setShowSuccessBanner(true);
 
@@ -585,6 +598,12 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              <RateLimitNotice
+                isLimited={newsRateLimiter.isLimited}
+                retryAfterSeconds={newsRateLimiter.retryAfterSeconds}
+                message={newsRateLimiter.errorMessage}
+              />
+
               {/* Tajuk Berita */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -973,19 +992,31 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-800 hover:to-emerald-800 text-white text-xs sm:text-sm font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                  disabled={isSubmitting || newsRateLimiter.isLimited}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-800 hover:to-emerald-800 text-white text-xs sm:text-sm font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send className="w-4 h-4" />
-                  <span>
-                    {isSubmitting
-                      ? 'Sedang Memproses...'
-                      : editingNewsId
-                      ? 'Simpan Perubahan Berita'
-                      : publishDirectly
-                      ? 'Siarkan Ke Laman Utama Secara Langsung'
-                      : 'Simpan Sebagai Deraf'}
-                  </span>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Sedang Memproses...</span>
+                    </>
+                  ) : newsRateLimiter.isLimited ? (
+                    <>
+                      <Clock className="w-4 h-4 animate-spin text-amber-200" />
+                      <span>Sila Tunggu {newsRateLimiter.retryAfterSeconds}s (Kawalan Had Masa)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>
+                        {editingNewsId
+                          ? 'Simpan Perubahan Berita'
+                          : publishDirectly
+                          ? 'Siarkan Ke Laman Utama Secara Langsung'
+                          : 'Simpan Sebagai Deraf'}
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

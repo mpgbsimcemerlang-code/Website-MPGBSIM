@@ -13,9 +13,12 @@ import {
   Save,
   MessageSquare,
   Trophy,
+  Loader2,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { BestPracticeItem, MemberSubmission } from '../../types';
+import { useRateLimiter } from '../../utils/rateLimiter';
+import { RateLimitNotice } from './RateLimitNotice';
 
 export const PortalSubmitPractice: React.FC = () => {
   const { currentUser, submitBestPractice, submitMemberForm, setPortalTab, submissions } =
@@ -69,74 +72,114 @@ export const PortalSubmitPractice: React.FC = () => {
   ];
 
   const [formError, setFormError] = useState('');
+  const [isSubmittingBp, setIsSubmittingBp] = useState(false);
+  const [isSubmittingGen, setIsSubmittingGen] = useState(false);
+
+  // Client-side rate-limiters for Best Practice and General Submissions
+  const bpRateLimiter = useRateLimiter('practice_submission');
+  const genRateLimiter = useRateLimiter('general_submission');
 
   const handleBestPracticeSubmit = async (status: 'Draft' | 'Submitted') => {
     setFormError('');
+    if (isSubmittingBp) return;
+
     if (!bpTitle.trim() || !bpChallenge.trim()) {
       setFormError('Sila lengkapkan sekurang-kurangnya Tajuk dan Cabaran sekolah.');
       return;
     }
 
-    await submitBestPractice({
-      title: bpTitle,
-      school: bpSchool || currentUser?.school || 'Sekolah Ahli',
-      category: bpCategory,
-      challenge: bpChallenge,
-      approach: bpApproach,
-      implementation: bpImplementation,
-      outcome: bpOutcome,
-      lessonLearned: bpLessonLearned,
-      supportingDocs: bpSupportingFile || undefined,
-      driveUrl: bpSupportingFile || undefined,
-      documentUrl: bpSupportingFile || undefined,
-      images: bpImageUrl ? [bpImageUrl] : undefined,
-      status,
-      year: String(new Date().getFullYear()),
-    });
+    if (!bpRateLimiter.verifyCanSubmit()) {
+      setFormError(bpRateLimiter.errorMessage || 'Sila tunggu sebelum menghantar amalan terbaik seterusnya.');
+      return;
+    }
 
-    setSuccessMessage(
-      status === 'Submitted'
-        ? 'Amalan terbaik anda telah berjaya dihantar untuk semakan urus setia MPGBSIM.'
-        : 'Amalan terbaik anda telah disimpan sebagai Draf.'
-    );
-    setIsSubmittedSuccess(true);
+    setIsSubmittingBp(true);
+    try {
+      await submitBestPractice({
+        title: bpTitle,
+        school: bpSchool || currentUser?.school || 'Sekolah Ahli',
+        category: bpCategory,
+        challenge: bpChallenge,
+        approach: bpApproach,
+        implementation: bpImplementation,
+        outcome: bpOutcome,
+        lessonLearned: bpLessonLearned,
+        supportingDocs: bpSupportingFile || undefined,
+        driveUrl: bpSupportingFile || undefined,
+        documentUrl: bpSupportingFile || undefined,
+        images: bpImageUrl ? [bpImageUrl] : undefined,
+        status,
+        year: String(new Date().getFullYear()),
+      });
 
-    // Reset fields
-    setBpTitle('');
-    setBpChallenge('');
-    setBpApproach('');
-    setBpImplementation('');
-    setBpOutcome('');
-    setBpLessonLearned('');
+      bpRateLimiter.triggerSubmission();
+
+      setSuccessMessage(
+        status === 'Submitted'
+          ? 'Amalan terbaik anda telah berjaya dihantar untuk semakan urus setia MPGBSIM.'
+          : 'Amalan terbaik anda telah disimpan sebagai Draf.'
+      );
+      setIsSubmittedSuccess(true);
+
+      // Reset fields
+      setBpTitle('');
+      setBpChallenge('');
+      setBpApproach('');
+      setBpImplementation('');
+      setBpOutcome('');
+      setBpLessonLearned('');
+    } catch (err: any) {
+      console.error('Error submitting best practice:', err);
+      setFormError(err?.message || 'Ralat semasa menghantar amalan terbaik. Sila cuba lagi.');
+    } finally {
+      setIsSubmittingBp(false);
+    }
   };
 
   const handleGeneralSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    if (isSubmittingGen) return;
+
     if (!genTitle.trim() || !genContent.trim()) {
       setFormError('Sila lengkapkan tajuk dan kandungan cadangan.');
       return;
     }
 
-    await submitMemberForm({
-      submitter: currentUser?.fullName || 'Ahli PGB',
-      submitterEmail: currentUser?.email || 'ahli@mpgbsim.org.my',
-      school: currentUser?.school || 'Sekolah Ahli',
-      type: genType,
-      title: genTitle,
-      content: genContent,
-      attachmentName: genAttachment || undefined,
-      date: new Date().toISOString().split('T')[0],
-      status: 'Submitted',
-    });
+    if (!genRateLimiter.verifyCanSubmit()) {
+      setFormError(genRateLimiter.errorMessage || 'Sila tunggu sebelum menghantar maklum balas seterusnya.');
+      return;
+    }
 
-    setSuccessMessage(
-      `Bahan "${genTitle}" jenis (${genType}) telah direkodkan ke dalam peti masuk urus setia.`
-    );
-    setIsSubmittedSuccess(true);
-    setGenTitle('');
-    setGenContent('');
-    setGenAttachment('');
+    setIsSubmittingGen(true);
+    try {
+      await submitMemberForm({
+        submitter: currentUser?.fullName || 'Ahli PGB',
+        submitterEmail: currentUser?.email || 'ahli@mpgbsim.org.my',
+        school: currentUser?.school || 'Sekolah Ahli',
+        type: genType,
+        title: genTitle,
+        content: genContent,
+        attachmentName: genAttachment || undefined,
+        date: new Date().toISOString().split('T')[0],
+        status: 'Submitted',
+      });
+
+      genRateLimiter.triggerSubmission();
+
+      setSuccessMessage(
+        `Bahan "${genTitle}" jenis (${genType}) telah direkodkan ke dalam peti masuk urus setia.`
+      );
+      setIsSubmittedSuccess(true);
+      setGenTitle('');
+      setGenContent('');
+      setGenAttachment('');
+    } catch (err: any) {
+      console.error('Error submitting member form:', err);
+      setFormError(err?.message || 'Ralat semasa menghantar maklum balas. Sila cuba lagi.');
+    } finally {
+      setIsSubmittingGen(false);
+    }
   };
 
   // User's own submissions
@@ -233,6 +276,12 @@ export const PortalSubmitPractice: React.FC = () => {
               Lengkapkan 12 fasa di bawah untuk dinilai oleh AJK Media & Panel Akademik MPGBSIM.
             </p>
           </div>
+
+          <RateLimitNotice
+            isLimited={bpRateLimiter.isLimited}
+            retryAfterSeconds={bpRateLimiter.retryAfterSeconds}
+            message={bpRateLimiter.errorMessage}
+          />
 
           <div className="space-y-4 text-xs">
             {/* Title & School */}
@@ -402,19 +451,39 @@ export const PortalSubmitPractice: React.FC = () => {
             <div className="pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-end gap-3">
               <button
                 type="button"
+                disabled={isSubmittingBp || bpRateLimiter.isLimited}
                 onClick={() => handleBestPracticeSubmit('Draft')}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4 text-slate-500" />
-                Simpan sebagai Draft
+                {isSubmittingBp ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
+                ) : (
+                  <Save className="w-4 h-4 text-slate-500" />
+                )}
+                <span>Simpan sebagai Draft</span>
               </button>
               <button
                 type="button"
+                disabled={isSubmittingBp || bpRateLimiter.isLimited}
                 onClick={() => handleBestPracticeSubmit('Submitted')}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-colors"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Send className="w-4 h-4" />
-                Hantar untuk Semakan (Submit)
+                {isSubmittingBp ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Sedang Menyimpan...</span>
+                  </>
+                ) : bpRateLimiter.isLimited ? (
+                  <>
+                    <Clock className="w-4 h-4 animate-spin text-amber-200" />
+                    <span>Sila Tunggu {bpRateLimiter.retryAfterSeconds}s</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Hantar untuk Semakan (Submit)</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -430,6 +499,12 @@ export const PortalSubmitPractice: React.FC = () => {
               Hantar cadangan penambahbaikan, kertas kerja program, kisah kejayaan atau berita aktiviti sekolah anda.
             </p>
           </div>
+
+          <RateLimitNotice
+            isLimited={genRateLimiter.isLimited}
+            retryAfterSeconds={genRateLimiter.retryAfterSeconds}
+            message={genRateLimiter.errorMessage}
+          />
 
           <form onSubmit={handleGeneralSubmit} className="space-y-4 text-xs">
             <div>
@@ -485,10 +560,25 @@ export const PortalSubmitPractice: React.FC = () => {
             <div className="pt-4 border-t border-slate-200 flex justify-end">
               <button
                 type="submit"
-                className="px-6 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-2 shadow-xs"
+                disabled={isSubmittingGen || genRateLimiter.isLimited}
+                className="px-6 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Send className="w-4 h-4" />
-                Hantar Submisi Kepada Urus Setia
+                {isSubmittingGen ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Sedang Menghantar...</span>
+                  </>
+                ) : genRateLimiter.isLimited ? (
+                  <>
+                    <Clock className="w-4 h-4 animate-spin text-amber-300" />
+                    <span>Sila Tunggu {genRateLimiter.retryAfterSeconds}s</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Hantar Submisi Kepada Urus Setia</span>
+                  </>
+                )}
               </button>
             </div>
           </form>

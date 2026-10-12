@@ -644,11 +644,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
         setCurrentUser(profile);
 
-        // Sync user to Firestore if possible
-        try {
-          await setDoc(doc(db, 'users', fbUser.uid), profile, { merge: true });
-        } catch (e) {
-          console.warn('Firestore user profile sync notice:', e);
+        // Only create initial user profile document in Firestore if it does NOT exist yet
+        if (!savedProfile) {
+          try {
+            await setDoc(doc(db, 'users', fbUser.uid), profile, { merge: true });
+          } catch (e) {
+            console.warn('Firestore initial user profile creation notice:', e);
+          }
         }
       }
     });
@@ -682,10 +684,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             }
             setAnnouncements(list);
           } else if (!isSeeded && INITIAL_ANNOUNCEMENTS.length > 0) {
+            // Display default announcements purely in client state without writing to Firestore inside listener
             localStorage.setItem('mpgbsim_announcements_seeded', 'true');
-            INITIAL_ANNOUNCEMENTS.forEach((item) => {
-              setDoc(doc(db, 'announcements', item.id), item, { merge: true }).catch(() => {});
-            });
             setAnnouncements(INITIAL_ANNOUNCEMENTS);
           } else {
             setAnnouncements([]);
@@ -715,10 +715,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             }
             setDocuments(list);
           } else if (!isSeeded && INITIAL_DOCUMENTS.length > 0) {
+            // Display default documents purely in client state without writing to Firestore inside listener
             localStorage.setItem('mpgbsim_documents_seeded', 'true');
-            INITIAL_DOCUMENTS.forEach((item) => {
-              setDoc(doc(db, 'documents', item.id), item, { merge: true }).catch(() => {});
-            });
             setDocuments(INITIAL_DOCUMENTS);
           } else {
             setDocuments([]);

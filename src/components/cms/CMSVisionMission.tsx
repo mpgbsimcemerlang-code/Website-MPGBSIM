@@ -69,7 +69,6 @@ export const CMSVisionMission: React.FC = () => {
     e.preventDefault();
     setIsSaving(true);
     updateVisionMission(form);
-    await syncAllToFirestore();
     setIsSaving(false);
     showToast('Kandungan Pengenalan, Visi, Misi & Tonggak Teras berjaya disimpan dan disegerakkan!');
   };

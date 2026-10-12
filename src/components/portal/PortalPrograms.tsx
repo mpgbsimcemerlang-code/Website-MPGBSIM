@@ -19,6 +19,8 @@ import {
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { ProgramEvent } from '../../types';
+import { useRateLimiter } from '../../utils/rateLimiter';
+import { RateLimitNotice } from './RateLimitNotice';
 
 export const PortalPrograms: React.FC = () => {
   const {
@@ -37,6 +39,9 @@ export const PortalPrograms: React.FC = () => {
   const [isRegisterSuccess, setIsRegisterSuccess] = useState(false);
   const [registerSuccessMessage, setRegisterSuccessMessage] = useState<string>('');
   const [registeringId, setRegisteringId] = useState<string | null>(null);
+
+  // Client-side rate-limiting for program registration
+  const progRateLimiter = useRateLimiter('program_registration');
 
   // New Program Modal for Admin/Media AJK
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -101,6 +106,11 @@ export const PortalPrograms: React.FC = () => {
     const prog = programs.find((p) => p.id === progId);
     if (!prog) return;
 
+    if (!progRateLimiter.verifyCanSubmit()) {
+      alert(progRateLimiter.errorMessage || 'Sila tunggu sebelum mendaftar program seterusnya.');
+      return;
+    }
+
     const spotsTotal = prog.spotsTotal || 100;
     const spotsFilled = prog.spotsFilled || 0;
     if (spotsFilled >= spotsTotal || prog.registrationOpen === false) {
@@ -121,6 +131,7 @@ export const PortalPrograms: React.FC = () => {
       });
 
       if (res.success) {
+        progRateLimiter.triggerSubmission();
         registerForProgram(progId);
         setRegisterSuccessMessage(res.message);
         setIsRegisterSuccess(true);

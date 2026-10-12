@@ -27,7 +27,6 @@ export const AdminStatsManagement: React.FC = () => {
     e.preventDefault();
     setIsSaving(true);
     updateStats(statsForm);
-    await syncAllToFirestore();
     setIsSaving(false);
     showToast('Statistik rangkaian sekolah berjaya dikemaskini dan disegerakkan ke Cloud Firestore!');
   };
@@ -42,7 +41,6 @@ export const AdminStatsManagement: React.FC = () => {
     };
     setStatsForm(defaults);
     updateStats(defaults);
-    await syncAllToFirestore();
     showToast('Statistik telah diset semula kepada nilai anggaran rasmi.');
   };
 

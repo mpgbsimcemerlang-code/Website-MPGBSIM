@@ -25,6 +25,7 @@ import {
 import { NewsItem, StrategicFocus, BestPracticeItem, ProgramEvent } from '../types';
 import { db, doc, setDoc } from '../firebase';
 import { useAdminContent } from '../context/AdminContentContext';
+import { checkAndRecordRateLimit } from '../utils/rateLimiter';
 
 export type ModalContentType =
   | { type: 'news'; data: NewsItem }
@@ -117,6 +118,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
       return;
     }
 
+    const rateLimit = checkAndRecordRateLimit('program_registration');
+    if (!rateLimit.allowed) {
+      setProgError(rateLimit.message);
+      return;
+    }
+
     setProgSubmitting(true);
     setProgError(null);
 
@@ -157,6 +164,12 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
 
   const handleShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const rateLimit = checkAndRecordRateLimit('practice_submission');
+    if (!rateLimit.allowed) {
+      alert(rateLimit.message);
+      return;
+    }
+
     try {
       const id = `share-${Date.now()}`;
       await setDoc(doc(db, 'submissions', id), {
@@ -321,7 +334,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                 Senarai Inisiatif Strategik Kebangsaan:
               </h4>
               <div className="space-y-2.5">
-                {content.data.initiatives.map((init, idx) => (
+                {(content.data.initiatives || []).map((init, idx) => (
                   <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800">
                     <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                     <span>{init}</span>
@@ -376,7 +389,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
               <div>
                 <h4 className="text-sm font-bold text-slate-900 mb-2">Hasil Pencapaian Terperinci:</h4>
                 <div className="space-y-2">
-                  {content.data.keyOutcomes.map((item, idx) => (
+                  {(content.data.keyOutcomes || []).map((item, idx) => (
                     <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                       <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
                       <span>{item}</span>

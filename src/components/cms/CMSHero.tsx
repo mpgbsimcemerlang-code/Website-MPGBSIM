@@ -61,7 +61,6 @@ export const CMSHero: React.FC = () => {
     setIsSaving(true);
     updateBranding(brandingForm);
     updateHero(heroForm);
-    await syncAllToFirestore();
     setIsSaving(false);
     showToast('Elemen Hero Banner & Slogan Utama berjaya dikemaskini dan disegerakkan!');
   };
