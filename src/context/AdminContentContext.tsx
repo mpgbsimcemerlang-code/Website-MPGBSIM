@@ -56,6 +56,7 @@ import {
   repairSchoolIntegrity,
   type DiagnosticReport,
 } from '../utils/schoolDiagnostic';
+import { compressDataUrl } from '../utils/imageCompressor';
 
 export interface BrandingData {
   logoUrl: string;
@@ -2621,6 +2622,24 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const updateMemberSchool = async (id: string, updated: Partial<MemberSchool>) => {
+    // Compress any oversized base64 data URLs to protect Firestore 1MB document limit and localStorage quotas
+    const safeSchoolPhotoUrl = updated.schoolPhotoUrl
+      ? await compressDataUrl(updated.schoolPhotoUrl, 800, 500, 0.70)
+      : updated.schoolPhotoUrl;
+    const safePrincipalPhotoUrl = updated.principalPhotoUrl
+      ? await compressDataUrl(updated.principalPhotoUrl, 360, 360, 0.72)
+      : updated.principalPhotoUrl;
+    const safeLogoUrl = updated.logoUrl
+      ? await compressDataUrl(updated.logoUrl, 260, 260, 0.75)
+      : updated.logoUrl;
+
+    const safeUpdated: Partial<MemberSchool> = {
+      ...updated,
+      ...(safeSchoolPhotoUrl !== undefined ? { schoolPhotoUrl: safeSchoolPhotoUrl } : {}),
+      ...(safePrincipalPhotoUrl !== undefined ? { principalPhotoUrl: safePrincipalPhotoUrl } : {}),
+      ...(safeLogoUrl !== undefined ? { logoUrl: safeLogoUrl } : {}),
+    };
+
     let finalUpdatedSchools: MemberSchool[] = [];
     let updatedSchoolObj: MemberSchool | null = null;
 
@@ -2628,14 +2647,14 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       finalUpdatedSchools = prev.memberSchools.map((s) => {
         const isMatch =
           s.id === id ||
-          (updated.code && s.code && s.code.toLowerCase().trim() === updated.code.toLowerCase().trim()) ||
+          (safeUpdated.code && s.code && s.code.toLowerCase().trim() === safeUpdated.code.toLowerCase().trim()) ||
           (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.code === 'MIA1009' || s.id === 'sch-musleh-1')) ||
-          (updated.name && s.name && s.name.toLowerCase().trim() === updated.name.toLowerCase().trim());
+          (safeUpdated.name && s.name && s.name.toLowerCase().trim() === safeUpdated.name.toLowerCase().trim());
 
         if (isMatch) {
           const merged: MemberSchool = {
             ...s,
-            ...updated,
+            ...safeUpdated,
             updatedAt: new Date().toISOString(),
           };
           updatedSchoolObj = merged;
@@ -2661,15 +2680,15 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       await setDoc(
         doc(db, 'schools', id),
         {
-          ...updated,
+          ...safeUpdated,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
-      if (id === 'sch-musleh-1' || updated.code === 'MJAC011') {
+      if (id === 'sch-musleh-1' || safeUpdated.code === 'MJAC011') {
         await setDoc(
           doc(db, 'schools', 'sch-musleh-1'),
-          { ...updated, updatedAt: new Date().toISOString() },
+          { ...safeUpdated, updatedAt: new Date().toISOString() },
           { merge: true }
         ).catch(() => {});
       }
@@ -2677,25 +2696,25 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Firestore update school notice:', e);
     }
 
-    // 2. Persist to localStorage directly (both v3 and legacy)
+    // 2. Persist to localStorage directly (v3 only, clean up legacy)
     try {
-      ['mpgbsim_cms_content_v3', 'mpgbsim_cms_content'].forEach((key) => {
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.memberSchools && Array.isArray(parsed.memberSchools)) {
-            parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
-              const isMatch =
-                s.id === id ||
-                (updated.code && s.code && s.code.toLowerCase().trim() === updated.code.toLowerCase().trim()) ||
-                (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.code === 'MIA1009' || s.id === 'sch-musleh-1')) ||
-                (updated.name && s.name && s.name.toLowerCase().trim() === updated.name.toLowerCase().trim());
-              return isMatch ? { ...s, ...updated, updatedAt: new Date().toISOString() } : s;
-            });
-            safeLocalStorageSet(key, JSON.stringify(parsed));
-          }
+      const key = 'mpgbsim_cms_content_v3';
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.memberSchools && Array.isArray(parsed.memberSchools)) {
+          parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
+            const isMatch =
+              s.id === id ||
+              (updated.code && s.code && s.code.toLowerCase().trim() === updated.code.toLowerCase().trim()) ||
+              (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.code === 'MIA1009' || s.id === 'sch-musleh-1')) ||
+              (updated.name && s.name && s.name.toLowerCase().trim() === updated.name.toLowerCase().trim());
+            return isMatch ? { ...s, ...updated, updatedAt: new Date().toISOString() } : s;
+          });
+          safeLocalStorageSet(key, JSON.stringify(parsed));
         }
-      });
+      }
+      safeLocalStorageRemove('mpgbsim_cms_content');
     } catch (e) {}
 
     // 3. INTEGRATE WITH MEMBER PORTAL:
@@ -2806,16 +2825,16 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       return nextState;
     });
 
-    // 1. Persist to local storage
+    // 1. Persist to local storage (v3 only, clean up legacy)
     try {
-      ['mpgbsim_cms_content_v3', 'mpgbsim_cms_content'].forEach((key) => {
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          parsed.memberSchools = repairedSchools;
-          safeLocalStorageSet(key, JSON.stringify(parsed));
-        }
-      });
+      const key = 'mpgbsim_cms_content_v3';
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        parsed.memberSchools = repairedSchools;
+        safeLocalStorageSet(key, JSON.stringify(parsed));
+      }
+      safeLocalStorageRemove('mpgbsim_cms_content');
       if (repairedUser) {
         safeLocalStorageSet('mpgbsim_portal_user_v1', JSON.stringify(repairedUser));
       }

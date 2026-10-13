@@ -50,10 +50,13 @@ import {
   OperationType,
 } from '../firebase';
 import { repairSchoolIntegrity } from '../utils/schoolDiagnostic';
+import { compressDataUrl } from '../utils/imageCompressor';
 import {
   safeLocalStorageSet,
   safeLocalStorageGet,
   safeLocalStorageRemove,
+  saveToIndexedDB,
+  loadFromIndexedDB,
 } from '../utils/storage';
 
 export type PortalTab =
@@ -193,11 +196,10 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
 
   // 3. Overlay local CMS content if it contains newer local modifications
   try {
-    for (const key of ['mpgbsim_cms_content_v3', 'mpgbsim_cms_content']) {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.memberSchools && Array.isArray(parsed.memberSchools)) {
+    const saved = localStorage.getItem('mpgbsim_cms_content_v3') || localStorage.getItem('mpgbsim_cms_content');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.memberSchools && Array.isArray(parsed.memberSchools)) {
           parsed.memberSchools.forEach((sch: MemberSchool) => {
             if (sch.id) {
               const existing =
@@ -217,8 +219,6 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
               }
             }
           });
-          break;
-        }
       }
     }
   } catch (e) {}
@@ -292,6 +292,16 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           user.membershipNo = 'MPGB-2026-MJAC011';
           user.phone = user.phone || '+60 6-335 1290';
           user.joinYear = 2026;
+          // Sanitize any legacy oversized base64 data URLs (>180KB) in cache to prevent QuotaExceededError
+          if (typeof user.schoolPhotoUrl === 'string' && user.schoolPhotoUrl.startsWith('data:') && user.schoolPhotoUrl.length > 180 * 1024) {
+            user.schoolPhotoUrl = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80';
+          }
+          if (typeof user.photoURL === 'string' && user.photoURL.startsWith('data:') && user.photoURL.length > 180 * 1024) {
+            user.photoURL = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+          }
+          if (typeof user.logoUrl === 'string' && user.logoUrl.startsWith('data:') && user.logoUrl.length > 180 * 1024) {
+            user.logoUrl = 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=400&q=80';
+          }
           user.photoURL = user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
           user.schoolPhotoUrl = user.schoolPhotoUrl || 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80';
           user.logoUrl = user.logoUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=400&q=80';
@@ -412,10 +422,23 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [viewMode]);
 
   useEffect(() => {
+    // If no currentUser was recovered from localStorage, check IndexedDB backup
+    if (!currentUser) {
+      loadFromIndexedDB<UserProfile>('portal_user').then((cached) => {
+        if (cached && cached.uid && !cached.uid.startsWith('demo-')) {
+          setCurrentUser((curr) => curr || cached);
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
     if (currentUser) {
       safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+      saveToIndexedDB('portal_user', currentUser).catch(() => {});
     } else {
       safeLocalStorageRemove(STORAGE_KEYS.CURRENT_USER);
+      saveToIndexedDB('portal_user', null).catch(() => {});
     }
   }, [currentUser]);
 
@@ -1400,6 +1423,17 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       delete safeUpdates.membershipNo;
     }
 
+    // Compress any oversized base64 data URLs to protect Firestore 1MB document limit and localStorage quotas
+    if (safeUpdates.schoolPhotoUrl) {
+      safeUpdates.schoolPhotoUrl = await compressDataUrl(safeUpdates.schoolPhotoUrl, 800, 500, 0.70);
+    }
+    if (safeUpdates.photoURL) {
+      safeUpdates.photoURL = await compressDataUrl(safeUpdates.photoURL, 360, 360, 0.72);
+    }
+    if (safeUpdates.logoUrl) {
+      safeUpdates.logoUrl = await compressDataUrl(safeUpdates.logoUrl, 260, 260, 0.75);
+    }
+
     const updated: UserProfile = {
       ...baseUser,
       ...safeUpdates,
@@ -1452,48 +1486,48 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       });
     } catch (e) {}
 
-    // Also update local storage CMS cache (v3 & legacy) and trigger website refresh
+    // Also update local storage CMS cache (v3 only) and trigger website refresh
     try {
-      ['mpgbsim_cms_content_v3', 'mpgbsim_cms_content'].forEach((key) => {
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.memberSchools) {
-            parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
-              const matchCode = s.code && currentUser.membershipNo?.includes(s.code);
-              const matchEmail = s.email && currentUser.email && s.email.toLowerCase() === currentUser.email.toLowerCase();
-              const matchMusleh =
-                (s.code === 'MJAC011' || s.id === 'sch-musleh-1') &&
-                (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'));
-              if (matchCode || matchEmail || matchMusleh) {
-                return {
-                  ...s,
-                  ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
-                  ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
-                  ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
-                  ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
-                  ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
-                  ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
-                  ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
-                  ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone } : {}),
-                  ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail } : {}),
-                  ...(safeUpdates.phone ? { pgbPhone: safeUpdates.phone } : {}),
-                  ...(safeUpdates.pgbEmail ? { pgbEmail: safeUpdates.pgbEmail } : {}),
-                  ...(safeUpdates.studentCount !== undefined ? { studentCount: safeUpdates.studentCount } : {}),
-                  ...(safeUpdates.teacherCount !== undefined ? { teacherCount: safeUpdates.teacherCount } : {}),
-                  ...(safeUpdates.website ? { website: safeUpdates.website } : {}),
-                  ...(safeUpdates.photoURL ? { principalPhotoUrl: safeUpdates.photoURL } : {}),
-                  ...(safeUpdates.logoUrl ? { logoUrl: safeUpdates.logoUrl } : {}),
-                  ...(safeUpdates.schoolPhotoUrl ? { schoolPhotoUrl: safeUpdates.schoolPhotoUrl } : {}),
-                  updatedAt: new Date().toISOString(),
-                };
-              }
-              return s;
-            });
-            safeLocalStorageSet(key, JSON.stringify(parsed));
-          }
+      const key = 'mpgbsim_cms_content_v3';
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.memberSchools) {
+          parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
+            const matchCode = s.code && currentUser.membershipNo?.includes(s.code);
+            const matchEmail = s.email && currentUser.email && s.email.toLowerCase() === currentUser.email.toLowerCase();
+            const matchMusleh =
+              (s.code === 'MJAC011' || s.id === 'sch-musleh-1') &&
+              (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'));
+            if (matchCode || matchEmail || matchMusleh) {
+              return {
+                ...s,
+                ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
+                ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
+                ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
+                ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
+                ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
+                ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
+                ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
+                ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone } : {}),
+                ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail } : {}),
+                ...(safeUpdates.phone ? { pgbPhone: safeUpdates.phone } : {}),
+                ...(safeUpdates.pgbEmail ? { pgbEmail: safeUpdates.pgbEmail } : {}),
+                ...(safeUpdates.studentCount !== undefined ? { studentCount: safeUpdates.studentCount } : {}),
+                ...(safeUpdates.teacherCount !== undefined ? { teacherCount: safeUpdates.teacherCount } : {}),
+                ...(safeUpdates.website ? { website: safeUpdates.website } : {}),
+                ...(safeUpdates.photoURL ? { principalPhotoUrl: safeUpdates.photoURL } : {}),
+                ...(safeUpdates.logoUrl ? { logoUrl: safeUpdates.logoUrl } : {}),
+                ...(safeUpdates.schoolPhotoUrl ? { schoolPhotoUrl: safeUpdates.schoolPhotoUrl } : {}),
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return s;
+          });
+          safeLocalStorageSet(key, JSON.stringify(parsed));
         }
-      });
+      }
+      safeLocalStorageRemove('mpgbsim_cms_content');
       window.dispatchEvent(new Event('mpgbsim_content_updated'));
     } catch (e) {}
   };
@@ -1589,28 +1623,28 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       })
     );
 
-    // 6. Update local storage CMS school list cache (both v3 and legacy)
+    // 6. Update local storage CMS school list cache (v3 only)
     try {
-      ['mpgbsim_cms_content_v3', 'mpgbsim_cms_content'].forEach((key) => {
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.memberSchools) {
-            parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
-              if (
-                (s.email && s.email.toLowerCase() === currentUser.email?.toLowerCase()) ||
-                (s.name && s.name.toLowerCase() === currentUser.school?.toLowerCase()) ||
-                (currentUser.membershipNo && s.code && currentUser.membershipNo.includes(s.code)) ||
-                ((s.code === 'MJAC011' || s.code === 'MIA1009') && currentUser.school?.toLowerCase().includes('musleh'))
-              ) {
-                return { ...s, password: cleanPass };
-              }
-              return s;
-            });
-            safeLocalStorageSet(key, JSON.stringify(parsed));
-          }
+      const key = 'mpgbsim_cms_content_v3';
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.memberSchools) {
+          parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
+            if (
+              (s.email && s.email.toLowerCase() === currentUser.email?.toLowerCase()) ||
+              (s.name && s.name.toLowerCase() === currentUser.school?.toLowerCase()) ||
+              (currentUser.membershipNo && s.code && currentUser.membershipNo.includes(s.code)) ||
+              ((s.code === 'MJAC011' || s.code === 'MIA1009') && currentUser.school?.toLowerCase().includes('musleh'))
+            ) {
+              return { ...s, password: cleanPass };
+            }
+            return s;
+          });
+          safeLocalStorageSet(key, JSON.stringify(parsed));
         }
-      });
+      }
+      safeLocalStorageRemove('mpgbsim_cms_content');
       window.dispatchEvent(new Event('mpgbsim_content_updated'));
     } catch (e) {}
 

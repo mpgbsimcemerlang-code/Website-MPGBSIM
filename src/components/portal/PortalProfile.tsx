@@ -38,6 +38,7 @@ import { useAdminContent } from '../../context/AdminContentContext';
 import { Logo } from '../Logo';
 import QRCode from 'qrcode';
 import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
+import { compressImageFile, compressDataUrl } from '../../utils/imageCompressor';
 
 const normalizeSchoolCategory = (t?: string): string => {
   if (!t) return 'Sekolah Menengah';
@@ -237,49 +238,46 @@ export const PortalProfile: React.FC = () => {
     'Penolong Kanan Pentadbiran',
   ];
 
-  // Photo Upload Handlers
-  const handlePgbPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Photo Upload Handlers with automatic client-side compression (<80KB)
+  const handlePgbPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert('Saiz gambar PGB melebihi 3MB. Sila pilih fail imej yang lebih kecil.');
-        return;
+      try {
+        const compressed = await compressImageFile(file, 360, 360, 0.72);
+        setPhotoURL(compressed);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = () => setPhotoURL(reader.result as string);
+        reader.readAsDataURL(file);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPhotoURL(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
-  const handleSchoolPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSchoolPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Saiz foto institusi melebihi 5MB. Sila pilih fail imej yang lebih kecil.');
-        return;
+      try {
+        const compressed = await compressImageFile(file, 800, 500, 0.70);
+        setSchoolPhotoUrl(compressed);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = () => setSchoolPhotoUrl(reader.result as string);
+        reader.readAsDataURL(file);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setSchoolPhotoUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Saiz logo sekolah melebihi 2MB.');
-        return;
+      try {
+        const compressed = await compressImageFile(file, 260, 260, 0.75);
+        setLogoUrl(compressed);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = () => setLogoUrl(reader.result as string);
+        reader.readAsDataURL(file);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setLogoUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -298,6 +296,11 @@ export const PortalProfile: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // Re-compress any existing large base64 data URLs before saving to Firestore/localStorage
+      const safePhotoURL = photoURL ? await compressDataUrl(photoURL.trim(), 360, 360, 0.72) : undefined;
+      const safeSchoolPhotoUrl = schoolPhotoUrl ? await compressDataUrl(schoolPhotoUrl.trim(), 800, 500, 0.70) : undefined;
+      const safeLogoUrl = logoUrl ? await compressDataUrl(logoUrl.trim(), 260, 260, 0.75) : undefined;
+
       await updateUserProfile({
         fullName: fullName.trim(),
         position,
@@ -308,7 +311,7 @@ export const PortalProfile: React.FC = () => {
         pgbEmail: pgbEmail ? pgbEmail.trim() : undefined,
         phone: phone ? phone.trim() : undefined,
         pgbPhone: phone ? phone.trim() : undefined,
-        photoURL: photoURL ? photoURL.trim() : undefined,
+        photoURL: safePhotoURL,
         school: school.trim(),
         schoolCode: schoolCode ? schoolCode.trim().toUpperCase() : undefined,
         schoolType: schoolType || 'Sekolah Menengah',
@@ -320,8 +323,8 @@ export const PortalProfile: React.FC = () => {
         studentCount: Number(studentCount) || 0,
         teacherCount: Number(teacherCount) || 0,
         website: website ? website.trim() : undefined,
-        logoUrl: logoUrl ? logoUrl.trim() : undefined,
-        schoolPhotoUrl: schoolPhotoUrl ? schoolPhotoUrl.trim() : undefined,
+        logoUrl: safeLogoUrl,
+        schoolPhotoUrl: safeSchoolPhotoUrl,
         hidePhone,
         expertise: expertiseStr.split(',').map((s) => s.trim()).filter(Boolean),
         interests: interestsStr.split(',').map((s) => s.trim()).filter(Boolean),
@@ -371,9 +374,9 @@ export const PortalProfile: React.FC = () => {
           studentCount: Number(studentCount) || matchedSchool.studentCount,
           teacherCount: Number(teacherCount) || matchedSchool.teacherCount,
           website: website ? website.trim() : matchedSchool.website,
-          logoUrl: logoUrl ? logoUrl.trim() : matchedSchool.logoUrl,
-          schoolPhotoUrl: schoolPhotoUrl ? schoolPhotoUrl.trim() : matchedSchool.schoolPhotoUrl,
-          principalPhotoUrl: photoURL ? photoURL.trim() : matchedSchool.principalPhotoUrl,
+          logoUrl: safeLogoUrl || matchedSchool.logoUrl,
+          schoolPhotoUrl: safeSchoolPhotoUrl || matchedSchool.schoolPhotoUrl,
+          principalPhotoUrl: safePhotoURL || matchedSchool.principalPhotoUrl,
         });
       }
 

@@ -110,3 +110,82 @@ function fallbackFileReader(file: File, resolve: (val: string) => void) {
   }
 }
 
+/**
+ * Re-compresses an existing base64 data URL to keep it under Firestore 1MB and localStorage limits.
+ */
+export async function compressDataUrl(
+  dataUrl: string,
+  maxWidth: number = 800,
+  maxHeight: number = 600,
+  quality: number = 0.72
+): Promise<string> {
+  if (
+    !dataUrl ||
+    typeof dataUrl !== 'string' ||
+    !dataUrl.startsWith('data:image') ||
+    dataUrl.startsWith('data:image/svg+xml')
+  ) {
+    return dataUrl;
+  }
+
+  // If already under 120KB (~122,880 chars), it is lightweight and safe
+  if (dataUrl.length < 120 * 1024) {
+    return dataUrl;
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(dataUrl), 4000);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      clearTimeout(timeout);
+      try {
+        let { width, height } = img;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, width);
+        canvas.height = Math.max(1, height);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'medium';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let result = '';
+        try {
+          result = canvas.toDataURL('image/webp', quality);
+        } catch {
+          result = canvas.toDataURL('image/jpeg', quality);
+        }
+        if (!result || !result.startsWith('data:image')) {
+          result = canvas.toDataURL('image/jpeg', quality);
+        }
+
+        resolve(result && result.length < dataUrl.length ? result : dataUrl);
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+
+    img.onerror = () => {
+      clearTimeout(timeout);
+      resolve(dataUrl);
+    };
+
+    img.src = dataUrl;
+  });
+}
+
+
