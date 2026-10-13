@@ -50,7 +50,10 @@ import {
   handleFirestoreError,
   OperationType,
   ensureFirebaseAuth,
+  writeBatch,
 } from '../firebase';
+import { sanitizeForFirestore } from '../services/firebaseConfig';
+import { StorageManagementService } from '../services/StorageManagementService';
 import {
   runSchoolDiagnostic,
   repairSchoolIntegrity,
@@ -2873,20 +2876,15 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     });
 
     try {
-      const existing = JSON.parse(localStorage.getItem('mpgbsim_pending_registrations') || '[]');
+      const existingRaw = StorageManagementService.getItem('mpgbsim_pending_registrations');
+      const existing = existingRaw ? JSON.parse(existingRaw) : [];
       existing.unshift(item);
-      localStorage.setItem('mpgbsim_pending_registrations', JSON.stringify(existing.slice(0, 50)));
+      StorageManagementService.setItem(
+        'mpgbsim_pending_registrations',
+        JSON.stringify(existing.slice(0, 50)),
+        { isCritical: false }
+      );
     } catch (e) {}
-
-    try {
-      await setDoc(doc(db, 'memberApplications', item.id), {
-        ...item,
-        submittedAt: item.submittedAt || new Date().toISOString(),
-        status: item.status || 'pending',
-      });
-    } catch (e) {
-      console.warn('Firestore write memberApplication notice:', e);
-    }
 
     window.dispatchEvent(new Event('mpgbsim_content_updated'));
   };
@@ -3303,7 +3301,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const addAlumniRecord = async (
     item: Omit<AlumniRecord, 'id' | 'submittedAt'> | AlumniRecord
   ): Promise<string> => {
-    const id = (item as AlumniRecord).id || `alm-${Date.now()}`;
+    const year = new Date().getFullYear();
+    const timeSuffix = Date.now().toString(36).toUpperCase().slice(-5);
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const id = (item as AlumniRecord).id || `ALU-${year}-${timeSuffix}-${randomSuffix}`;
     const now = new Date().toISOString();
     const newRecord: AlumniRecord = {
       ...item,
@@ -3324,17 +3325,56 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       legacyQuote: item.legacyQuote || '',
     };
 
+    // Submissions inbox notification for Secretariat
+    const notifData = sanitizeForFirestore({
+      name: newRecord.fullName || '',
+      email: newRecord.email || '',
+      phone: newRecord.phone || '',
+      subject: `Pendaftaran Alumni PGB: ${newRecord.fullName} (${newRecord.lastSchool || 'Pesara PGB'})`,
+      category: 'Alumni',
+      message: `Pendaftaran Direktori Alumni MPGBSIM baru diterima. Nama: ${newRecord.fullName}, Gelaran: ${newRecord.title || '-'}, Sekolah Terakhir: ${newRecord.lastSchool || '-'}, Tahun Bersara: ${newRecord.retirementYear || '-'}, Emel: ${newRecord.email}, Telefon: ${newRecord.phone || '-'}. Status Semasa: SUBMITTED (Perlu Pengesahan Urus Setia).`,
+      status: 'unread',
+      createdAt: now,
+    });
+
+    // Atomic write to both 'alumni' collection and 'submissions' notification inbox
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'alumni', id), sanitizeForFirestore(newRecord as any));
+      batch.set(doc(db, 'submissions', id), notifData);
+      await batch.commit();
+    } catch (firestoreErr: any) {
+      console.error('Ralat pangkalan data Firestore semasa menghantar pendaftaran alumni:', firestoreErr);
+      const code = firestoreErr?.code || '';
+      const msg = (firestoreErr?.message || '').toLowerCase();
+
+      if (code === 'resource-exhausted' || msg.includes('resource_exhausted') || msg.includes('quota') || msg.includes('limit')) {
+        throw new Error(
+          'Had kuota Cloud Firestore telah dicapai buat masa ini (RESOURCE_EXHAUSTED). Pendaftaran alumni tidak dapat diproses sekarang. Sila hubungi Urus Setia MPGBSIM atau cuba semula selepas kuota harian diperbaharui.'
+        );
+      }
+      if (code === 'permission-denied' || msg.includes('permission-denied')) {
+        throw new Error(
+          'Akses pangkalan data ditolak oleh polisi keselamatan Cloud Firestore (PERMISSION_DENIED). Sila hubungi pentadbir portal.'
+        );
+      }
+      if (code === 'unavailable' || msg.includes('unavailable') || msg.includes('network') || msg.includes('failed to fetch')) {
+        throw new Error(
+          'Pelayan Cloud Firestore tidak dapat dihubungi buat masa ini. Sila pastikan sambungan internet anda aktif dan cuba lagi.'
+        );
+      }
+      throw new Error(
+        `Gagal menyimpan pendaftaran alumni ke Cloud Firestore (${code || 'Ralat Rangkaian'}). Sila semak sambungan internet anda dan cuba lagi.`
+      );
+    }
+
+    // Only update local state AFTER confirmed successful write
     setSiteData((prev) => {
       const updated = [newRecord, ...(prev.alumni || [])];
       return { ...prev, alumni: updated };
     });
 
-    try {
-      await ensureFirebaseAuth().catch(() => null);
-      await setDoc(doc(db, 'alumni', id), newRecord);
-    } catch (e) {
-      console.warn('Firestore addAlumniRecord notice:', e);
-    }
     return id;
   };
 

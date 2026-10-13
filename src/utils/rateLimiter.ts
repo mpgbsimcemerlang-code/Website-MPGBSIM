@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 export type RateLimitAction =
   | 'member_registration'
+  | 'alumni_registration'
   | 'practice_submission'
   | 'general_submission'
   | 'school_news_submission'
@@ -50,6 +51,14 @@ export const DEFAULT_RATE_LIMIT_POLICIES: Record<RateLimitAction, RateLimitPolic
     maxAttempts: 3,       // Max 3 registrations within 10 minutes
     windowMs: 10 * 60 * 1000,
     customMessage: 'Pendaftaran keahlian hanya boleh dihantar 3 kali dalam tempoh 10 minit bagi mengelakkan permohonan bertindih.',
+  },
+  alumni_registration: {
+    action: 'alumni_registration',
+    name: 'Pendaftaran Alumni PGB',
+    minIntervalMs: 15000, // 15 seconds cooldown
+    maxAttempts: 3,       // Max 3 registrations within 10 minutes
+    windowMs: 10 * 60 * 1000,
+    customMessage: 'Pendaftaran rekod alumni hanya dibenarkan 3 kali dalam tempoh 10 minit bagi mengelakkan permohonan bertindih.',
   },
   practice_submission: {
     action: 'practice_submission',

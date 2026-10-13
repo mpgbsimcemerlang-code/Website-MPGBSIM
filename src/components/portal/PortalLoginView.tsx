@@ -298,6 +298,39 @@ export const PortalLoginView: React.FC = () => {
     setRegSuccess(null);
     setRegError(null);
 
+    const sCode = (regForm.schoolCode || '').trim().toUpperCase();
+    const sEmail = (regForm.email || '').trim().toLowerCase();
+
+    // 1. Semakan institusi sedia ada berdaftar
+    if (sCode) {
+      const existingSchool = siteData.memberSchools?.find(
+        (s) => s.code && s.code.toUpperCase() === sCode
+      );
+      if (existingSchool) {
+        setRegError(
+          `Institusi dengan Kod Sekolah (${sCode}) telah berdaftar secara rasmi dalam direktori MPGBSIM (${existingSchool.name}). Sila gunakan tab "Semakan Status" untuk log masuk PGB berdaftar.`
+        );
+        setRegSubmitting(false);
+        return;
+      }
+    }
+
+    // 2. Semakan permohonan sedia ada dalam sistem
+    const existingApp = siteData.memberApplications?.find(
+      (a) =>
+        (sCode && a.schoolCode && a.schoolCode.toUpperCase() === sCode) ||
+        (sEmail && a.email && a.email.toLowerCase() === sEmail)
+    );
+    if (existingApp) {
+      setRegError(
+        `Permohonan bagi ${regForm.schoolName} (${sCode || sEmail}) telah wujud dalam sistem dengan status "${
+          existingApp.status === 'approved' ? 'Telah Diluluskan' : 'Sedang Diproses Urus Setia'
+        }". Sila buat semakan di tab "Semakan Status".`
+      );
+      setRegSubmitting(false);
+      return;
+    }
+
     try {
       const serviceYear = Number(regForm.serviceStartYear) || new Date().getFullYear();
       const joinYear = Number(regForm.joinYear) || Number(regForm.schoolJoinYear) || new Date().getFullYear();
@@ -350,7 +383,7 @@ export const PortalLoginView: React.FC = () => {
         try {
           await addMemberApplication(application);
         } catch (ctxErr) {
-          console.warn('Member application added to Firestore but context sync warning:', ctxErr);
+          console.warn('Member application state update warning:', ctxErr);
         }
 
         setRegSuccess(
@@ -371,7 +404,7 @@ export const PortalLoginView: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressed = await compressImageFile(file, 600, 600, 0.75);
+        const compressed = await compressImageFile(file, 400, 400, 0.70);
         setRegForm((prev) => ({ ...prev, pgbPhotoUrl: compressed }));
       } catch (err) {
         console.warn('Gagal memampatkan foto PGB:', err);
@@ -383,7 +416,7 @@ export const PortalLoginView: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressed = await compressImageFile(file, 800, 800, 0.75);
+        const compressed = await compressImageFile(file, 500, 350, 0.70);
         setRegForm((prev) => ({ ...prev, schoolPhotoUrl: compressed }));
       } catch (err) {
         console.warn('Gagal memampatkan foto sekolah:', err);
@@ -395,7 +428,7 @@ export const PortalLoginView: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressed = await compressImageFile(file, 400, 400, 0.85);
+        const compressed = await compressImageFile(file, 300, 300, 0.70);
         setRegForm((prev) => ({ ...prev, logoUrl: compressed }));
       } catch (err) {
         console.warn('Gagal memampatkan logo:', err);

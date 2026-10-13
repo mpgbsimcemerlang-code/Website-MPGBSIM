@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { AlumniRecord, LeadershipHistoryRecord, AlumniConsent } from '../../types';
 import { compressImageFile } from '../../utils/imageCompressor';
+import { checkAndRecordRateLimit } from '../../utils/rateLimiter';
+import { useAdminContent } from '../../context/AdminContentContext';
 
 interface AlumniRegistrationModalProps {
   isOpen: boolean;
@@ -34,6 +36,7 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
   onClose,
   onSubmit,
 }) => {
+  const { siteData } = useAdminContent();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submittedSuccess, setSubmittedSuccess] = useState<boolean>(false);
@@ -54,7 +57,8 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
 
     setIsCompressingPhoto(true);
     try {
-      const dataUrl = await compressImageFile(file, 600, 600, 0.85);
+      // Optimized 400x400 with 0.70 compression to ensure document stays <30KB and protects Firestore quota
+      const dataUrl = await compressImageFile(file, 400, 400, 0.70);
       if (dataUrl) {
         setPhoto(dataUrl);
       }
@@ -201,6 +205,18 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
         setErrorMessage('Sila masukkan alamat emel yang sah.');
         return false;
       }
+      // Semakan pencegahan pendaftaran pendua berdasarkan emel
+      const existingAlumni = siteData.alumni?.find(
+        (a) => a.email && a.email.trim().toLowerCase() === email.trim().toLowerCase()
+      );
+      if (existingAlumni) {
+        setErrorMessage(
+          `Alamat emel ${email.trim()} telah didaftarkan dalam sistem Direktori Alumni MPGBSIM (${
+            existingAlumni.verificationStatus === 'APPROVED' ? 'Status: Diluluskan' : 'Status: Sedang Dalam Semakan'
+          }). Sila gunakan emel lain atau hubungi urus setia.`
+        );
+        return false;
+      }
       if (!phone.trim()) {
         setErrorMessage('Sila masukkan nombor telefon rujukan.');
         return false;
@@ -242,6 +258,22 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
     e.preventDefault();
     if (!validateStep(7)) return;
 
+    // Semakan pendua keselamatan akhir
+    const existingAlumni = siteData.alumni?.find(
+      (a) => a.email && a.email.trim().toLowerCase() === email.trim().toLowerCase()
+    );
+    if (existingAlumni) {
+      setErrorMessage(`Alamat emel ${email.trim()} telah didaftarkan dalam direktori alumni.`);
+      return;
+    }
+
+    // Semakan Had Kadar (Rate Limiting) untuk mengelakkan penulisan berlebihan ke Firestore
+    const rateCheck = checkAndRecordRateLimit('alumni_registration');
+    if (!rateCheck.allowed) {
+      setErrorMessage(rateCheck.message);
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage('');
 
@@ -279,7 +311,7 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
       setSubmittedSuccess(true);
     } catch (err: any) {
       setIsSubmitting(false);
-      setErrorMessage(err?.message || 'Gagal menghantar permohonan alumni. Sila cuba lagi.');
+      setErrorMessage(err?.message || 'Gagal menghantar permohonan alumni ke pangkalan data. Sila semak sambungan internet anda dan cuba lagi.');
     }
   };
 

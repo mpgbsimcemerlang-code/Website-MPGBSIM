@@ -24,6 +24,7 @@ import {
   orderBy,
   onSnapshot,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -155,5 +156,6 @@ export {
   orderBy,
   onSnapshot,
   Timestamp,
+  writeBatch,
   type User,
 };
