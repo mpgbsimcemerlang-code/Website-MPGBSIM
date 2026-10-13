@@ -30,6 +30,8 @@ import {
   Calendar,
   Loader2,
   Clock,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Logo } from '../Logo';
 import { useMemberPortal } from '../../context/MemberPortalContext';
@@ -42,7 +44,6 @@ import { RateLimitNotice } from './RateLimitNotice';
 
 export const PortalLoginView: React.FC = () => {
   const {
-    loginAsMemberSchool,
     loginWithEmail,
     loginWithGoogle,
     setViewMode,
@@ -78,6 +79,7 @@ export const PortalLoginView: React.FC = () => {
     message: string;
     data?: any;
   } | null>(null);
+  const [copiedTempPass, setCopiedTempPass] = useState(false);
 
   // New Registration form
   const [regForm, setRegForm] = useState<MemberRegistrationForm>({
@@ -769,7 +771,7 @@ export const PortalLoginView: React.FC = () => {
                         </button>
                       </div>
                       <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
-                        Sila masukkan kata laluan akaun sekolah anda. Sekiranya anda telah menukar kata laluan di profil, sila gunakan kata laluan baharu tersebut.
+                        Kata laluan sementara akaun sekolah berdaftar: <strong className="text-amber-300 font-mono">MPGBSIM2026</strong>. Sekiranya anda telah menukar kata laluan di profil ahli, sila gunakan kata laluan baharu anda.
                       </p>
                     </div>
 
@@ -857,8 +859,9 @@ export const PortalLoginView: React.FC = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <div className="mt-1.5 text-[11px] text-slate-400">
-                  <span>Hanya akaun sekolah dan pentadbir berdaftar MPGBSIM yang dibenarkan log masuk.</span>
+                <div className="mt-1.5 text-[11px] text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <span>Hanya akaun sekolah dan pentadbir berdaftar yang dibenarkan log masuk.</span>
+                  <span className="text-[10px] text-amber-300/90 font-medium">Kata laluan sementara: <strong className="font-mono text-amber-300 font-bold">MPGBSIM2026</strong></span>
                 </div>
               </div>
 
@@ -1534,14 +1537,72 @@ export const PortalLoginView: React.FC = () => {
                       Status: <span className="font-bold text-amber-400">{statusResult.data.status}</span>
                     </div>
                     {statusResult.data.school && (
-                      <button
-                        type="button"
-                        onClick={() => loginAsMemberSchool(statusResult.data.school)}
-                        className="mt-2 w-full py-2 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5"
-                      >
-                        <span>Terus Log Masuk Sebagai PGB</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="mt-4 pt-3 border-t border-slate-800 space-y-3">
+                        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-400/30 text-amber-100 space-y-2.5">
+                          <div className="flex items-center gap-2 font-bold text-amber-300">
+                            <KeyRound className="w-4 h-4 text-amber-400 shrink-0" />
+                            <span className="text-xs">Kata Laluan Sementara Log Masuk PGB</span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            Pendaftaran institusi anda disahkan berdaftar. Untuk log masuk sebagai Pengetua / Guru Besar (PGB), sila gunakan kata laluan sementara rasmi:
+                          </p>
+
+                          <div className="p-3 rounded-xl bg-slate-950 border border-amber-400/40 flex items-center justify-between gap-3 shadow-inner">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase tracking-wider font-semibold">
+                                Kata Laluan Sementara:
+                              </span>
+                              <span className="font-mono text-base font-black text-amber-400 tracking-widest select-all">
+                                MPGBSIM2026
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText('MPGBSIM2026');
+                                setCopiedTempPass(true);
+                                setTimeout(() => setCopiedTempPass(false), 2500);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition cursor-pointer active:scale-95 border border-slate-700"
+                              title="Salin kata laluan sementara"
+                            >
+                              {copiedTempPass ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span className="text-emerald-300">Disalin!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Salin</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <div className="flex items-start gap-2 text-[11px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                            <Shield className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
+                            <span className="leading-relaxed">
+                              <strong>Langkah Keselamatan:</strong> Selepas berjaya log masuk ke portal, anda boleh menukar kata laluan mengikut pilihan anda pada bila-bila masa di menu <strong>Profil Ahli</strong>.
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const loginId = statusResult.data.code || statusResult.data.school?.email || '';
+                            setEmailInput(loginId);
+                            setPasswordInput('MPGBSIM2026');
+                            setActiveTab('credentials');
+                          }}
+                          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer active:scale-98"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-slate-950" />
+                          <span>Pergi ke Halaman Log Masuk (PGB)</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-slate-950" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}

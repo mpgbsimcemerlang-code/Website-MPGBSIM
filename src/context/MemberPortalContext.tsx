@@ -1245,6 +1245,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     // 2. Check matched school object in 'schools' collection
     if (!customPasswordSet && matched.password) {
       const defaultFormats = [
+        'MPGBSIM2026',
+        'mpgbsim2026',
         `PGB#${matched.code?.toUpperCase()}`,
         'PGB#MJAC011',
         'PGB#MIA1009',
@@ -1259,26 +1261,29 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     let isValidPass = false;
 
     if (customPasswordSet) {
-      // If user has changed their password, ONLY the new custom password is valid! Default formats like PGB#MJAC011 are REJECTED.
+      // If user has changed their password, ONLY the new custom password is valid! Default formats like MPGBSIM2026 are REJECTED.
       isValidPass = cleanPass === customPasswordSet;
     } else {
-      // If no custom password has been set yet, allow initial default formats
-      const expectedPassword = matched.password || `PGB#${matched.code?.toUpperCase()}` || 'MPGB2026!';
+      // If no custom password has been set yet, allow official temporary password MPGBSIM2026 or initial formats
+      const isTempPassword = cleanPass === 'MPGBSIM2026' || cleanPass.toUpperCase() === 'MPGBSIM2026';
+      const expectedPassword = matched.password || 'MPGBSIM2026';
       isValidPass =
+        isTempPassword ||
         cleanPass === matched.password ||
         cleanPass === expectedPassword ||
         (isMuslehSchool && (cleanPass === 'PGB#MJAC011' || cleanPass === 'PGB#MIA1009')) ||
+        cleanPass === `PGB#${matched.code?.toUpperCase()}` ||
         cleanPass === 'MPGB2026!';
     }
 
     if (!isValidPass) {
       if (customPasswordSet) {
         throw new Error(
-          `Kata laluan tidak tepat. Anda telah menukar kata laluan akaun ini — format asal (PGB#${matched.code}) tidak lagi sah. Sila masukkan kata laluan baharu anda.`
+          `Kata laluan tidak tepat. Anda telah menetapkan kata laluan baharu untuk akaun ini — kata laluan sementara (MPGBSIM2026) tidak lagi sah. Sila masukkan kata laluan peribadi yang telah dikemas kini.`
         );
       } else {
         throw new Error(
-          `Kata laluan tidak tepat bagi institusi ${matched.name}. Sila masukkan kata laluan akaun sekolah yang sah.`
+          `Kata laluan tidak tepat bagi institusi ${matched.name}. Sila gunakan kata laluan sementara rasmi (MPGBSIM2026) atau kata laluan akaun sekolah anda.`
         );
       }
     }

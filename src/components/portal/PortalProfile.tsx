@@ -1267,6 +1267,15 @@ export const PortalProfile: React.FC = () => {
               </div>
             </div>
 
+            {(!currentUser?.portalPassword || currentUser?.portalPassword === 'MPGBSIM2026') && (
+              <div className="mt-3 p-3.5 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 text-xs flex items-start gap-2.5 shadow-xs">
+                <KeyRound className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed">
+                  <strong>Peringatan Keselamatan:</strong> Akaun anda masih menggunakan kata laluan sementara rasmi (<strong>MPGBSIM2026</strong>). Sila tetapkan kata laluan peribadi baharu di bawah bagi menjamin keselamatan akaun sekolah anda.
+                </div>
+              </div>
+            )}
+
             {passwordSuccess && (
               <div className="mt-4 p-4 rounded-2xl bg-emerald-600 text-white text-xs font-semibold flex items-center gap-2.5 shadow-md animate-in fade-in">
                 <CheckCircle className="w-5 h-5 shrink-0" />
