@@ -334,6 +334,12 @@ export const PortalLoginView: React.FC = () => {
     try {
       const serviceYear = Number(regForm.serviceStartYear) || new Date().getFullYear();
       const joinYear = Number(regForm.joinYear) || Number(regForm.schoolJoinYear) || new Date().getFullYear();
+
+      if (joinYear < 1970) {
+        setRegError('Tahun Sekolah Menjadi Ahli MPGBSIM mestilah bermula dari tahun 1970 atau lebih baharu (nilai >= 1970).');
+        setRegSubmitting(false);
+        return;
+      }
       
       const res = await savePendingRegistration({
         ...regForm,
@@ -1261,7 +1267,7 @@ export const PortalLoginView: React.FC = () => {
                       <input
                         type="number"
                         required
-                        min="1990"
+                        min="1970"
                         max={new Date().getFullYear() + 2}
                         value={regForm.joinYear || ''}
                         onChange={(e) =>
@@ -1274,7 +1280,7 @@ export const PortalLoginView: React.FC = () => {
                         placeholder={`cth: ${new Date().getFullYear()}`}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white font-mono focus:outline-hidden focus:border-amber-400 transition"
                       />
-                      <span className="text-[10px] text-slate-500 mt-0.5 block">Tahun institusi sekolah memohon / menyertai keahlian MPGBSIM</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5 block">Tahun institusi sekolah memohon / menyertai keahlian MPGBSIM (minimum 1970)</span>
                     </div>
                     <div>
                       <label className="block text-slate-300 mb-1 font-semibold">Negeri *</label>

@@ -920,14 +920,14 @@ export const PortalProfile: React.FC = () => {
                     <input
                       type="number"
                       required
-                      min="1990"
+                      min="1970"
                       max={new Date().getFullYear() + 2}
                       value={joinYear}
                       onChange={(e) => setJoinYear(e.target.value)}
                       placeholder="cth: 2024"
                       className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-mono font-semibold text-slate-900 focus:ring-2 focus:ring-teal-700 focus:outline-none"
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Tahun sekolah rasmi menjadi ahli MPGBSIM</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Tahun sekolah rasmi menjadi ahli MPGBSIM (minimum 1970)</span>
                   </div>
 
                   <div>

@@ -1373,6 +1373,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         if (matchCode || matchEmail || matchMusleh) {
           updateDoc(doc(db, 'schools', d.id), {
             ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
+            ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
             ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
             ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
             ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
@@ -1412,6 +1413,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               return {
                 ...s,
                 ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
+                ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
                 ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
                 ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
                 ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),

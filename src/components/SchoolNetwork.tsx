@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { NetworkStats, MemberSchool } from '../types';
 import { MALAYSIA_STATES, SCHOOL_TYPES } from '../data/constants';
 import { useAdminContent } from '../context/AdminContentContext';
@@ -7,14 +7,8 @@ import {
   MapPin,
   Users,
   Search,
-  SlidersHorizontal,
-  Info,
   Edit3,
-  Check,
-  RotateCcw,
-  Sparkles,
   Building2,
-  AlertCircle,
   X,
   Eye,
   Globe,
@@ -24,7 +18,10 @@ import {
   Calendar,
   ShieldCheck,
   ExternalLink,
-  ChevronRight,
+  UserCheck,
+  BookOpen,
+  Radio,
+  RotateCcw,
 } from 'lucide-react';
 
 interface SchoolNetworkProps {
@@ -33,21 +30,202 @@ interface SchoolNetworkProps {
   schools: MemberSchool[];
 }
 
+type LiveCardFilter = 'ALL' | 'PENGETUA' | 'GURU_BESAR' | 'MURID_RENDAH' | 'PELAJAR_MENENGAH';
+
+export const isPrimarySchoolRecord = (school: MemberSchool): boolean => {
+  const typeLower = (school.type || '').toLowerCase();
+  const nameLower = (school.name || '').toLowerCase();
+  const desigLower = (school.designation || '').toLowerCase();
+  const principalLower = (school.principal || '').toLowerCase();
+
+  // Check explicit primary school naming first (e.g. "Sekolah Rendah Islam I Musleh" with type "Rakan Musleh")
+  if (
+    typeLower === 'sekolah rendah' ||
+    typeLower.includes('rendah') ||
+    nameLower.includes('rendah') ||
+    /\bsri\b|\bsriti\b|\bsra\b|\bsrai\b|\bsr\b/i.test(nameLower)
+  ) {
+    return true;
+  }
+
+  // Check explicit secondary / tahfiz indicators
+  if (
+    typeLower === 'sekolah menengah' ||
+    typeLower.includes('menengah') ||
+    typeLower.includes('smka') ||
+    typeLower.includes('sabk') ||
+    typeLower.includes('tahfiz') ||
+    /\bsmk\b|\bsmka\b|\bsma\b|\bsmi\b|\bsmabk\b|\bmaahad\b/i.test(nameLower)
+  ) {
+    return false;
+  }
+
+  if (desigLower.includes('guru besar') || principalLower.includes('guru besar')) {
+    return true;
+  }
+
+  return false;
+};
+
+export const isGuruBesarRecord = (school: MemberSchool): boolean => {
+  const desigLower = (school.designation || '').toLowerCase();
+  const principalLower = (school.principal || '').toLowerCase();
+
+  if (desigLower.includes('guru besar') || principalLower.includes('guru besar')) {
+    return true;
+  }
+  if (desigLower.includes('pengetua') || principalLower.includes('pengetua')) {
+    return false;
+  }
+  return isPrimarySchoolRecord(school);
+};
+
 export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
-  stats,
-  onUpdateStats,
-  schools
+  schools,
 }) => {
-  const { isAdmin, setIsCMSOpen } = useAdminContent();
-  const [isEditing, setIsEditing] = useState(false);
-  const [tempStats, setTempStats] = useState<NetworkStats>({ ...stats });
+  const { isAdmin, setIsCMSOpen, siteData } = useAdminContent();
+
+  // Track live update timestamp whenever schools or applications change
+  const [lastSyncedAt, setLastSyncedAt] = useState<string>(() =>
+    new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  );
+
+  useEffect(() => {
+    setLastSyncedAt(
+      new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    );
+  }, [schools, siteData.memberSchools, siteData.memberApplications]);
+
+  useEffect(() => {
+    const onLiveUpdate = () => {
+      setLastSyncedAt(
+        new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+    };
+    window.addEventListener('mpgbsim_school_updated', onLiveUpdate);
+    window.addEventListener('mpgbsim_content_updated', onLiveUpdate);
+    window.addEventListener('storage', onLiveUpdate);
+    return () => {
+      window.removeEventListener('mpgbsim_school_updated', onLiveUpdate);
+      window.removeEventListener('mpgbsim_content_updated', onLiveUpdate);
+      window.removeEventListener('storage', onLiveUpdate);
+    };
+  }, []);
+
+  // Merge registered schools with any approved applications & enrich designation from applications
+  const effectiveSchools = useMemo(() => {
+    const baseList = schools && schools.length > 0 ? schools : siteData.memberSchools || [];
+    const approvedApps = (siteData.memberApplications || []).filter((a) => a.status === 'approved');
+
+    const enriched = baseList.map((sch) => {
+      if (sch.designation) return sch;
+      const matchedApp = approvedApps.find(
+        (a) =>
+          (a.schoolCode && sch.code && a.schoolCode.toLowerCase() === sch.code.toLowerCase()) ||
+          (a.schoolName && sch.name && a.schoolName.toLowerCase() === sch.name.toLowerCase())
+      );
+      if (matchedApp?.designation) {
+        return { ...sch, designation: matchedApp.designation };
+      }
+      return sch;
+    });
+
+    // Include any approved application not yet present in baseList
+    approvedApps.forEach((app) => {
+      const exists = enriched.some(
+        (s) =>
+          (app.schoolCode && s.code && app.schoolCode.toLowerCase() === s.code.toLowerCase()) ||
+          (app.schoolName && s.name && app.schoolName.toLowerCase() === s.name.toLowerCase())
+      );
+      if (!exists && app.schoolName) {
+        enriched.push({
+          id: `app-sch-${app.id}`,
+          name: app.schoolName,
+          code: app.schoolCode || '-',
+          type: app.schoolType || 'Sekolah Menengah',
+          state: app.state || 'Selangor',
+          district: app.district || '',
+          principal: app.fullName || 'PGB Berdaftar',
+          designation: app.designation,
+          principalPhotoUrl: app.pgbPhotoUrl || '',
+          studentCount: Number(app.studentCount) || 0,
+          teacherCount: Number(app.teacherCount) || 0,
+          joinYear: Number(app.joinYear || app.schoolJoinYear) || new Date().getFullYear(),
+          logoUrl: app.logoUrl || '',
+          schoolPhotoUrl: app.schoolPhotoUrl || '',
+          website: app.website || '',
+          address: app.address || '',
+          phone: app.schoolPhone || app.phoneNumber || '',
+          email: app.schoolEmail || app.email || '',
+        });
+      }
+    });
+
+    return enriched;
+  }, [schools, siteData.memberSchools, siteData.memberApplications]);
+
+  // Compute the 5 real-time Live Metrics from effectiveSchools
+  const liveMetrics = useMemo(() => {
+    let principalsCount = 0;
+    let headteachersCount = 0;
+    let primaryStudentsCount = 0;
+    let secondaryStudentsCount = 0;
+    let primarySchoolsCount = 0;
+    let secondarySchoolsCount = 0;
+    let totalTeachersCount = 0;
+    const statesSet = new Set<string>();
+
+    effectiveSchools.forEach((sch) => {
+      const primary = isPrimarySchoolRecord(sch);
+      const guruBesar = isGuruBesarRecord(sch);
+      const students = Math.max(0, Number(sch.studentCount) || 0);
+      const teachers = Math.max(0, Number(sch.teacherCount) || 0);
+
+      if (guruBesar) {
+        headteachersCount += 1;
+      } else {
+        principalsCount += 1;
+      }
+
+      if (primary) {
+        primarySchoolsCount += 1;
+        primaryStudentsCount += students;
+      } else {
+        secondarySchoolsCount += 1;
+        secondaryStudentsCount += students;
+      }
+
+      totalTeachersCount += teachers;
+      if (sch.state && sch.state.trim()) {
+        statesSet.add(sch.state.trim());
+      }
+    });
+
+    const pendingAppsCount = (siteData.memberApplications || []).filter(
+      (a) => a.status === 'pending'
+    ).length;
+
+    return {
+      totalSchools: effectiveSchools.length,
+      principalsCount,
+      headteachersCount,
+      primaryStudentsCount,
+      secondaryStudentsCount,
+      primarySchoolsCount,
+      secondarySchoolsCount,
+      totalStudentsCount: primaryStudentsCount + secondaryStudentsCount,
+      totalTeachersCount,
+      statesCovered: statesSet.size,
+      pendingAppsCount,
+    };
+  }, [effectiveSchools, siteData.memberApplications]);
 
   // School profile modal state
   const [selectedSchool, setSelectedSchool] = useState<MemberSchool | null>(null);
 
   // Derive live school record so modal immediately reflects CMS profile updates
   const activeSchool = selectedSchool
-    ? schools.find(
+    ? effectiveSchools.find(
         (s) =>
           s.id === selectedSchool.id ||
           (selectedSchool.code && s.code && s.code.toLowerCase() === selectedSchool.code.toLowerCase())
@@ -58,25 +236,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState('Semua Negeri');
   const [selectedType, setSelectedType] = useState('Semua Jenis Sekolah');
-
-  const handleSaveStats = (e: React.FormEvent) => {
-    e.preventDefault();
-    onUpdateStats({ ...tempStats });
-    setIsEditing(false);
-  };
-
-  const handleResetStats = () => {
-    const defaultVals: NetworkStats = {
-      schoolsCount: 420,
-      statesCount: 14,
-      principalsCount: 850,
-      studentsBenefited: '180,000+',
-      isPlaceholder: true,
-    };
-    setTempStats(defaultVals);
-    onUpdateStats(defaultVals);
-    setIsEditing(false);
-  };
+  const [liveCardFilter, setLiveCardFilter] = useState<LiveCardFilter>('ALL');
 
   // Filter schools
   const normalizeCategory = (t?: string) => {
@@ -89,7 +249,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
     return 'Sekolah Menengah';
   };
 
-  const filteredSchools = schools.filter((school) => {
+  const filteredSchools = effectiveSchools.filter((school) => {
     const matchesSearch =
       school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       school.principal.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -99,215 +259,280 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
     const matchesState = selectedState === 'Semua Negeri' || school.state === selectedState;
     const matchesType = selectedType === 'Semua Jenis Sekolah' || normalizeCategory(school.type) === selectedType;
 
-    return matchesSearch && matchesState && matchesType;
+    let matchesLiveCard = true;
+    if (liveCardFilter === 'PENGETUA') {
+      matchesLiveCard = !isGuruBesarRecord(school);
+    } else if (liveCardFilter === 'GURU_BESAR') {
+      matchesLiveCard = isGuruBesarRecord(school);
+    } else if (liveCardFilter === 'MURID_RENDAH') {
+      matchesLiveCard = isPrimarySchoolRecord(school);
+    } else if (liveCardFilter === 'PELAJAR_MENENGAH') {
+      matchesLiveCard = !isPrimarySchoolRecord(school);
+    }
+
+    return matchesSearch && matchesState && matchesType && matchesLiveCard;
   });
+
+  const handleSelectLiveCard = (filter: LiveCardFilter) => {
+    setLiveCardFilter((prev) => (prev === filter ? 'ALL' : filter));
+  };
 
   return (
     <section id="sekolah-ahli" className="py-20 bg-slate-100/70 border-b border-slate-200 scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-teal-100 text-teal-900 text-xs font-bold uppercase tracking-wider mb-3">
-            <School className="w-3.5 h-3.5 text-teal-700" />
-            <span>Rangkaian Pendidikan Islam</span>
+          <div className="inline-flex items-center gap-2 text-teal-800 text-xs font-bold uppercase tracking-wider mb-3">
+            <School className="w-4 h-4 text-teal-700" />
+            <span>Rangkaian Pendidikan Islam Kebangsaan</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
             Rangkaian Sekolah-Sekolah Ahli MPGBSIM
           </h2>
           <p className="mt-3 text-base text-slate-600">
-            Jaringan kolaborasi kepimpinan merangkumi SRI, SMI, Maahad Tahfiz & Rakan Musleh dibawah Musleh Integrated Education Berhad (MIEB) di seluruh tanah air.
+            Jaringan kolaborasi kepimpinan merangkumi SRI, SMI, Maahad Tahfiz & Rakan Musleh di bawah Musleh Integrated Education Berhad (MIEB) di seluruh tanah air.
           </p>
           <div className="w-16 h-1 bg-gradient-to-r from-teal-600 to-amber-500 mx-auto mt-4 rounded-full" />
         </div>
 
-        {/* Clear Placeholder Disclaimer Badge */}
-        {stats.isPlaceholder && (
-          <div className="mb-8 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs sm:text-sm font-bold text-amber-900">
-                  PEMBERITAHUAN: Nilai Statistik Adalah Pemegang Tempat (Placeholder Rasmi)
-                </p>
-                <p className="text-xs text-amber-800 mt-0.5">
-                  Angka yang dipaparkan adalah anggaran sementara sehingga bancian rasmi keahlian MPGBSIM 2026 selesai dimuktamadkan oleh Urus Setia.
-                </p>
-              </div>
-            </div>
+        {/* Live Updates Status Bar */}
+        <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-700">
+            <span className="inline-flex items-center gap-1.5 font-bold text-emerald-800">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
+              </span>
+              <Radio className="w-3.5 h-3.5 text-emerald-700" />
+              <span>PAPARAN DATA LANGSUNG (LIVE UPDATES)</span>
+            </span>
+            <span aria-hidden="true" className="text-slate-300">·</span>
+            <span className="text-slate-600">
+              Dikemas kini secara masa nyata mengikut pendaftaran sekolah & kemas kini profil ahli
+            </span>
+            <span aria-hidden="true" className="text-slate-300 hidden md:inline">·</span>
+            <span className="text-[11px] font-mono text-slate-500 hidden md:inline">
+              Segerak Terakhir: {lastSyncedAt}
+            </span>
+          </div>
 
+          <div className="flex items-center gap-2 shrink-0">
+            {liveCardFilter !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setLiveCardFilter('ALL')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Papar Semua ({liveMetrics.totalSchools})</span>
+              </button>
+            )}
             {isAdmin && (
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsCMSOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-colors"
-                >
-                  <span>Buka CMS Statistik</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-200/80 hover:bg-amber-300 text-amber-950 font-bold text-xs shrink-0 cursor-pointer border border-amber-300 transition-colors"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-amber-900" />
-                  <span>{isEditing ? 'Tutup' : 'Sunting Cepat'}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsCMSOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Urus Sekolah di CMS</span>
+              </button>
             )}
           </div>
-        )}
+        </div>
 
-        {/* If placeholder is hidden but user is admin, show a small edit button */}
-        {!stats.isPlaceholder && isAdmin && (
-          <div className="mb-6 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setIsCMSOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300 text-xs font-bold transition shadow-2xs"
-            >
-              <Edit3 className="w-3.5 h-3.5 text-teal-700" />
-              <span>Sunting Statistik Rangkaian (CMS)</span>
-            </button>
-          </div>
-        )}
-
-        {/* Editable Form Modal / Drawer if editing mode active */}
-        {isEditing && (
-          <form
-            onSubmit={handleSaveStats}
-            className="mb-8 p-6 rounded-xl bg-white border-2 border-amber-300 shadow-md animate-fadeIn"
+        {/* 5 Live Updates Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+          {/* Card 1: Jumlah Sekolah yang Berdaftar */}
+          <button
+            type="button"
+            onClick={() => handleSelectLiveCard('ALL')}
+            className={`text-left p-5 rounded-2xl bg-white border transition-all cursor-pointer flex flex-col justify-between ${
+              liveCardFilter === 'ALL'
+                ? 'border-teal-600 ring-2 ring-teal-600/15 shadow-md'
+                : 'border-slate-200 hover:border-teal-400 shadow-xs hover:shadow-md'
+            }`}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-teal-700" />
-                <span>Ubah Suai Nilai Statistik Placeholder (Untuk Ujian & Demonstrasi)</span>
-              </h4>
-              <button
-                type="button"
-                onClick={handleResetStats}
-                className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
-              >
-                <RotateCcw className="w-3 h-3" /> Set Semula Default
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Bilangan Sekolah (Placeholder)
-                </label>
-                <input
-                  type="number"
-                  value={tempStats.schoolsCount}
-                  onChange={(e) =>
-                    setTempStats({ ...tempStats, schoolsCount: Number(e.target.value) })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
-                  min="0"
-                />
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                  <School className="w-5 h-5" />
+                </div>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>Live</span>
+                </span>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Bilangan Negeri & Wilayah
-                </label>
-                <input
-                  type="number"
-                  value={tempStats.statesCount}
-                  onChange={(e) =>
-                    setTempStats({ ...tempStats, statesCount: Number(e.target.value) })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
-                  min="1"
-                  max="16"
-                />
+              <div className="text-3xl font-extrabold text-slate-900 font-mono tabular-nums tracking-tight">
+                {liveMetrics.totalSchools.toLocaleString('ms-MY')}
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Bilangan Pengetua & Guru Besar
-                </label>
-                <input
-                  type="number"
-                  value={tempStats.principalsCount}
-                  onChange={(e) =>
-                    setTempStats({ ...tempStats, principalsCount: Number(e.target.value) })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
-                  min="0"
-                />
-              </div>
+              <h3 className="text-sm font-bold text-slate-800 mt-1">
+                Jumlah Sekolah Berdaftar
+              </h3>
             </div>
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
-              >
-                <Check className="w-3.5 h-3.5" /> Simpan Perubahan Paparan
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* 3 Main Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {/* Stat 1: Schools */}
-          <div className="relative p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all text-center">
-            <span className="absolute top-3 right-3 text-[10px] uppercase font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded">
-              Placeholder
-            </span>
-            <div className="w-12 h-12 rounded-xl bg-teal-50 border border-teal-100 text-teal-700 flex items-center justify-center mx-auto mb-4">
-              <School className="w-6 h-6" />
-            </div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-1 font-mono tracking-tight">
-              {stats.schoolsCount}+
-            </div>
-            <p className="text-sm font-bold text-slate-700">Sekolah-Sekolah Ahli</p>
-            <p className="text-xs text-slate-500 mt-1">
-              SRI, SMI, Maahad Tahfiz & Rakan Musleh
+            <p className="text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100">
+              {liveMetrics.primarySchoolsCount} Rendah · {liveMetrics.secondarySchoolsCount} Menengah · {liveMetrics.statesCovered} Negeri
             </p>
+          </button>
+
+          {/* Card 2: Jumlah Pengetua */}
+          <button
+            type="button"
+            onClick={() => handleSelectLiveCard('PENGETUA')}
+            className={`text-left p-5 rounded-2xl bg-white border transition-all cursor-pointer flex flex-col justify-between ${
+              liveCardFilter === 'PENGETUA'
+                ? 'border-teal-600 ring-2 ring-teal-600/15 shadow-md'
+                : 'border-slate-200 hover:border-teal-400 shadow-xs hover:shadow-md'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>Live</span>
+                </span>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-900 font-mono tabular-nums tracking-tight">
+                {liveMetrics.principalsCount.toLocaleString('ms-MY')}
+              </div>
+              <h3 className="text-sm font-bold text-slate-800 mt-1">
+                Jumlah Pengetua
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100">
+              Peneraju Sekolah Menengah Islam & Maahad Tahfiz
+            </p>
+          </button>
+
+          {/* Card 3: Jumlah Guru Besar */}
+          <button
+            type="button"
+            onClick={() => handleSelectLiveCard('GURU_BESAR')}
+            className={`text-left p-5 rounded-2xl bg-white border transition-all cursor-pointer flex flex-col justify-between ${
+              liveCardFilter === 'GURU_BESAR'
+                ? 'border-teal-600 ring-2 ring-teal-600/15 shadow-md'
+                : 'border-slate-200 hover:border-teal-400 shadow-xs hover:shadow-md'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>Live</span>
+                </span>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-900 font-mono tabular-nums tracking-tight">
+                {liveMetrics.headteachersCount.toLocaleString('ms-MY')}
+              </div>
+              <h3 className="text-sm font-bold text-slate-800 mt-1">
+                Jumlah Guru Besar
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100">
+              Peneraju Sekolah Rendah Islam (SRI & Rakan Musleh)
+            </p>
+          </button>
+
+          {/* Card 4: Jumlah Murid Sekolah Rendah */}
+          <button
+            type="button"
+            onClick={() => handleSelectLiveCard('MURID_RENDAH')}
+            className={`text-left p-5 rounded-2xl bg-white border transition-all cursor-pointer flex flex-col justify-between ${
+              liveCardFilter === 'MURID_RENDAH'
+                ? 'border-teal-600 ring-2 ring-teal-600/15 shadow-md'
+                : 'border-slate-200 hover:border-teal-400 shadow-xs hover:shadow-md'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>Live</span>
+                </span>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-900 font-mono tabular-nums tracking-tight">
+                {liveMetrics.primaryStudentsCount.toLocaleString('ms-MY')}
+              </div>
+              <h3 className="text-sm font-bold text-slate-800 mt-1">
+                Jumlah Murid Sekolah Rendah
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100">
+              Enrolmen aktif di {liveMetrics.primarySchoolsCount} buah sekolah rendah ahli
+            </p>
+          </button>
+
+          {/* Card 5: Jumlah Pelajar Sekolah Menengah */}
+          <button
+            type="button"
+            onClick={() => handleSelectLiveCard('PELAJAR_MENENGAH')}
+            className={`text-left p-5 rounded-2xl bg-white border transition-all cursor-pointer flex flex-col justify-between ${
+              liveCardFilter === 'PELAJAR_MENENGAH'
+                ? 'border-teal-600 ring-2 ring-teal-600/15 shadow-md'
+                : 'border-slate-200 hover:border-teal-400 shadow-xs hover:shadow-md'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                  <GraduationCap className="w-5 h-5" />
+                </div>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>Live</span>
+                </span>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-900 font-mono tabular-nums tracking-tight">
+                {liveMetrics.secondaryStudentsCount.toLocaleString('ms-MY')}
+              </div>
+              <h3 className="text-sm font-bold text-slate-800 mt-1">
+                Jumlah Pelajar Sekolah Menengah
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100">
+              Enrolmen aktif di {liveMetrics.secondarySchoolsCount} buah sekolah menengah ahli
+            </p>
+          </button>
+        </div>
+
+        {/* Summary Strip: Combined Enrolment & Coverage */}
+        <div className="mb-10 px-5 py-3.5 rounded-xl bg-teal-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm">
+            <span className="font-bold text-amber-300">Ringkasan Keseluruhan Rangkaian:</span>
+            <span>
+              Jumlah Enrolmen Keseluruhan:{' '}
+              <strong className="font-mono tabular-nums text-white">
+                {liveMetrics.totalStudentsCount.toLocaleString('ms-MY')}
+              </strong>{' '}
+              murid & pelajar
+            </span>
+            <span aria-hidden="true" className="text-teal-600">·</span>
+            <span>
+              Tenaga Pengajar:{' '}
+              <strong className="font-mono tabular-nums text-white">
+                {liveMetrics.totalTeachersCount.toLocaleString('ms-MY')}
+              </strong>{' '}
+              guru
+            </span>
+            <span aria-hidden="true" className="text-teal-600">·</span>
+            <span>
+              Liputan:{' '}
+              <strong className="font-mono tabular-nums text-white">
+                {liveMetrics.statesCovered}
+              </strong>{' '}
+              negeri
+            </span>
           </div>
-
-          {/* Stat 2: States */}
-          <div className="relative p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all text-center">
-            <span className="absolute top-3 right-3 text-[10px] uppercase font-bold text-teal-800 bg-teal-100/80 px-2 py-0.5 rounded">
-              Liputan Penuh
-            </span>
-            <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-4">
-              <MapPin className="w-6 h-6" />
-            </div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-1 font-mono tracking-tight">
-              {stats.statesCount}
-            </div>
-            <p className="text-sm font-bold text-slate-700">Negeri & Wilayah Persekutuan</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Rangkaian menyeluruh Semenanjung, Sabah & Sarawak
-            </p>
-          </div>
-
-          {/* Stat 3: Principals & Headteachers */}
-          <div className="relative p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all text-center">
-            <span className="absolute top-3 right-3 text-[10px] uppercase font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded">
-              Placeholder
-            </span>
-            <div className="w-12 h-12 rounded-xl bg-teal-50 border border-teal-100 text-teal-700 flex items-center justify-center mx-auto mb-4">
-              <Users className="w-6 h-6" />
-            </div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900 mb-1 font-mono tracking-tight">
-              {stats.principalsCount}+
-            </div>
-            <p className="text-sm font-bold text-slate-700">Pengetua & Guru Besar</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Pemimpin instruksional berjiwa Rabbani
-            </p>
+          <div className="text-[11px] text-teal-200/90 shrink-0">
+            Klik mana-mana kad statistik di atas untuk menapis senarai sekolah di bawah
           </div>
         </div>
 
@@ -324,8 +549,9 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
               </p>
             </div>
 
-            <div className="text-xs text-slate-400">
-              Menunjukkan <strong className="text-slate-800">{filteredSchools.length}</strong> daripada {schools.length} sekolah ahli berdaftar
+            <div className="text-xs text-slate-500">
+              Menunjukkan <strong className="text-slate-900 font-mono tabular-nums">{filteredSchools.length}</strong> daripada{' '}
+              <strong className="text-slate-900 font-mono tabular-nums">{effectiveSchools.length}</strong> sekolah ahli berdaftar
             </div>
           </div>
 
@@ -395,97 +621,118 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
                 <tr>
                   <th className="py-3 px-4">Nama Sekolah</th>
                   <th className="py-3 px-4">Kod</th>
-                  <th className="py-3 px-4">Jenis</th>
+                  <th className="py-3 px-4">Kategori</th>
                   <th className="py-3 px-4">Negeri / Daerah</th>
                   <th className="py-3 px-4">Pengetua / Guru Besar</th>
+                  <th className="py-3 px-4 text-right">Enrolmen</th>
                   <th className="py-3 px-4 text-center">Tindakan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredSchools.length > 0 ? (
-                  filteredSchools.map((sch) => (
-                    <tr
-                      key={sch.id}
-                      onClick={() => setSelectedSchool(sch)}
-                      className="hover:bg-teal-50/60 transition-colors cursor-pointer group"
-                      title="Klik untuk lihat profil penuh sekolah"
-                    >
-                      <td className="py-3 px-4 font-semibold text-slate-900 group-hover:text-teal-900">
-                        <div className="flex items-center gap-2">
-                          {sch.logoUrl && (
-                            <img
-                              src={sch.logoUrl}
-                              alt=""
-                              className="w-6 h-6 rounded-md object-contain shrink-0 border border-slate-200 p-0.5 bg-white"
-                            />
-                          )}
-                          <span>{sch.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs text-teal-800 font-bold">
-                        {sch.code}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                          {sch.type}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">
-                        {sch.district}, {sch.state}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-slate-800">
-                        <div className="flex items-center gap-2.5">
-                          {sch.principalPhotoUrl ? (
-                            <img
-                              src={sch.principalPhotoUrl}
-                              alt={sch.principal}
-                              className="w-8 h-8 rounded-full object-cover border-2 border-teal-700 shrink-0 shadow-xs"
-                              onError={(e) => {
-                                (e.target as any).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs shrink-0 font-bold">
-                              {sch.principal ? sch.principal.charAt(0) : 'P'}
+                  filteredSchools.map((sch) => {
+                    const isPrimary = isPrimarySchoolRecord(sch);
+                    const isGB = isGuruBesarRecord(sch);
+                    return (
+                      <tr
+                        key={sch.id}
+                        onClick={() => setSelectedSchool(sch)}
+                        className="hover:bg-teal-50/60 transition-colors cursor-pointer group"
+                        title="Klik untuk lihat profil penuh sekolah"
+                      >
+                        <td className="py-3 px-4 font-semibold text-slate-900 group-hover:text-teal-900">
+                          <div className="flex items-center gap-2">
+                            {sch.logoUrl && (
+                              <img
+                                src={sch.logoUrl}
+                                alt=""
+                                className="w-6 h-6 rounded-md object-contain shrink-0 border border-slate-200 p-0.5 bg-white"
+                              />
+                            )}
+                            <span>{sch.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-xs text-teal-800 font-bold">
+                          {sch.code}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-slate-600">
+                          <span className="font-semibold text-slate-800">{sch.type}</span>
+                          <span className="block text-[11px] text-slate-500">
+                            {isPrimary ? 'Sekolah Rendah' : 'Sekolah Menengah'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">
+                          {sch.district ? `${sch.district}, ${sch.state}` : sch.state}
+                        </td>
+                        <td className="py-3 px-4 font-medium text-slate-800">
+                          <div className="flex items-center gap-2.5">
+                            {sch.principalPhotoUrl ? (
+                              <img
+                                src={sch.principalPhotoUrl}
+                                alt={sch.principal}
+                                className="w-8 h-8 rounded-full object-cover border-2 border-teal-700 shrink-0 shadow-xs"
+                                onError={(e) => {
+                                  (e.target as any).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs shrink-0 font-bold">
+                                {sch.principal ? sch.principal.charAt(0) : 'P'}
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-semibold text-slate-900 group-hover:text-teal-900 block">
+                                {sch.principal}
+                              </span>
+                              <span className="text-[11px] text-teal-700 font-medium">
+                                {isGB ? 'Guru Besar' : 'Pengetua'}
+                              </span>
                             </div>
-                          )}
-                          <span className="font-semibold text-slate-900 group-hover:text-teal-900">{sch.principal}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedSchool(sch);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-800 hover:bg-teal-900 text-white font-semibold text-xs transition-transform cursor-pointer shadow-2xs group-hover:scale-105"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Profil</span>
-                          </button>
-                          {isAdmin && (
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono tabular-nums">
+                          <span className="font-bold text-slate-900">
+                            {(Number(sch.studentCount) || 0).toLocaleString('ms-MY')}
+                          </span>
+                          <span className="block text-[10px] font-sans text-slate-500">
+                            {isPrimary ? 'Murid Rendah' : 'Pelajar Menengah'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setIsCMSOpen(true);
+                                setSelectedSchool(sch);
                               }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold text-xs transition cursor-pointer"
-                              title="Buka Pusat Kawalan CMS untuk menyunting profil sekolah ini"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-800 hover:bg-teal-900 text-white font-semibold text-xs transition-transform cursor-pointer shadow-2xs group-hover:scale-105"
                             >
-                              <Edit3 className="w-3 h-3 text-amber-800" />
-                              <span className="hidden sm:inline">CMS</span>
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Profil</span>
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setIsCMSOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold text-xs transition cursor-pointer"
+                                title="Buka Pusat Kawalan CMS untuk menyunting profil sekolah ini"
+                              >
+                                <Edit3 className="w-3 h-3 text-amber-800" />
+                                <span className="hidden sm:inline">CMS</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400 text-sm">
+                    <td colSpan={7} className="py-8 text-center text-slate-400 text-sm">
                       Tiada sekolah sepadan dengan carian ini. Sila ubah penapis anda.
                     </td>
                   </tr>

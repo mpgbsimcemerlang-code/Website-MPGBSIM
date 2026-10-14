@@ -109,6 +109,7 @@ export const AdminSchoolManagement: React.FC = () => {
     district: '',
     type: 'Sekolah Menengah',
     principal: '',
+    designation: 'Pengetua',
     principalPhotoUrl: '',
     schoolPhotoUrl: '',
     website: 'https://',
@@ -154,6 +155,13 @@ export const AdminSchoolManagement: React.FC = () => {
       district: school.district || '',
       type: school.type,
       principal: school.principal || '',
+      designation:
+        school.designation ||
+        (school.type?.toLowerCase().includes('rendah') ||
+        school.name?.toLowerCase().includes('rendah') ||
+        school.principal?.toLowerCase().includes('guru besar')
+          ? 'Guru Besar'
+          : 'Pengetua'),
       principalPhotoUrl: school.principalPhotoUrl || '',
       schoolPhotoUrl: school.schoolPhotoUrl || '',
       website: school.website || '',
@@ -563,7 +571,16 @@ export const AdminSchoolManagement: React.FC = () => {
                   </label>
                   <select
                     value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    onChange={(e) => {
+                      const nextType = e.target.value;
+                      const autoDesig =
+                        nextType === 'Sekolah Rendah'
+                          ? 'Guru Besar'
+                          : nextType === 'Sekolah Menengah' || nextType === 'Maahad Tahfiz'
+                          ? 'Pengetua'
+                          : formData.designation || 'Pengetua';
+                      setFormData({ ...formData, type: nextType, designation: autoDesig });
+                    }}
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
                   >
                     {schoolTypes.map((t) => (
@@ -575,7 +592,21 @@ export const AdminSchoolManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Jawatan Kepimpinan PGB
+                  </label>
+                  <select
+                    value={formData.designation || 'Pengetua'}
+                    onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white font-semibold"
+                  >
+                    <option value="Pengetua">Pengetua</option>
+                    <option value="Guru Besar">Guru Besar</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Nama Pengetua / Guru Besar

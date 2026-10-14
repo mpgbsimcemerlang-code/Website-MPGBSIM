@@ -17,6 +17,7 @@ export const CMSMemberSchools: React.FC = () => {
     state: 'Selangor',
     district: '',
     principal: '',
+    designation: 'Pengetua',
     studentCount: 850,
     joinYear: 2024,
   });
@@ -47,6 +48,7 @@ export const CMSMemberSchools: React.FC = () => {
         state: form.state || 'Selangor',
         district: form.district || 'Pusat',
         principal: form.principal,
+        designation: form.designation || (form.type === 'Sekolah Rendah' ? 'Guru Besar' : 'Pengetua'),
         studentCount: Number(form.studentCount) || 500,
         joinYear: Number(form.joinYear) || 2024,
       });
@@ -61,6 +63,7 @@ export const CMSMemberSchools: React.FC = () => {
         state: form.state || 'Selangor',
         district: form.district || 'Pusat',
         principal: form.principal,
+        designation: form.designation || (form.type === 'Sekolah Rendah' ? 'Guru Besar' : 'Pengetua'),
         studentCount: Number(form.studentCount) || 500,
         joinYear: Number(form.joinYear) || new Date().getFullYear(),
       };
@@ -76,6 +79,7 @@ export const CMSMemberSchools: React.FC = () => {
       state: 'Selangor',
       district: '',
       principal: '',
+      designation: 'Pengetua',
       studentCount: 850,
       joinYear: 2024,
     });
@@ -257,7 +261,21 @@ export const CMSMemberSchools: React.FC = () => {
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Jawatan Kepimpinan PGB
+              </label>
+              <select
+                value={form.designation || (form.type === 'Sekolah Rendah' ? 'Guru Besar' : 'Pengetua')}
+                onChange={(e) => setForm({ ...form, designation: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-600 font-semibold"
+              >
+                <option value="Pengetua">Pengetua</option>
+                <option value="Guru Besar">Guru Besar</option>
+              </select>
+            </div>
+
+            <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                 Nama Pengetua / Guru Besar Semasa <span className="text-red-500">*</span>
               </label>
@@ -289,6 +307,8 @@ export const CMSMemberSchools: React.FC = () => {
               </label>
               <input
                 type="number"
+                min="1970"
+                max={new Date().getFullYear() + 2}
                 value={form.joinYear || 2024}
                 onChange={(e) => setForm({ ...form, joinYear: Number(e.target.value) })}
                 className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-600"

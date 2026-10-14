@@ -1,12 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { NetworkStats } from '../../types';
-import { BarChart3, Save, RotateCcw, CheckCircle, AlertCircle, School, Users, MapPin, Sparkles } from 'lucide-react';
+import { isPrimarySchoolRecord, isGuruBesarRecord } from '../SchoolNetwork';
+import { BarChart3, Save, RotateCcw, CheckCircle, AlertCircle, School, Users, MapPin, Sparkles, Radio } from 'lucide-react';
 
 export const AdminStatsManagement: React.FC = () => {
-  const { siteData, updateStats, syncAllToFirestore } = useAdminContent();
+  const { siteData, updateStats } = useAdminContent();
   const [toast, setToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const liveCounts = useMemo(() => {
+    const schools = siteData.memberSchools || [];
+    let principals = 0;
+    let headteachers = 0;
+    let primaryStudents = 0;
+    let secondaryStudents = 0;
+
+    schools.forEach((sch) => {
+      const isPrimary = isPrimarySchoolRecord(sch);
+      const isGB = isGuruBesarRecord(sch);
+      const count = Math.max(0, Number(sch.studentCount) || 0);
+
+      if (isGB) headteachers += 1;
+      else principals += 1;
+
+      if (isPrimary) primaryStudents += count;
+      else secondaryStudents += count;
+    });
+
+    return {
+      totalSchools: schools.length,
+      principals,
+      headteachers,
+      primaryStudents,
+      secondaryStudents,
+    };
+  }, [siteData.memberSchools]);
 
   const [statsForm, setStatsForm] = useState<NetworkStats>(
     siteData.stats || {
@@ -65,7 +94,7 @@ export const AdminStatsManagement: React.FC = () => {
             Statistik Impak & Rangkaian Sekolah MPGBSIM
           </h2>
           <p className="text-xs text-teal-100/90 mt-1 max-w-xl">
-            Kemas kini angka rasmi bagi bilangan sekolah ahli, liputan negeri, kepimpinan PGB, dan jumlah murid di laman utama.
+            Pantau kiraan langsung (Live Updates) daripada direktori sekolah ahli serta kemas kini angka sasaran rangkaian kebangsaan.
           </p>
         </div>
 
@@ -89,12 +118,57 @@ export const AdminStatsManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Live Updates Real-Time Summary */}
+      <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs sm:text-sm">
+            <Radio className="w-4 h-4 text-emerald-700" />
+            <span>Kiraan Data Langsung (Live Updates) — Rangkaian Sekolah-Sekolah Ahli MPGBSIM</span>
+          </div>
+          <span className="text-[11px] font-semibold text-emerald-800">
+            Automatik daripada Direktori Sekolah
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="p-3 rounded-xl bg-white border border-emerald-200/80">
+            <div className="text-xl font-black text-slate-900 font-mono tabular-nums">
+              {liveCounts.totalSchools.toLocaleString('ms-MY')}
+            </div>
+            <div className="text-[11px] font-bold text-slate-600 mt-0.5">Sekolah Berdaftar</div>
+          </div>
+          <div className="p-3 rounded-xl bg-white border border-emerald-200/80">
+            <div className="text-xl font-black text-slate-900 font-mono tabular-nums">
+              {liveCounts.principals.toLocaleString('ms-MY')}
+            </div>
+            <div className="text-[11px] font-bold text-slate-600 mt-0.5">Jumlah Pengetua</div>
+          </div>
+          <div className="p-3 rounded-xl bg-white border border-emerald-200/80">
+            <div className="text-xl font-black text-slate-900 font-mono tabular-nums">
+              {liveCounts.headteachers.toLocaleString('ms-MY')}
+            </div>
+            <div className="text-[11px] font-bold text-slate-600 mt-0.5">Jumlah Guru Besar</div>
+          </div>
+          <div className="p-3 rounded-xl bg-white border border-emerald-200/80">
+            <div className="text-xl font-black text-slate-900 font-mono tabular-nums">
+              {liveCounts.primaryStudents.toLocaleString('ms-MY')}
+            </div>
+            <div className="text-[11px] font-bold text-slate-600 mt-0.5">Murid Sekolah Rendah</div>
+          </div>
+          <div className="p-3 rounded-xl bg-white border border-emerald-200/80">
+            <div className="text-xl font-black text-slate-900 font-mono tabular-nums">
+              {liveCounts.secondaryStudents.toLocaleString('ms-MY')}
+            </div>
+            <div className="text-[11px] font-bold text-slate-600 mt-0.5">Pelajar Sekolah Menengah</div>
+          </div>
+        </div>
+      </div>
+
       {/* Notice Card */}
       <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
         <div className="text-xs text-amber-950">
           <span className="font-bold block">Status Bancian & Paparan Laman:</span>
-          Angka-angka ini dipaparkan pada kad statistik bahagian "Rangkaian Sekolah-Sekolah Ahli MPGBSIM". Anda boleh mengaktifkan atau menyahaktifkan label makluman anggaran bancian.
+          Angka di atas dikira secara langsung (live updates) daripada pangkalan data sekolah berdaftar dan dipaparkan pada ruangan "Rangkaian Sekolah-Sekolah Ahli MPGBSIM".
         </div>
       </div>
 

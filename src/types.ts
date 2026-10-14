@@ -330,6 +330,7 @@ export interface MemberSchool {
   state: string;
   district: string;
   principal: string;
+  designation?: 'Pengetua' | 'Guru Besar' | string;
   principalPhotoUrl?: string;
   studentCount: number;
   teacherCount?: number;
