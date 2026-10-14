@@ -137,6 +137,61 @@ export async function ensureFirebaseAuth(): Promise<User | null> {
   return auth.currentUser || null;
 }
 
+const QUOTA_BREAKER_KEY = 'mpgbsim_firestore_quota_exceeded_at';
+const QUOTA_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown before retrying Firestore reads
+let quotaExceededMemoryTimestamp = 0;
+let hasLoggedQuotaNotice = false;
+
+export function isQuotaExceededError(err: any): boolean {
+  if (!err) return false;
+  const msg = String(err?.message || err || '').toLowerCase();
+  const code = String(err?.code || '').toLowerCase();
+  return (
+    code.includes('resource-exhausted') ||
+    msg.includes('quota limit exceeded') ||
+    msg.includes('quota exceeded') ||
+    msg.includes('resource-exhausted')
+  );
+}
+
+export function isFirestoreQuotaExceeded(): boolean {
+  const now = Date.now();
+  if (quotaExceededMemoryTimestamp > 0 && now - quotaExceededMemoryTimestamp < QUOTA_COOLDOWN_MS) {
+    return true;
+  }
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      const raw = window.sessionStorage.getItem(QUOTA_BREAKER_KEY);
+      if (raw) {
+        const ts = Number(raw);
+        if (!isNaN(ts) && now - ts < QUOTA_COOLDOWN_MS) {
+          quotaExceededMemoryTimestamp = ts;
+          return true;
+        } else {
+          window.sessionStorage.removeItem(QUOTA_BREAKER_KEY);
+        }
+      }
+    } catch {}
+  }
+  return false;
+}
+
+export function markFirestoreQuotaExceeded(source?: string): void {
+  const now = Date.now();
+  quotaExceededMemoryTimestamp = now;
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      window.sessionStorage.setItem(QUOTA_BREAKER_KEY, String(now));
+    } catch {}
+  }
+  if (!hasLoggedQuotaNotice) {
+    hasLoggedQuotaNotice = true;
+    console.info(
+      `[MPGBSIM Offline Fallback] Had bacaan harian percuma Firestore (50,000 read/hari) telah penuh${source ? ` (${source})` : ''}. Sistem kini beroperasi menggunakan pangkalan data cache tempatan (LocalStorage/IndexedDB) sehingga kuota direset pada jam 3:00 Petang (Waktu Malaysia).`
+    );
+  }
+}
+
 export {
   signInWithPopup,
   signOut,
@@ -159,3 +214,4 @@ export {
   writeBatch,
   type User,
 };
+

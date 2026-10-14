@@ -48,7 +48,11 @@ import {
   updatePassword,
   handleFirestoreError,
   OperationType,
+  isQuotaExceededError,
+  isFirestoreQuotaExceeded,
+  markFirestoreQuotaExceeded,
 } from '../firebase';
+import { useAdminContent } from './AdminContentContext';
 import { repairSchoolIntegrity } from '../utils/schoolDiagnostic';
 import { compressDataUrl } from '../utils/imageCompressor';
 import {
@@ -174,24 +178,30 @@ const STORAGE_KEYS = {
 export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
   const schoolsMap = new Map<string, MemberSchool>();
 
-  // 1. Fetch directly from the same Firestore collection used by Admin CMS ('schools')
-  try {
-    const snap = await getDocs(collection(db, 'schools'));
-    if (!snap.empty) {
-      snap.forEach((d) => {
-        const sch = { id: d.id, ...(d.data() as any) } as MemberSchool;
-        if (sch.id) {
-          const existing =
-            schoolsMap.get(sch.id) ||
-            (sch.code ? schoolsMap.get(`code:${sch.code.toUpperCase()}`) : undefined);
-          const merged = existing ? { ...existing, ...sch } : sch;
-          schoolsMap.set(sch.id, merged);
-          if (sch.code) schoolsMap.set(`code:${sch.code.toUpperCase()}`, merged);
-        }
-      });
+  // 1. Fetch directly from the same Firestore collection used by Admin CMS ('schools') if quota allows
+  if (!isFirestoreQuotaExceeded()) {
+    try {
+      const snap = await getDocs(collection(db, 'schools'));
+      if (!snap.empty) {
+        snap.forEach((d) => {
+          const sch = { id: d.id, ...(d.data() as any) } as MemberSchool;
+          if (sch.id) {
+            const existing =
+              schoolsMap.get(sch.id) ||
+              (sch.code ? schoolsMap.get(`code:${sch.code.toUpperCase()}`) : undefined);
+            const merged = existing ? { ...existing, ...sch } : sch;
+            schoolsMap.set(sch.id, merged);
+            if (sch.code) schoolsMap.set(`code:${sch.code.toUpperCase()}`, merged);
+          }
+        });
+      }
+    } catch (e: any) {
+      if (isQuotaExceededError(e)) {
+        markFirestoreQuotaExceeded('getLatestRegisteredSchools');
+      } else {
+        console.warn('Firestore schools fetch notice in MemberPortalContext:', e);
+      }
     }
-  } catch (e) {
-    console.warn('Firestore schools fetch notice in MemberPortalContext:', e);
   }
 
   // 3. Overlay local CMS content if it contains newer local modifications
@@ -244,6 +254,8 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
 };
 
 export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { siteData } = useAdminContent();
+
   // View mode: 'public' (landing page) or 'portal' (dedicated member portal application)
   const [viewMode, setViewMode] = useState<'public' | 'portal'>(() => {
     try {
@@ -404,17 +416,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     return [];
   });
 
-  // Registered Member Schools state directly synced with Firestore 'schools' collection used by Admin CMS
-  const [registeredSchools, setRegisteredSchools] = useState<MemberSchool[]>([]);
-
-  // Initial load of registered schools directly from Firestore 'schools' collection
-  useEffect(() => {
-    getLatestRegisteredSchools().then((list) => {
-      if (list && list.length > 0) {
-        setRegisteredSchools(list);
-      }
-    }).catch(() => {});
-  }, []);
+  // Registered Member Schools state directly synced with AdminContentContext 'siteData.memberSchools' (zero duplicate Firestore reads)
+  const [registeredSchools, setRegisteredSchools] = useState<MemberSchool[]>(() => siteData.memberSchools || []);
 
   // Sync to local storage with quota protection
   useEffect(() => {
@@ -681,47 +684,113 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     return () => unsub();
   }, []);
 
-  // Cloud Firestore Real-time Listeners for Member Portal Data across all devices
+  // Sync shared collections directly from AdminContentContext to avoid duplicate Firestore listeners & read quota waste
   useEffect(() => {
-    const unsubscribes: (() => void)[] = [];
+    if (Array.isArray(siteData.announcements) && siteData.announcements.length > 0) {
+      setAnnouncements(siteData.announcements);
+    }
+  }, [siteData.announcements]);
 
-    // 1. Announcements
-    try {
-      const unsubAnn = onSnapshot(
-        collection(db, 'announcements'),
-        (snapshot) => {
-          const isSeeded = localStorage.getItem('mpgbsim_announcements_seeded') === 'true';
+  useEffect(() => {
+    if (Array.isArray(siteData.practices) && siteData.practices.length > 0) {
+      setBestPractices(siteData.practices);
+    }
+  }, [siteData.practices]);
 
-          if (!snapshot.empty) {
-            const list: AnnouncementItem[] = [];
-            snapshot.forEach((docSnap) => {
-              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
-            });
-            list.sort((a, b) => {
-              if (a.pinned && !b.pinned) return -1;
-              if (!a.pinned && b.pinned) return 1;
-              return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
-            });
-            if (!isSeeded) {
-              localStorage.setItem('mpgbsim_announcements_seeded', 'true');
-            }
-            setAnnouncements(list);
-          } else if (!isSeeded && INITIAL_ANNOUNCEMENTS.length > 0) {
-            // Display default announcements purely in client state without writing to Firestore inside listener
-            localStorage.setItem('mpgbsim_announcements_seeded', 'true');
-            setAnnouncements(INITIAL_ANNOUNCEMENTS);
-          } else {
-            setAnnouncements([]);
-          }
-        },
-        (err) => console.warn('Firestore announcements listener notification:', err.message)
-      );
-      unsubscribes.push(unsubAnn);
-    } catch (e) {
-      console.warn('Announcements listener error:', e);
+  useEffect(() => {
+    if (Array.isArray(siteData.news) && siteData.news.length > 0) {
+      setSchoolNews(sortNewsByPublishedDate(siteData.news));
+    }
+  }, [siteData.news]);
+
+  useEffect(() => {
+    if (Array.isArray(siteData.memberSchools) && siteData.memberSchools.length > 0) {
+      const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.CURRENT_USER) : null;
+      const portalUser = portalUserRaw ? JSON.parse(portalUserRaw) : null;
+      const { repairedSchools } = repairSchoolIntegrity(siteData.memberSchools, portalUser);
+      setRegisteredSchools(repairedSchools);
+
+      // Synchronize currentUser in real-time if matching school profile was updated in CMS
+      setCurrentUser((prev) => {
+        if (!prev) return prev;
+        const matched = repairedSchools.find((s) => {
+          const matchMusleh =
+            (s.id === 'sch-musleh-1' || s.code === 'MJAC011') &&
+            (prev.email?.includes('imusleh') ||
+              prev.school?.toLowerCase().includes('musleh') ||
+              prev.membershipNo?.includes('MJAC011') ||
+              prev.membershipNo?.includes('MIA1009'));
+          const matchId = prev.uid === `sch-user-${s.id}` || prev.uid?.includes(s.id);
+          const matchCode = prev.membershipNo && s.code && prev.membershipNo.includes(s.code);
+          const matchEmail = prev.email && s.email && prev.email.toLowerCase() === s.email.toLowerCase();
+          const matchSchoolName = prev.school && s.name && prev.school.toLowerCase().trim() === s.name.toLowerCase().trim();
+          return matchMusleh || matchId || matchCode || matchEmail || matchSchoolName;
+        });
+
+        if (matched) {
+          const needsUpdate =
+            (matched.principal && matched.principal !== prev.fullName) ||
+            (matched.name && matched.name !== prev.school) ||
+            (matched.state && matched.state !== prev.state) ||
+            (matched.phone && matched.phone !== prev.phone) ||
+            (matched.principalPhotoUrl && matched.principalPhotoUrl !== prev.photoURL) ||
+            (matched.schoolPhotoUrl && matched.schoolPhotoUrl !== prev.schoolPhotoUrl) ||
+            (matched.logoUrl && matched.logoUrl !== prev.logoUrl) ||
+            (matched.type && matched.type !== prev.schoolType);
+
+          if (!needsUpdate) return prev;
+
+          const updatedUser: UserProfile = {
+            ...prev,
+            ...(matched.principal ? { fullName: matched.principal } : {}),
+            ...(matched.name ? { school: matched.name } : {}),
+            ...(matched.state ? { state: matched.state } : {}),
+            ...(matched.phone ? { phone: matched.phone } : {}),
+            ...(matched.principalPhotoUrl ? { photoURL: matched.principalPhotoUrl } : {}),
+            ...(matched.schoolPhotoUrl ? { schoolPhotoUrl: matched.schoolPhotoUrl } : {}),
+            ...(matched.logoUrl ? { logoUrl: matched.logoUrl } : {}),
+            ...(matched.type ? { schoolType: matched.type } : {}),
+            updatedAt: new Date().toISOString(),
+          };
+          safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+          return updatedUser;
+        }
+        return prev;
+      });
+    }
+  }, [siteData.memberSchools]);
+
+  // On-demand Portal-only Firestore Listeners (only attached when user enters Portal mode and quota allows)
+  useEffect(() => {
+    if (viewMode !== 'portal' || isFirestoreQuotaExceeded()) {
+      return;
     }
 
-    // 2. Documents
+    const unsubscribes: (() => void)[] = [];
+    let isCircuitBroken = false;
+
+    const cleanupPortalListeners = () => {
+      while (unsubscribes.length > 0) {
+        const unsub = unsubscribes.pop();
+        try {
+          if (unsub) unsub();
+        } catch {}
+      }
+    };
+
+    const handlePortalListenerError = (label: string, err: any) => {
+      if (isQuotaExceededError(err)) {
+        if (!isCircuitBroken) {
+          isCircuitBroken = true;
+          markFirestoreQuotaExceeded(label);
+          cleanupPortalListeners();
+        }
+        return;
+      }
+      console.warn(`Firestore ${label} listener notification:`, err?.message || err);
+    };
+
+    // 1. Documents (Portal-only)
     try {
       const unsubDoc = onSnapshot(
         collection(db, 'documents'),
@@ -738,41 +807,20 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             }
             setDocuments(list);
           } else if (!isSeeded && INITIAL_DOCUMENTS.length > 0) {
-            // Display default documents purely in client state without writing to Firestore inside listener
             localStorage.setItem('mpgbsim_documents_seeded', 'true');
             setDocuments(INITIAL_DOCUMENTS);
           } else {
             setDocuments([]);
           }
         },
-        (err) => console.warn('Firestore documents listener notification:', err.message)
+        (err) => handlePortalListenerError('documents', err)
       );
       unsubscribes.push(unsubDoc);
     } catch (e) {
       console.warn('Documents listener error:', e);
     }
 
-    // 3. Best Practices
-    try {
-      const unsubBP = onSnapshot(
-        collection(db, 'bestPractices'),
-        (snapshot) => {
-          if (!snapshot.empty) {
-            const list: BestPracticeItem[] = [];
-            snapshot.forEach((docSnap) => {
-              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
-            });
-            setBestPractices(list);
-          }
-        },
-        (err) => console.warn('Firestore best practices listener notification:', err.message)
-      );
-      unsubscribes.push(unsubBP);
-    } catch (e) {
-      console.warn('Best Practices listener error:', e);
-    }
-
-    // 4. Submissions
+    // 2. Portal Submissions
     try {
       const unsubSub = onSnapshot(
         collection(db, 'submissions'),
@@ -785,14 +833,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             setSubmissions(list);
           }
         },
-        (err) => console.warn('Firestore submissions listener notification:', err.message)
+        (err) => handlePortalListenerError('submissions', err)
       );
       unsubscribes.push(unsubSub);
     } catch (e) {
       console.warn('Submissions listener error:', e);
     }
 
-    // 5. Notifications
+    // 3. Portal Notifications
     try {
       const unsubNotif = onSnapshot(
         collection(db, 'notifications'),
@@ -805,161 +853,17 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             setNotifications(list);
           }
         },
-        (err) => console.warn('Firestore notifications listener notification:', err.message)
+        (err) => handlePortalListenerError('notifications', err)
       );
       unsubscribes.push(unsubNotif);
     } catch (e) {
       console.warn('Notifications listener error:', e);
     }
 
-    // 6. Member Schools (Direct real-time sync with Firestore 'schools' collection used by Admin CMS)
-    try {
-      const unsubSchools = onSnapshot(
-        collection(db, 'schools'),
-        (snapshot) => {
-          if (!snapshot.empty) {
-            const list: MemberSchool[] = [];
-            snapshot.forEach((docSnap) => {
-              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
-            });
-            const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.CURRENT_USER) : null;
-            const portalUser = portalUserRaw ? JSON.parse(portalUserRaw) : null;
-            const { repairedSchools } = repairSchoolIntegrity(list, portalUser);
-            setRegisteredSchools(repairedSchools);
-
-            // Synchronize currentUser in real-time if matching school profile was updated in CMS
-            setCurrentUser((prev) => {
-              if (!prev) return prev;
-              const matched = repairedSchools.find((s) => {
-                const matchMusleh =
-                  (s.id === 'sch-musleh-1' || s.code === 'MJAC011') &&
-                  (prev.email?.includes('imusleh') ||
-                    prev.school?.toLowerCase().includes('musleh') ||
-                    prev.membershipNo?.includes('MJAC011') ||
-                    prev.membershipNo?.includes('MIA1009'));
-                const matchId = prev.uid === `sch-user-${s.id}` || prev.uid?.includes(s.id);
-                const matchCode = prev.membershipNo && s.code && prev.membershipNo.includes(s.code);
-                const matchEmail = prev.email && s.email && prev.email.toLowerCase() === s.email.toLowerCase();
-                const matchSchoolName = prev.school && s.name && prev.school.toLowerCase().trim() === s.name.toLowerCase().trim();
-                return matchMusleh || matchId || matchCode || matchEmail || matchSchoolName;
-              });
-
-              if (matched) {
-                const updatedUser: UserProfile = {
-                  ...prev,
-                  ...(matched.principal ? { fullName: matched.principal } : {}),
-                  ...(matched.name ? { school: matched.name } : {}),
-                  ...(matched.state ? { state: matched.state } : {}),
-                  ...(matched.phone ? { phone: matched.phone } : {}),
-                  ...(matched.principalPhotoUrl ? { photoURL: matched.principalPhotoUrl } : {}),
-                  ...(matched.schoolPhotoUrl ? { schoolPhotoUrl: matched.schoolPhotoUrl } : {}),
-                  ...(matched.logoUrl ? { logoUrl: matched.logoUrl } : {}),
-                  ...(matched.type ? { schoolType: matched.type } : {}),
-                  updatedAt: new Date().toISOString(),
-                };
-                safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
-                return updatedUser;
-              }
-              return prev;
-            });
-          }
-        },
-        (err) => console.warn('Firestore schools listener notification in MemberPortal:', err.message)
-      );
-      unsubscribes.push(unsubSchools);
-    } catch (e) {
-      console.warn('Schools listener error:', e);
-    }
-
-    // 7. News (Direct real-time sync with Firestore 'news' collection so PGB sees published school news immediately)
-    try {
-      const unsubNews = onSnapshot(
-        collection(db, 'news'),
-        (snapshot) => {
-          if (!snapshot.empty) {
-            const list: NewsItem[] = [];
-            snapshot.forEach((docSnap) => {
-              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
-            });
-            setSchoolNews(sortNewsByPublishedDate(list));
-          }
-        },
-        (err) => console.warn('Firestore news listener notification in MemberPortal:', err.message)
-      );
-      unsubscribes.push(unsubNews);
-    } catch (e) {
-      console.warn('News listener error:', e);
-    }
-
     return () => {
-      unsubscribes.forEach((unsub) => {
-        try {
-          unsub();
-        } catch {}
-      });
+      cleanupPortalListeners();
     };
-  }, []);
-
-  // Synchronize currentUser with live Firestore 'schools' data on initial portal load
-  useEffect(() => {
-    if (!currentUser) return;
-    let isCancelled = false;
-
-    getLatestRegisteredSchools().then((schools) => {
-      if (isCancelled || !schools || schools.length === 0) return;
-      const matched = schools.find((s) => {
-        const matchMusleh =
-          (s.id === 'sch-musleh-1' || s.code === 'MJAC011') &&
-          (currentUser.email?.includes('imusleh') ||
-            currentUser.school?.toLowerCase().includes('musleh') ||
-            currentUser.membershipNo?.includes('MJAC011') ||
-            currentUser.membershipNo?.includes('MIA1009'));
-        const matchId = currentUser.uid === `sch-user-${s.id}` || currentUser.uid?.includes(s.id);
-        const matchCode = currentUser.membershipNo && s.code && currentUser.membershipNo.includes(s.code);
-        const matchEmail = currentUser.email && s.email && currentUser.email.toLowerCase() === s.email.toLowerCase();
-        const matchSchoolName = currentUser.school && s.name && currentUser.school.toLowerCase().trim() === s.name.toLowerCase().trim();
-        return matchMusleh || matchId || matchCode || matchEmail || matchSchoolName;
-      });
-
-      if (matched) {
-        const needsUpdate =
-          (matched.principal && matched.principal !== currentUser.fullName) ||
-          (matched.name && matched.name !== currentUser.school) ||
-          (matched.state && matched.state !== currentUser.state) ||
-          (matched.phone && matched.phone !== currentUser.phone) ||
-          (matched.principalPhotoUrl && matched.principalPhotoUrl !== currentUser.photoURL) ||
-          (matched.schoolPhotoUrl && matched.schoolPhotoUrl !== currentUser.schoolPhotoUrl) ||
-          (matched.logoUrl && matched.logoUrl !== currentUser.logoUrl) ||
-          (matched.type && matched.type !== currentUser.schoolType);
-
-        if (needsUpdate) {
-          setCurrentUser((prev) => {
-            if (!prev) return prev;
-            const updated: UserProfile = {
-              ...prev,
-              ...(matched.principal ? { fullName: matched.principal } : {}),
-              ...(matched.name ? { school: matched.name } : {}),
-              ...(matched.state ? { state: matched.state } : {}),
-              ...(matched.phone ? { phone: matched.phone } : {}),
-              ...(matched.principalPhotoUrl ? { photoURL: matched.principalPhotoUrl } : {}),
-              ...(matched.schoolPhotoUrl ? { schoolPhotoUrl: matched.schoolPhotoUrl } : {}),
-              ...(matched.logoUrl ? { logoUrl: matched.logoUrl } : {}),
-              ...(matched.type ? { schoolType: matched.type } : {}),
-              updatedAt: new Date().toISOString(),
-            };
-            safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
-            return updated;
-          });
-        }
-      }
-    }).catch((err) => {
-      console.warn('Penyelarasan sekolah profil notis:', err);
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
+  }, [viewMode]);
 
   const currentRole: UserRole = currentUser?.role || 'PUBLIC';
 

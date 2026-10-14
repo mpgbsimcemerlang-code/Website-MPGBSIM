@@ -253,13 +253,20 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
                 <h2 className="text-base font-black text-slate-900 leading-tight">
                   Pusat Kawalan CMS MPGBSIM
                 </h2>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Segerak PC & Android Aktif</span>
-                </span>
+                {syncStatus === 'read-only' ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Mod Baca Sahaja (Cache Tempatan Aktif)</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Segerak PC & Android Aktif</span>
+                  </span>
+                )}
                 {lastSyncedAt && (
                   <span className="text-[10px] text-slate-400 hidden lg:inline">
-                    Disegerak {lastSyncedAt}
+                    {syncStatus === 'read-only' ? `Cache ${lastSyncedAt}` : `Disegerak ${lastSyncedAt}`}
                   </span>
                 )}
               </div>
