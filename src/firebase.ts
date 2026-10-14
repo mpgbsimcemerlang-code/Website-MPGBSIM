@@ -138,7 +138,7 @@ export async function ensureFirebaseAuth(): Promise<User | null> {
 }
 
 const QUOTA_BREAKER_KEY = 'mpgbsim_firestore_quota_exceeded_at';
-const QUOTA_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown before retrying Firestore reads
+const QUOTA_COOLDOWN_MS = 60 * 1000; // 60 seconds cooldown so daily quota reset restores immediately
 let quotaExceededMemoryTimestamp = 0;
 let hasLoggedQuotaNotice = false;
 
@@ -152,6 +152,16 @@ export function isQuotaExceededError(err: any): boolean {
     msg.includes('quota exceeded') ||
     msg.includes('resource-exhausted')
   );
+}
+
+export function clearFirestoreQuotaBreaker(): void {
+  quotaExceededMemoryTimestamp = 0;
+  hasLoggedQuotaNotice = false;
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      window.sessionStorage.removeItem(QUOTA_BREAKER_KEY);
+    } catch {}
+  }
 }
 
 export function isFirestoreQuotaExceeded(): boolean {
@@ -169,6 +179,7 @@ export function isFirestoreQuotaExceeded(): boolean {
           return true;
         } else {
           window.sessionStorage.removeItem(QUOTA_BREAKER_KEY);
+          quotaExceededMemoryTimestamp = 0;
         }
       }
     } catch {}
@@ -187,7 +198,7 @@ export function markFirestoreQuotaExceeded(source?: string): void {
   if (!hasLoggedQuotaNotice) {
     hasLoggedQuotaNotice = true;
     console.info(
-      `[MPGBSIM Offline Fallback] Had bacaan harian percuma Firestore (50,000 read/hari) telah penuh${source ? ` (${source})` : ''}. Sistem kini beroperasi menggunakan pangkalan data cache tempatan (LocalStorage/IndexedDB) sehingga kuota direset pada jam 3:00 Petang (Waktu Malaysia).`
+      `[MPGBSIM Offline Fallback] Had bacaan harian percuma Firestore (50,000 read/hari) telah penuh${source ? ` (${source})` : ''}. Sistem kini beroperasi menggunakan pangkalan data cache tempatan (LocalStorage/IndexedDB) sehingga kuota direset.`
     );
   }
 }

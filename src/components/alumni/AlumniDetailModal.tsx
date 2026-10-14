@@ -110,7 +110,8 @@ export const AlumniDetailModal: React.FC<AlumniDetailModalProps> = ({
               </h2>
 
               <p className="text-sm sm:text-base text-amber-200/90 font-medium">
-                {alumni.lastPosition} — <span className="text-slate-200">{alumni.lastSchool}</span>
+                {alumni.lastPosition} — <span className="text-slate-200">{alumni.lastSchool}</span>{' '}
+                <span className="text-teal-300 text-xs font-semibold">({alumni.state})</span>
               </p>
 
               {/* Service Period & Badges */}
@@ -174,11 +175,10 @@ export const AlumniDetailModal: React.FC<AlumniDetailModalProps> = ({
                         <span className="text-xs font-bold text-teal-800 bg-teal-100/80 px-2.5 py-0.5 rounded-md">
                           {rec.startYear} – {rec.endYear}
                         </span>
-                        {rec.state && (
-                          <span className="text-xs text-slate-500 font-medium">
-                            {rec.state}
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 text-xs text-teal-800 bg-white border border-teal-200 px-2 py-0.5 rounded-md font-semibold">
+                          <MapPin className="w-3 h-3 text-teal-600" />
+                          Negeri Sekolah: {rec.state || alumni.state}
+                        </span>
                       </div>
 
                       <h4 className="text-sm sm:text-base font-bold text-slate-900">

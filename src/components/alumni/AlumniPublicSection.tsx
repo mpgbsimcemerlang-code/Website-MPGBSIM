@@ -61,6 +61,9 @@ export const AlumniPublicSection: React.FC<AlumniPublicSectionProps> = ({
     const stateSet = new Set<string>();
     approvedAlumni.forEach((a) => {
       if (a.state) stateSet.add(a.state.trim());
+      a.leadershipHistory?.forEach((lh) => {
+        if (lh.state) stateSet.add(lh.state.trim());
+      });
     });
 
     // Years of Leadership sum
@@ -84,7 +87,12 @@ export const AlumniPublicSection: React.FC<AlumniPublicSectionProps> = ({
   // Extract unique filter dropdown values
   const availableStates = useMemo(() => {
     const set = new Set<string>();
-    approvedAlumni.forEach((a) => a.state && set.add(a.state));
+    approvedAlumni.forEach((a) => {
+      if (a.state) set.add(a.state);
+      a.leadershipHistory?.forEach((lh) => {
+        if (lh.state) set.add(lh.state);
+      });
+    });
     return Array.from(set).sort();
   }, [approvedAlumni]);
 
@@ -97,14 +105,25 @@ export const AlumniPublicSection: React.FC<AlumniPublicSectionProps> = ({
   // Filtered Alumni List
   const filteredAlumni = useMemo(() => {
     return approvedAlumni.filter((a) => {
+      const q = searchQuery.toLowerCase();
       const matchQuery =
         !searchQuery.trim() ||
-        a.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.lastSchool.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.lastPosition.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.state.toLowerCase().includes(searchQuery.toLowerCase());
+        a.fullName.toLowerCase().includes(q) ||
+        a.lastSchool.toLowerCase().includes(q) ||
+        a.lastPosition.toLowerCase().includes(q) ||
+        a.state.toLowerCase().includes(q) ||
+        (a.leadershipHistory &&
+          a.leadershipHistory.some(
+            (lh) =>
+              lh.schoolName?.toLowerCase().includes(q) ||
+              lh.state?.toLowerCase().includes(q)
+          ));
 
-      const matchState = selectedState === 'ALL' || a.state === selectedState;
+      const matchState =
+        selectedState === 'ALL' ||
+        a.state === selectedState ||
+        (a.leadershipHistory &&
+          a.leadershipHistory.some((lh) => lh.state === selectedState));
 
       const matchPosition =
         selectedPosition === 'ALL' ||
@@ -358,6 +377,11 @@ export const AlumniPublicSection: React.FC<AlumniPublicSectionProps> = ({
                       <div className="flex items-center gap-1.5 font-semibold text-slate-200">
                         <Building2 className="w-3.5 h-3.5 text-teal-400 shrink-0" />
                         <span className="truncate">{alumni.lastSchool}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-teal-300 font-medium">
+                        <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Negeri Berkhidmat: {alumni.state}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 text-slate-400">

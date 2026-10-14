@@ -56,6 +56,7 @@ import {
   isQuotaExceededError,
   isFirestoreQuotaExceeded,
   markFirestoreQuotaExceeded,
+  clearFirestoreQuotaBreaker,
 } from '../firebase';
 import { sanitizeForFirestore } from '../services/firebaseConfig';
 import { StorageManagementService } from '../services/StorageManagementService';
@@ -1037,13 +1038,36 @@ const sanitizeMemberApplicationsList = (apps: MemberApplication[] = []): MemberA
 
 const sanitizeLeadershipList = (list: LeaderProfile[] = []): LeaderProfile[] => {
   const baseList = list || [];
-  const mapped = baseList.map((l, index) => {
+  let maxExplicitOrder = 0;
+  baseList.forEach((l) => {
+    if (l.order !== undefined && l.order !== null && !isNaN(Number(l.order))) {
+      maxExplicitOrder = Math.max(maxExplicitOrder, Number(l.order));
+    }
+  });
+
+  // Sort items without explicit order by their timestamp ID (e.g., ldr-1790730350833) so chronological order is preserved
+  const preSorted = [...baseList].sort((a, b) => {
+    const aHasOrder = a.order !== undefined && a.order !== null && !isNaN(Number(a.order));
+    const bHasOrder = b.order !== undefined && b.order !== null && !isNaN(Number(b.order));
+    if (aHasOrder && bHasOrder) return Number(a.order) - Number(b.order);
+    if (aHasOrder) return -1;
+    if (bHasOrder) return 1;
+    return String(a.id || '').localeCompare(String(b.id || ''));
+  });
+
+  let nextUnassignedOrder = maxExplicitOrder + 1;
+
+  const mapped = preSorted.map((l) => {
     const isFaiz = l.id === 'lead-1' || l.name?.toLowerCase().includes('faiz');
     const avatar = isFaiz
       ? (l.avatarUrl && !l.avatarUrl.includes('photo-1507003211169') ? l.avatarUrl : faizLeaderPhoto)
       : (l.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=600');
-    // Mohamad Faiz Azizan is authoritative #1 (order: 0) if order not yet defined
-    const effectiveOrder = l.order !== undefined ? Number(l.order) : (isFaiz ? 0 : index + 1);
+    const hasExplicitOrder = l.order !== undefined && l.order !== null && !isNaN(Number(l.order));
+    const effectiveOrder = hasExplicitOrder
+      ? Number(l.order)
+      : isFaiz
+        ? 0
+        : nextUnassignedOrder++;
     return {
       ...l,
       name: isFaiz ? (l.name || 'Mohamad Faiz Azizan') : l.name,
@@ -1159,6 +1183,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const buildStateFromLocalStorageCache = (prev?: SiteContentState): SiteContentState => {
     const initialSync = getInitialSiteContentSync();
     const cachedCms = getCachedFirestoreCollection<Partial<SiteContentState>>('cmsContent');
+    const cachedLeadership = getCachedFirestoreCollection<LeaderProfile[]>('leadership');
+    const cachedResources = getCachedFirestoreCollection<ResourceDocument[]>('resources');
     const cachedNews = getCachedFirestoreCollection<NewsItem[]>('news');
     const cachedEvents = getCachedFirestoreCollection<ProgramEvent[]>('events');
     const cachedPractices = getCachedFirestoreCollection<BestPracticeItem[]>('bestPractices');
@@ -1190,9 +1216,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       (prev?.practices?.length ? prev.practices : INITIAL_BEST_PRACTICES);
 
     const rawLeadership =
-      (cachedCms?.leadership && cachedCms.leadership.length > 0 ? cachedCms.leadership : null) ||
+      (cachedLeadership && cachedLeadership.length > 0 ? cachedLeadership : null) ||
       (initialSync?.leadership?.length ? initialSync.leadership : null) ||
-      (prev?.leadership?.length ? prev.leadership : DEFAULT_LEADERSHIP);
+      (prev?.leadership?.length ? prev.leadership : null) ||
+      (cachedCms?.leadership && cachedCms.leadership.length > 0 ? cachedCms.leadership : DEFAULT_LEADERSHIP);
 
     const rawMedia =
       (cachedMedia && cachedMedia.length > 0 ? cachedMedia : null) ||
@@ -1200,9 +1227,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       (prev?.media?.length ? prev.media : DEFAULT_MEDIA);
 
     const rawResources =
-      (cachedCms?.resources && cachedCms.resources.length > 0 ? cachedCms.resources : null) ||
+      (cachedResources && cachedResources.length > 0 ? cachedResources : null) ||
       (initialSync?.resources?.length ? initialSync.resources : null) ||
-      (prev?.resources?.length ? prev.resources : DEFAULT_RESOURCES);
+      (prev?.resources?.length ? prev.resources : null) ||
+      (cachedCms?.resources && cachedCms.resources.length > 0 ? cachedCms.resources : DEFAULT_RESOURCES);
 
     const rawAlumni =
       (cachedAlumni && cachedAlumni.length > 0 ? cachedAlumni : null) ||
@@ -1314,6 +1342,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // Helper to persist any CMS content section to Firestore in real-time across devices
   const saveCmsContentToFirestore = async (patch: Partial<SiteContentState>) => {
+    if (patch.leadership) {
+      cacheFirestoreCollection('leadership', patch.leadership);
+    }
+    if (patch.resources) {
+      cacheFirestoreCollection('resources', patch.resources);
+    }
     // Always update the local cmsContent cache first
     const existingCachedCms = getCachedFirestoreCollection<Partial<SiteContentState>>('cmsContent') || {};
     cacheFirestoreCollection('cmsContent', { ...existingCachedCms, ...patch });
@@ -1326,14 +1360,30 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     try {
       setSyncStatus('syncing');
       await ensureFirebaseAuth().catch(() => null);
+      // Omit heavy base64 payloads from leadership/resources inside the single cmsContent doc to respect Firestore 1MB limit
+      // (Full leadership and resource documents are stored in their dedicated 'leadership' and 'resources' collections)
+      const safePatchForCmsDoc: Record<string, any> = { ...patch };
+      if (Array.isArray(safePatchForCmsDoc.leadership)) {
+        safePatchForCmsDoc.leadership = safePatchForCmsDoc.leadership.map((l: LeaderProfile) => ({
+          ...l,
+          avatarUrl: l.avatarUrl && l.avatarUrl.startsWith('data:') && l.avatarUrl.length > 15000 ? '' : l.avatarUrl,
+        }));
+      }
+      if (Array.isArray(safePatchForCmsDoc.resources)) {
+        safePatchForCmsDoc.resources = safePatchForCmsDoc.resources.map((r: ResourceDocument) => ({
+          ...r,
+          fileUrl: r.fileUrl && r.fileUrl.startsWith('data:') && r.fileUrl.length > 15000 ? '' : r.fileUrl,
+        }));
+      }
       await setDoc(
         doc(db, 'siteSettings', 'cmsContent'),
         {
-          ...patch,
+          ...safePatchForCmsDoc,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
+      clearFirestoreQuotaBreaker();
       setIsReadOnlyMode(false);
       setIsFirebaseConnected(true);
       setSyncStatus('synced');
@@ -1348,40 +1398,66 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
-  // Hydrate full state from IndexedDB on initial mount
+  // Hydrate full state from IndexedDB on initial mount (only if live Firestore listeners haven't already populated more complete data)
   useEffect(() => {
     getFullSiteContentAsync()
       .then((cached) => {
         if (cached) {
-          setSiteData((prev) => ({
-            ...prev,
-            branding: cached.branding || prev.branding,
-            hero: cached.hero || prev.hero,
-            visionMission: cached.visionMission || prev.visionMission,
-            strategicFocus: Array.isArray(cached.strategicFocus) ? cached.strategicFocus : prev.strategicFocus,
-            stats: cached.stats || prev.stats,
-            memberSchools: Array.isArray(cached.memberSchools) && cached.memberSchools.length > 0
-              ? sanitizeMemberSchoolsList(cached.memberSchools)
-              : prev.memberSchools,
-            news: Array.isArray(cached.news) ? sortNewsByPublishedDate(cached.news) : prev.news,
-            programs: Array.isArray(cached.programs) ? cached.programs : prev.programs,
-            practices: Array.isArray(cached.practices) ? cached.practices : prev.practices,
-            leadership: Array.isArray(cached.leadership) && cached.leadership.length > 0
-              ? sanitizeLeadershipList(cached.leadership)
-              : prev.leadership,
-            media: Array.isArray(cached.media) ? cached.media : prev.media,
-            quote: cached.quote || prev.quote,
-            resources: Array.isArray(cached.resources) ? cached.resources : prev.resources,
-            cta: cached.cta || prev.cta,
-            contactInfo: cached.contactInfo || prev.contactInfo,
-            submissions: Array.isArray(cached.submissions) ? cached.submissions : prev.submissions,
-            memberApplications: Array.isArray(cached.memberApplications)
-              ? sanitizeMemberApplicationsList(cached.memberApplications)
-              : prev.memberApplications,
-            dashboardConfig: cached.dashboardConfig || prev.dashboardConfig,
-            alumni: Array.isArray(cached.alumni) ? cached.alumni : prev.alumni,
-            announcements: Array.isArray(cached.announcements) ? cached.announcements : prev.announcements,
-          }));
+          setSiteData((prev) => {
+            const prevHasRealLeaders =
+              Array.isArray(prev.leadership) &&
+              (prev.leadership.length > DEFAULT_LEADERSHIP.length ||
+                prev.leadership.some((l) => String(l.id).startsWith('ldr-')));
+            const cachedHasRealLeaders =
+              Array.isArray(cached.leadership) &&
+              (cached.leadership.length > DEFAULT_LEADERSHIP.length ||
+                cached.leadership.some((l: LeaderProfile) => String(l.id).startsWith('ldr-')));
+
+            const resolvedLeadership = prevHasRealLeaders
+              ? prev.leadership
+              : cachedHasRealLeaders
+                ? sanitizeLeadershipList(cached.leadership)
+                : Array.isArray(cached.leadership) && cached.leadership.length > 0
+                  ? sanitizeLeadershipList(cached.leadership)
+                  : prev.leadership;
+
+            const prevHasRealResources =
+              Array.isArray(prev.resources) &&
+              prev.resources.some((r) => String(r.id).startsWith('res-1'));
+            const resolvedResources = prevHasRealResources
+              ? prev.resources
+              : Array.isArray(cached.resources) && cached.resources.length > 0
+                ? cached.resources
+                : prev.resources;
+
+            return {
+              ...prev,
+              branding: cached.branding || prev.branding,
+              hero: cached.hero || prev.hero,
+              visionMission: cached.visionMission || prev.visionMission,
+              strategicFocus: Array.isArray(cached.strategicFocus) ? cached.strategicFocus : prev.strategicFocus,
+              stats: cached.stats || prev.stats,
+              memberSchools: Array.isArray(cached.memberSchools) && cached.memberSchools.length > 0
+                ? sanitizeMemberSchoolsList(cached.memberSchools)
+                : prev.memberSchools,
+              news: Array.isArray(cached.news) ? sortNewsByPublishedDate(cached.news) : prev.news,
+              programs: Array.isArray(cached.programs) ? cached.programs : prev.programs,
+              practices: Array.isArray(cached.practices) ? cached.practices : prev.practices,
+              leadership: resolvedLeadership,
+              media: Array.isArray(cached.media) ? cached.media : prev.media,
+              quote: cached.quote || prev.quote,
+              resources: resolvedResources,
+              cta: cached.cta || prev.cta,
+              contactInfo: cached.contactInfo || prev.contactInfo,
+              submissions: Array.isArray(cached.submissions) ? cached.submissions : prev.submissions,
+              memberApplications: Array.isArray(cached.memberApplications)
+                ? sanitizeMemberApplicationsList(cached.memberApplications)
+                : prev.memberApplications,
+              dashboardConfig: cached.dashboardConfig || prev.dashboardConfig,
+              alumni: Array.isArray(cached.alumni) ? cached.alumni : prev.alumni,
+              announcements: Array.isArray(cached.announcements) ? cached.announcements : prev.announcements,
+            };
+          });
         }
       })
       .catch((e) => {
@@ -1542,7 +1618,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       setIsLoading(false);
     };
 
-    // 0. Unified CMS Content listener (Hero, Vision/Mission, Strategic Focus, Stats, Quote, CTA, Leadership, Resources, Branding, Contact, Dashboard)
+    // 0. Unified CMS Content listener (Hero, Vision/Mission, Strategic Focus, Stats, Quote, CTA, Branding, Contact, Dashboard)
     try {
       const unsubCmsContent = onSnapshot(
         doc(db, 'siteSettings', 'cmsContent'),
@@ -1560,10 +1636,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               quote: d.quote ? { ...prev.quote, ...d.quote } : prev.quote,
               cta: d.cta ? { ...prev.cta, ...d.cta } : prev.cta,
               contactInfo: d.contactInfo ? { ...prev.contactInfo, ...d.contactInfo } : prev.contactInfo,
-              leadership: sanitizeLeadershipList(Array.isArray(d.leadership) && d.leadership.length > 0 ? d.leadership : DEFAULT_LEADERSHIP),
-              resources: Array.isArray(d.resources) && d.resources.length > 0 ? d.resources : DEFAULT_RESOURCES,
+              // Do not overwrite leadership or resources from cmsContent because authoritative records live in collection(db, 'leadership') & collection(db, 'resources')
+              leadership: prev.leadership?.length ? prev.leadership : DEFAULT_LEADERSHIP,
+              resources: prev.resources?.length ? prev.resources : DEFAULT_RESOURCES,
               dashboardConfig: d.dashboardConfig ? { ...prev.dashboardConfig, ...d.dashboardConfig } : prev.dashboardConfig,
             }));
+            clearFirestoreQuotaBreaker();
             setIsReadOnlyMode(false);
             setIsFirebaseConnected(true);
             setSyncStatus('synced');
@@ -1576,6 +1654,61 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       unsubscribes.push(unsubCmsContent);
     } catch (e) {
       console.warn('CMS Content listener setup error:', e);
+    }
+
+    // 0b. Leadership listener (Authoritative Barisan Kepimpinan Tertinggi MPGBSIM collection)
+    try {
+      const unsubLeadership = onSnapshot(
+        collection(db, 'leadership'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: LeaderProfile[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+            });
+            const sanitized = sanitizeLeadershipList(list);
+            cacheFirestoreCollection('leadership', sanitized);
+            setSiteData((prev) => ({
+              ...prev,
+              leadership: sanitized,
+            }));
+            clearFirestoreQuotaBreaker();
+            setIsReadOnlyMode(false);
+            setIsFirebaseConnected(true);
+            setSyncStatus('synced');
+          }
+          setIsLoading(false);
+        },
+        (err) => handleListenerError('Leadership', err)
+      );
+      unsubscribes.push(unsubLeadership);
+    } catch (e) {
+      console.warn('Leadership listener setup:', e);
+    }
+
+    // 0c. Resources listener (Authoritative Dokumen & Sumber Rasmi MPGBSIM collection)
+    try {
+      const unsubResources = onSnapshot(
+        collection(db, 'resources'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: ResourceDocument[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+            });
+            cacheFirestoreCollection('resources', list);
+            setSiteData((prev) => ({
+              ...prev,
+              resources: list,
+            }));
+          }
+          setIsLoading(false);
+        },
+        (err) => handleListenerError('Resources', err)
+      );
+      unsubscribes.push(unsubResources);
+    } catch (e) {
+      console.warn('Resources listener setup:', e);
     }
 
     // 1. News listener
@@ -2112,6 +2245,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   // One-click Firestore Initial Seeder / Full Sync across all devices
   const syncAllToFirestore = async (): Promise<{ success: boolean; message: string }> => {
     await persistSiteContent(siteData).catch(() => {});
+    cacheFirestoreCollection('leadership', siteData.leadership);
+    cacheFirestoreCollection('resources', siteData.resources);
     cacheFirestoreCollection('cmsContent', {
       branding: siteData.branding,
       hero: siteData.hero,
@@ -2121,8 +2256,6 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       quote: siteData.quote,
       cta: siteData.cta,
       contactInfo: siteData.contactInfo,
-      leadership: siteData.leadership,
-      resources: siteData.resources,
       dashboardConfig: siteData.dashboardConfig,
     });
     cacheFirestoreCollection('news', siteData.news);
@@ -2148,7 +2281,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
       let count = 0;
 
-      // 1. Sync Central CMS Content Document (Hero, Vision/Mission, Strategic Focus, Stats, Quote, CTA, Leadership, Resources, Branding, Contact Info)
+      // 1. Sync Central CMS Content Document (without heavy base64 arrays that exceed 1MB doc limit)
       await setDoc(
         doc(db, 'siteSettings', 'cmsContent'),
         {
@@ -2160,14 +2293,25 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           quote: siteData.quote,
           cta: siteData.cta,
           contactInfo: siteData.contactInfo,
-          leadership: siteData.leadership,
-          resources: siteData.resources,
           dashboardConfig: siteData.dashboardConfig,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
       count++;
+
+      // 1b. Sync Individual Leadership Documents to collection(db, 'leadership')
+      for (const leader of siteData.leadership) {
+        await setDoc(
+          doc(db, 'leadership', leader.id),
+          {
+            ...leader,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        count++;
+      }
 
       // 2. Sync News
       for (const item of siteData.news) {
@@ -3479,9 +3623,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       name: newRecord.fullName || '',
       email: newRecord.email || '',
       phone: newRecord.phone || '',
-      subject: `Pendaftaran Alumni PGB: ${newRecord.fullName} (${newRecord.lastSchool || 'Pesara PGB'})`,
+      subject: `Pendaftaran Alumni PGB: ${newRecord.fullName} (${newRecord.lastSchool || 'Pesara PGB'} - ${newRecord.state || ''})`,
       category: 'Alumni',
-      message: `Pendaftaran Direktori Alumni MPGBSIM baru diterima. Nama: ${newRecord.fullName}, Gelaran: ${newRecord.title || '-'}, Sekolah Terakhir: ${newRecord.lastSchool || '-'}, Tahun Bersara: ${newRecord.retirementYear || '-'}, Emel: ${newRecord.email}, Telefon: ${newRecord.phone || '-'}. Status Semasa: SUBMITTED (Perlu Pengesahan Urus Setia).`,
+      message: `Pendaftaran Direktori Alumni MPGBSIM baru diterima. Nama: ${newRecord.fullName}, Gelaran: ${newRecord.title || '-'}, Sekolah Terakhir: ${newRecord.lastSchool || '-'}, Negeri Sekolah Berkhidmat: ${newRecord.state || '-'}, Tahun Bersara: ${newRecord.retirementYear || '-'}, Emel: ${newRecord.email}, Telefon: ${newRecord.phone || '-'}. Status Semasa: SUBMITTED (Perlu Pengesahan Urus Setia).`,
       status: 'unread',
       createdAt: now,
     });

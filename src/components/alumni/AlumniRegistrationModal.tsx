@@ -460,11 +460,17 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Negeri Kediaman / Khidmat <span className="text-rose-500">*</span>
+                        Negeri Sekolah Berkhidmat <span className="text-rose-500">*</span>
                       </label>
                       <select
                         value={state}
-                        onChange={(e) => setState(e.target.value)}
+                        onChange={(e) => {
+                          const newState = e.target.value;
+                          setState(newState);
+                          setLeadershipHistory((prev) =>
+                            prev.map((r, i) => (i === 0 && !r.schoolName.trim() ? { ...r, state: newState } : r))
+                          );
+                        }}
                         className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500"
                       >
                         {statesList.map((st) => (
@@ -571,7 +577,7 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
                   <h3 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 flex items-center justify-between">
                     <span className="flex items-center gap-2">
                       <Briefcase className="w-4 h-4 text-teal-700" />
-                      Langkah 2: Sejarah Kepimpinan Institusi
+                      Langkah 2: Sejarah Kepimpinan Institusi & Negeri Sekolah Berkhidmat
                     </span>
                   </h3>
 
@@ -592,7 +598,7 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Sekolah / Institusi Terakhir <span className="text-rose-500">*</span>
+                        Sekolah / Institusi Terakhir Berkhidmat <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -602,6 +608,23 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
                         placeholder="Contoh: SMKA Maahad Hamidiah Kajang"
                         className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
                       />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Negeri Sekolah / Institusi Terakhir Berkhidmat <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500 font-medium text-slate-800"
+                      >
+                        {statesList.map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
@@ -633,7 +656,7 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
                       <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                        Senarai Sekolah & Jawatan Dijawat
+                        Senarai Sekolah, Negeri Berkhidmat & Jawatan Dijawat
                       </h4>
                       <button
                         type="button"
@@ -652,7 +675,7 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded">
-                            Rekod #{idx + 1}
+                            Rekod Sekolah #{idx + 1}
                           </span>
                           {leadershipHistory.length > 1 && (
                             <button
@@ -665,10 +688,10 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
                           )}
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2">
                             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                              Nama Sekolah / Institusi
+                              Nama Sekolah / Institusi Berkhidmat
                             </label>
                             <input
                               type="text"
@@ -679,6 +702,25 @@ export const AlumniRegistrationModal: React.FC<AlumniRegistrationModalProps> = (
                               placeholder="Contoh: SRI Al-Amin Bangi"
                               className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded bg-white"
                             />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                              Negeri Sekolah Berkhidmat
+                            </label>
+                            <select
+                              value={rec.state || state}
+                              onChange={(e) =>
+                                handleUpdateLeadershipRecord(rec.id!, 'state', e.target.value)
+                              }
+                              className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded bg-white font-medium text-slate-800"
+                            >
+                              {statesList.map((st) => (
+                                <option key={st} value={st}>
+                                  {st}
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
                           <div>

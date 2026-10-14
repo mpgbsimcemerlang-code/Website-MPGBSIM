@@ -17,9 +17,14 @@ import {
   Eye,
   MessageSquare,
   Upload,
+  MapPin,
+  Plus,
+  UserPlus,
 } from 'lucide-react';
-import { AlumniRecord, AlumniVerificationStatus } from '../../types';
+import { AlumniRecord, AlumniVerificationStatus, LeadershipHistoryRecord } from '../../types';
 import { compressImageFile } from '../../utils/imageCompressor';
+import { useAdminContent } from '../../context/AdminContentContext';
+import { AlumniRegistrationModal } from '../alumni/AlumniRegistrationModal';
 
 interface AdminAlumniManagementProps {
   alumniList: AlumniRecord[];
@@ -31,6 +36,25 @@ interface AdminAlumniManagementProps {
   isMediaAjk?: boolean;
 }
 
+const MALAYSIAN_STATES = [
+  'Johor',
+  'Kedah',
+  'Kelantan',
+  'Melaka',
+  'Negeri Sembilan',
+  'Pahang',
+  'Perak',
+  'Perlis',
+  'Pulau Pinang',
+  'Sabah',
+  'Sarawak',
+  'Selangor',
+  'Terengganu',
+  'Wilayah Persekutuan Kuala Lumpur',
+  'Wilayah Persekutuan Putrajaya',
+  'Wilayah Persekutuan Labuan',
+];
+
 export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
   alumniList,
   onApprove,
@@ -40,8 +64,11 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
   onToggleFeature,
   isMediaAjk = false,
 }) => {
+  const { addAlumniRecord } = useAdminContent();
   const [activeTab, setActiveTab] = useState<AlumniVerificationStatus | 'ALL' | 'FEATURED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStateFilter, setSelectedStateFilter] = useState<string>('ALL');
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
 
   // Rejection reason modal state
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -49,6 +76,14 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
 
   // Edit modal state
   const [editingAlumni, setEditingAlumni] = useState<AlumniRecord | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editFullName, setEditFullName] = useState('');
+  const [editLastPosition, setEditLastPosition] = useState('');
+  const [editLastSchool, setEditLastSchool] = useState('');
+  const [editState, setEditState] = useState('Selangor');
+  const [editCareerStartYear, setEditCareerStartYear] = useState<number>(1990);
+  const [editRetirementYear, setEditRetirementYear] = useState<number>(2024);
+  const [editLeadershipHistory, setEditLeadershipHistory] = useState<LeadershipHistoryRecord[]>([]);
   const [editBio, setEditBio] = useState('');
   const [editQuote, setEditQuote] = useState('');
   const [editContribution, setEditContribution] = useState('');
@@ -75,15 +110,29 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
   };
 
   const filteredAlumni = alumniList.filter((item) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery.trim() ||
-      item.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.lastSchool.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.state.toLowerCase().includes(searchQuery.toLowerCase());
+      item.fullName.toLowerCase().includes(q) ||
+      item.lastSchool.toLowerCase().includes(q) ||
+      (item.state && item.state.toLowerCase().includes(q)) ||
+      (item.leadershipHistory &&
+        item.leadershipHistory.some(
+          (lh) =>
+            lh.schoolName?.toLowerCase().includes(q) ||
+            lh.state?.toLowerCase().includes(q)
+        ));
 
-    if (activeTab === 'ALL') return matchesSearch;
-    if (activeTab === 'FEATURED') return matchesSearch && item.featured;
-    return matchesSearch && item.verificationStatus === activeTab;
+    const matchesState =
+      selectedStateFilter === 'ALL' ||
+      item.state === selectedStateFilter ||
+      (item.leadershipHistory &&
+        item.leadershipHistory.some((lh) => lh.state === selectedStateFilter));
+
+    if (!matchesSearch || !matchesState) return false;
+    if (activeTab === 'ALL') return true;
+    if (activeTab === 'FEATURED') return Boolean(item.featured);
+    return item.verificationStatus === activeTab;
   });
 
   const handleApprove = async (id: string) => {
@@ -111,23 +160,85 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
 
   const handleOpenEdit = (alumni: AlumniRecord) => {
     setEditingAlumni(alumni);
+    setEditTitle(alumni.title || '');
+    setEditFullName(alumni.fullName || '');
+    setEditLastPosition(alumni.lastPosition || '');
+    setEditLastSchool(alumni.lastSchool || '');
+    setEditState(alumni.state || 'Selangor');
+    setEditCareerStartYear(alumni.careerStartYear || 1990);
+    setEditRetirementYear(alumni.retirementYear || 2024);
+    setEditLeadershipHistory(
+      alumni.leadershipHistory && alumni.leadershipHistory.length > 0
+        ? alumni.leadershipHistory.map((r, i) => ({
+            ...r,
+            id: r.id || `lh-edit-${i}-${Date.now()}`,
+            state: r.state || alumni.state || 'Selangor',
+          }))
+        : [
+            {
+              id: `lh-edit-0-${Date.now()}`,
+              schoolName: alumni.lastSchool || '',
+              position: alumni.lastPosition || 'Pengetua',
+              startYear: alumni.careerStartYear || 2010,
+              endYear: alumni.retirementYear || 2024,
+              state: alumni.state || 'Selangor',
+            },
+          ]
+    );
     setEditBio(alumni.biography || '');
     setEditQuote(alumni.legacyQuote || '');
     setEditContribution(alumni.contributions || '');
     setEditPhoto(alumni.photo || '');
   };
 
+  const handleAddEditLeadershipRecord = () => {
+    setEditLeadershipHistory((prev) => [
+      ...prev,
+      {
+        id: `lh-edit-${Date.now()}`,
+        schoolName: '',
+        position: 'Pengetua',
+        startYear: 2015,
+        endYear: 2024,
+        state: editState || 'Selangor',
+      },
+    ]);
+  };
+
+  const handleRemoveEditLeadershipRecord = (id: string) => {
+    if (editLeadershipHistory.length <= 1) return;
+    setEditLeadershipHistory((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleUpdateEditLeadershipRecord = (
+    id: string,
+    field: keyof LeadershipHistoryRecord,
+    value: any
+  ) => {
+    setEditLeadershipHistory((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: value } : r))
+    );
+  };
+
   const handleSaveEdit = async () => {
     if (!editingAlumni) return;
     try {
       await onUpdate(editingAlumni.id, {
+        title: editTitle.trim(),
+        fullName: editFullName.trim() || editingAlumni.fullName,
+        lastPosition: editLastPosition.trim() || editingAlumni.lastPosition,
+        lastSchool: editLastSchool.trim() || editingAlumni.lastSchool,
+        state: editState,
+        careerStartYear: editCareerStartYear,
+        retirementYear: editRetirementYear,
+        leadershipHistory: editLeadershipHistory.filter((r) => r.schoolName.trim().length > 0),
         biography: editBio,
         legacyQuote: editQuote,
         contributions: editContribution,
         photo: editPhoto,
       });
       setEditingAlumni(null);
-      setStatusMessage('Kandungan profil alumni berjaya dikemaskini!');
+      setStatusMessage('Profil, sekolah & negeri berkhidmat alumni berjaya dikemaskini!');
       setTimeout(() => setStatusMessage(''), 3000);
     } catch (e: any) {
       alert('Ralat mengemaskini profil: ' + e.message);
@@ -153,6 +264,30 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
         </div>
       )}
 
+      {/* Header Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white p-5 rounded-2xl shadow-md">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            Pengurusan CMS Direktori Alumni PGB
+          </span>
+          <h3 className="text-lg font-black text-white mt-0.5">
+            Rekod Alumni, Sekolah & Negeri Berkhidmat
+          </h3>
+          <p className="text-xs text-slate-300">
+            Urus kelulusan pendaftaran, kemas kini sekolah dan negeri tempat berkhidmat, serta profil legasi alumni.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsRegistrationModalOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl shadow-md transition cursor-pointer shrink-0 self-start sm:self-center"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Daftar Alumni PGB Baharu</span>
+        </button>
+      </div>
+
       {/* Stats Summary Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
@@ -173,8 +308,8 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
         </div>
       </div>
 
-      {/* Tabs & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+      {/* Tabs, State Filter & Search */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
         <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
@@ -222,16 +357,34 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative min-w-[220px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari nama/sekolah..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
-          />
+        {/* State Filter & Search Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="relative min-w-[190px]">
+            <MapPin className="w-3.5 h-3.5 text-teal-700 absolute left-2.5 top-2.5 pointer-events-none" />
+            <select
+              value={selectedStateFilter}
+              onChange={(e) => setSelectedStateFilter(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg bg-white text-slate-700 cursor-pointer"
+            >
+              <option value="ALL">Semua Negeri Berkhidmat</option>
+              {MALAYSIAN_STATES.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative min-w-[220px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari nama, sekolah atau negeri..."
+              className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"
+            />
+          </div>
         </div>
       </div>
 
@@ -239,7 +392,7 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         {filteredAlumni.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500">
-            Tiada rekod alumni bertepatan dengan pilihan tab/carian.
+            Tiada rekod alumni bertepatan dengan pilihan tab/negeri/carian.
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
@@ -264,9 +417,12 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
                     )}
                   </div>
 
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-slate-900">{item.fullName}</span>
+                      <span className="text-sm font-bold text-slate-900">
+                        {item.title ? `${item.title} ` : ''}
+                        {item.fullName}
+                      </span>
                       <span
                         className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
                           item.verificationStatus === 'APPROVED'
@@ -286,9 +442,34 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-600 font-medium">
-                      {item.lastPosition} — <span className="text-slate-800">{item.lastSchool}</span> ({item.state})
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-700 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                        <span>
+                          {item.lastPosition} — <strong className="text-slate-900">{item.lastSchool}</strong>
+                        </span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-50 text-teal-900 border border-teal-200 text-[11px] font-bold">
+                        <MapPin className="w-3 h-3 text-teal-700" />
+                        Negeri Sekolah: {item.state || 'Tiada Maklumat'}
+                      </span>
+                    </div>
+
+                    {item.leadershipHistory && item.leadershipHistory.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                          Sejarah Sekolah:
+                        </span>
+                        {item.leadershipHistory.map((lh, idx) => (
+                          <span
+                            key={lh.id || idx}
+                            className="text-[11px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-md"
+                          >
+                            {lh.schoolName} ({lh.state || item.state})
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-3">
                       <span>Emel: {item.email}</span>
@@ -348,12 +529,12 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
                     <Star className={`w-4 h-4 ${item.featured ? 'fill-amber-500 text-amber-500' : ''}`} />
                   </button>
 
-                  {/* Edit Story / Bio */}
+                  {/* Edit Profile, School, State & Story */}
                   <button
                     type="button"
                     onClick={() => handleOpenEdit(item)}
                     className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300 cursor-pointer"
-                    title="Sunting Kandungan Story/Bio"
+                    title="Sunting Maklumat Sekolah, Negeri Berkhidmat & Legasi"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
@@ -415,16 +596,26 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
         </div>
       )}
 
-      {/* Modal Edit Bio & Story */}
+      {/* Modal Edit Profile, School, State & Story */}
       {editingAlumni && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Edit className="w-5 h-5 text-teal-700" />
-              Sunting Profil & Legasi Alumni: {editingAlumni.fullName}
-            </h3>
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4 my-auto max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 shrink-0">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Edit className="w-5 h-5 text-teal-700" />
+                Sunting Profil, Sekolah & Negeri Berkhidmat: {editingAlumni.fullName}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingAlumni(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4 overflow-y-auto pr-1 flex-1">
+              {/* Gambar Profil */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Gambar Profil Alumni
@@ -451,6 +642,236 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
                     <p className="text-[10px] text-slate-500">Pilih gambar rasmi dari peranti anda. Dioptimumkan secara automatik.</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Maklumat Utama, Sekolah Terakhir & Negeri Berkhidmat */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <h4 className="text-xs font-extrabold text-teal-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-teal-700" />
+                  Maklumat Perkhidmatan & Negeri Sekolah Berkhidmat
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Gelaran
+                    </label>
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="Contoh: Dato' Hj. / Ustaz"
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Nama Penuh Alumni
+                    </label>
+                    <input
+                      type="text"
+                      value={editFullName}
+                      onChange={(e) => setEditFullName(e.target.value)}
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Jawatan Terakhir
+                    </label>
+                    <input
+                      type="text"
+                      value={editLastPosition}
+                      onChange={(e) => setEditLastPosition(e.target.value)}
+                      placeholder="Contoh: Mantan Pengetua Cemerlang"
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Sekolah / Institusi Terakhir Berkhidmat
+                    </label>
+                    <input
+                      type="text"
+                      value={editLastSchool}
+                      onChange={(e) => setEditLastSchool(e.target.value)}
+                      placeholder="Contoh: SMKA Maahad Hamidiah Kajang"
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white font-semibold"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Negeri Sekolah / Institusi Terakhir Berkhidmat <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={editState}
+                      onChange={(e) => setEditState(e.target.value)}
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white font-bold text-teal-950"
+                    >
+                      {MALAYSIAN_STATES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Tahun Mula Khidmat
+                    </label>
+                    <input
+                      type="number"
+                      value={editCareerStartYear}
+                      onChange={(e) => setEditCareerStartYear(parseInt(e.target.value) || 1990)}
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Tahun Bersara / Akhir Khidmat
+                    </label>
+                    <input
+                      type="number"
+                      value={editRetirementYear}
+                      onChange={(e) => setEditRetirementYear(parseInt(e.target.value) || 2024)}
+                      className="w-full p-2 text-xs border border-slate-300 rounded-lg bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Senarai Sejarah Sekolah & Negeri Berkhidmat */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-teal-700" />
+                    Sejarah Sekolah & Negeri Tempat Berkhidmat
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleAddEditLeadershipRecord}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Tambah Sekolah
+                  </button>
+                </div>
+
+                {editLeadershipHistory.map((rec, idx) => (
+                  <div
+                    key={rec.id || idx}
+                    className="p-3 bg-white rounded-xl border border-slate-200 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        Sekolah #{idx + 1}
+                      </span>
+                      {editLeadershipHistory.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditLeadershipRecord(rec.id!)}
+                          className="text-rose-600 hover:text-rose-800 text-xs cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Nama Sekolah Berkhidmat
+                        </label>
+                        <input
+                          type="text"
+                          value={rec.schoolName}
+                          onChange={(e) =>
+                            handleUpdateEditLeadershipRecord(rec.id!, 'schoolName', e.target.value)
+                          }
+                          placeholder="Nama sekolah..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Negeri Sekolah Berkhidmat
+                        </label>
+                        <select
+                          value={rec.state || editState}
+                          onChange={(e) =>
+                            handleUpdateEditLeadershipRecord(rec.id!, 'state', e.target.value)
+                          }
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white font-semibold text-slate-800"
+                        >
+                          {MALAYSIAN_STATES.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Jawatan
+                        </label>
+                        <input
+                          type="text"
+                          value={rec.position}
+                          onChange={(e) =>
+                            handleUpdateEditLeadershipRecord(rec.id!, 'position', e.target.value)
+                          }
+                          placeholder="Pengetua / Guru Besar"
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Tahun Mula
+                        </label>
+                        <input
+                          type="number"
+                          value={rec.startYear}
+                          onChange={(e) =>
+                            handleUpdateEditLeadershipRecord(
+                              rec.id!,
+                              'startYear',
+                              parseInt(e.target.value) || 2010
+                            )
+                          }
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Tahun Tamat
+                        </label>
+                        <input
+                          type="number"
+                          value={rec.endYear}
+                          onChange={(e) =>
+                            handleUpdateEditLeadershipRecord(
+                              rec.id!,
+                              'endYear',
+                              parseInt(e.target.value) || 2024
+                            )
+                          }
+                          className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div>
@@ -490,7 +911,7 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 shrink-0">
               <button
                 type="button"
                 onClick={() => setEditingAlumni(null)}
@@ -509,6 +930,21 @@ export const AdminAlumniManagement: React.FC<AdminAlumniManagementProps> = ({
           </div>
         </div>
       )}
+
+      {/* Direct Admin Registration Modal */}
+      <AlumniRegistrationModal
+        isOpen={isRegistrationModalOpen}
+        onClose={() => setIsRegistrationModalOpen(false)}
+        onSubmit={async (data) => {
+          const id = await addAlumniRecord({
+            ...data,
+            verificationStatus: 'APPROVED',
+          });
+          setStatusMessage('Rekod alumni baharu berjaya didaftarkan dan diluluskan!');
+          setTimeout(() => setStatusMessage(''), 4000);
+          return id;
+        }}
+      />
     </div>
   );
 };
