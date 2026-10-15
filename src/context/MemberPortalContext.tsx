@@ -1079,22 +1079,32 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     // 2. Validate against real registered schools in database (merged from CMS cache & Firestore)
     const registeredSchools = await getLatestRegisteredSchools();
 
-    let matched = registeredSchools.find((s) => {
-      const codeMatch = s.code && (
-        s.code.toLowerCase().trim() === input.toLowerCase() ||
-        (input.toLowerCase() === 'mjac011' && (s.code.toLowerCase() === 'mjac011' || s.code.toLowerCase() === 'mia1009')) ||
-        (input.toLowerCase() === 'mia1009' && (s.code.toLowerCase() === 'mjac011' || s.code.toLowerCase() === 'mia1009'))
-      );
-      const emailMatch = s.email && s.email.toLowerCase().trim() === input.toLowerCase();
-      const nameMatch = s.name.toLowerCase().trim() === input.toLowerCase();
-      const muslehMatch =
-        (input.toLowerCase() === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-          input.toLowerCase() === 'mjac011' ||
-          input.toLowerCase() === 'mia1009' ||
-          input.toLowerCase().includes('imusleh')) &&
-        (s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh'));
-      return codeMatch || emailMatch || nameMatch || muslehMatch;
-    });
+    const inputClean = input.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let matched = registeredSchools.find((s) => s.code && s.code.toLowerCase().trim() === input.toLowerCase());
+
+    if (!matched) {
+      matched = registeredSchools.find((s) => {
+        const schCodeClean = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const codeMatch = Boolean(
+          s.code && (
+            (inputClean.length >= 4 && (schCodeClean === inputClean || schCodeClean.includes(inputClean))) ||
+            (input.toLowerCase() === 'mjac011' && (s.code.toLowerCase() === 'mjac011' || s.code.toLowerCase() === 'mia1009')) ||
+            (input.toLowerCase() === 'mia1009' && (s.code.toLowerCase() === 'mjac011' || s.code.toLowerCase() === 'mia1009'))
+          )
+        );
+        const emailMatch =
+          (s.email && s.email.toLowerCase().trim() === input.toLowerCase()) ||
+          (s.pgbEmail && s.pgbEmail.toLowerCase().trim() === input.toLowerCase());
+        const nameMatch = s.name.toLowerCase().trim() === input.toLowerCase();
+        const muslehMatch =
+          (input.toLowerCase() === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+            input.toLowerCase() === 'mjac011' ||
+            input.toLowerCase() === 'mia1009' ||
+            input.toLowerCase().includes('imusleh')) &&
+          (s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh'));
+        return codeMatch || emailMatch || nameMatch || muslehMatch;
+      });
+    }
 
     if (!matched && (
       input.toLowerCase() === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
@@ -1365,12 +1375,24 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       const snap = await getDocs(collection(db, 'schools'));
       snap.forEach((d) => {
         const sch = d.data() as MemberSchool;
-        const matchCode = sch.code && currentUser.membershipNo?.includes(sch.code);
-        const matchEmail = sch.email && currentUser.email && sch.email.toLowerCase() === currentUser.email.toLowerCase();
-        const matchMusleh =
+        const matchCode = Boolean(
+          sch.code &&
+            ((currentUser.schoolCode && sch.code.trim().toUpperCase() === currentUser.schoolCode.trim().toUpperCase()) ||
+              (currentUser.membershipNo && currentUser.membershipNo.toUpperCase().includes(sch.code.toUpperCase())))
+        );
+        const matchMusleh = Boolean(
           (sch.code === 'MJAC011' || sch.id === 'sch-musleh-1') &&
-          (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'));
-        if (matchCode || matchEmail || matchMusleh) {
+            (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'))
+        );
+        const matchPgbEmail = Boolean(
+          sch.pgbEmail && currentUser.email && sch.pgbEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
+        );
+        const matchExactName = Boolean(
+          sch.name && currentUser.school && sch.name.trim().toLowerCase() === currentUser.school.trim().toLowerCase()
+        );
+        const isMatchedSchool = matchCode || matchMusleh || (matchExactName && (matchPgbEmail || !sch.pgbEmail)) || matchPgbEmail;
+
+        if (isMatchedSchool) {
           updateDoc(doc(db, 'schools', d.id), {
             ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
             ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
@@ -1404,12 +1426,24 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         const parsed = JSON.parse(saved);
         if (parsed.memberSchools) {
           parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
-            const matchCode = s.code && currentUser.membershipNo?.includes(s.code);
-            const matchEmail = s.email && currentUser.email && s.email.toLowerCase() === currentUser.email.toLowerCase();
-            const matchMusleh =
+            const matchCode = Boolean(
+              s.code &&
+                ((currentUser.schoolCode && s.code.trim().toUpperCase() === currentUser.schoolCode.trim().toUpperCase()) ||
+                  (currentUser.membershipNo && currentUser.membershipNo.toUpperCase().includes(s.code.toUpperCase())))
+            );
+            const matchMusleh = Boolean(
               (s.code === 'MJAC011' || s.id === 'sch-musleh-1') &&
-              (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'));
-            if (matchCode || matchEmail || matchMusleh) {
+                (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'))
+            );
+            const matchPgbEmail = Boolean(
+              s.pgbEmail && currentUser.email && s.pgbEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
+            );
+            const matchExactName = Boolean(
+              s.name && currentUser.school && s.name.trim().toLowerCase() === currentUser.school.trim().toLowerCase()
+            );
+            const isMatchedSchool = matchCode || matchMusleh || (matchExactName && (matchPgbEmail || !s.pgbEmail)) || matchPgbEmail;
+
+            if (isMatchedSchool) {
               return {
                 ...s,
                 ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
@@ -1487,15 +1521,22 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       const snap = await getDocs(collection(db, 'schools'));
       snap.forEach((d) => {
         const sch = d.data() as MemberSchool;
-        const matchCode = sch.code && currentUser.membershipNo?.includes(sch.code);
-        const matchName =
-          sch.name && currentUser.school && sch.name.toLowerCase() === currentUser.school.toLowerCase();
-        const matchEmail =
-          sch.email && currentUser.email && sch.email.toLowerCase() === currentUser.email.toLowerCase();
-        const isMuslehMatch =
+        const matchCode = Boolean(
+          sch.code &&
+            ((currentUser.schoolCode && sch.code.trim().toUpperCase() === currentUser.schoolCode.trim().toUpperCase()) ||
+              (currentUser.membershipNo && currentUser.membershipNo.toUpperCase().includes(sch.code.toUpperCase())))
+        );
+        const matchExactName = Boolean(
+          sch.name && currentUser.school && sch.name.trim().toLowerCase() === currentUser.school.trim().toLowerCase()
+        );
+        const matchPgbEmail = Boolean(
+          sch.pgbEmail && currentUser.email && sch.pgbEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
+        );
+        const isMuslehMatch = Boolean(
           (d.id === 'sch-musleh-1' || sch.code === 'MJAC011' || sch.code === 'MIA1009') &&
-          (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'));
-        if (matchCode || matchName || matchEmail || isMuslehMatch) {
+            (currentUser.email?.includes('imusleh') || currentUser.school?.toLowerCase().includes('musleh'))
+        );
+        if (matchCode || isMuslehMatch || (matchExactName && (matchPgbEmail || !sch.pgbEmail)) || matchPgbEmail) {
           targetDocId = d.id;
         }
       });

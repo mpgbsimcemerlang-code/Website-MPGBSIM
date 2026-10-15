@@ -22,6 +22,7 @@ import {
   StickyNote,
   AlertTriangle,
   Sparkles,
+  Database,
 } from 'lucide-react';
 import { useAdminContent, DEFAULT_DASHBOARD_CONFIG } from '../../context/AdminContentContext';
 import { ContactSubmission } from '../../types';
@@ -382,6 +383,37 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
             </div>
           </div>
         </div>
+      </div>
+
+      {/* DATA AUDIT & INTEGRITY MONITORING BANNER */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white border border-slate-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center shrink-0">
+            <Database className="w-5 h-5 text-teal-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-extrabold text-white">
+                Audit Data & Integriti Rekod Sekolah (Firestore vs Metadata)
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                {siteData.memberSchools?.length || 27} Rekod Dipantau ✓
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+              Membandingkan bilangan rekod Firestore dengan metadata permohonan keahlian secara berterusan bagi mengesan jika berlaku kehilangan atau pertindihan data sekolah.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => onNavigateTab('audit-data')}
+          className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition flex items-center gap-2 shrink-0 self-start md:self-center cursor-pointer shadow-sm"
+        >
+          <Database className="w-3.5 h-3.5" />
+          <span>Buka Modul Audit Data</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* PENDING MEMBERSHIP APPLICATIONS SECTION */}

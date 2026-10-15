@@ -24,6 +24,7 @@ import {
   FileText,
   GraduationCap,
   Megaphone,
+  Database,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { AdminDashboardOverview } from './admin/AdminDashboardOverview';
@@ -38,6 +39,7 @@ import { AdminLeadershipManagement } from './admin/AdminLeadershipManagement';
 import { AdminStatsManagement } from './admin/AdminStatsManagement';
 import { AdminAlumniManagement } from './admin/AdminAlumniManagement';
 import { AdminAnnouncementsManagement } from './admin/AdminAnnouncementsManagement';
+import { AdminDataAuditManagement } from './admin/AdminDataAuditManagement';
 import { CMSHero } from './cms/CMSHero';
 import { CMSVisionMission } from './cms/CMSVisionMission';
 import { CMSStrategicFocus } from './cms/CMSStrategicFocus';
@@ -109,8 +111,20 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
   const applications = siteData.memberApplications || [];
   const pendingCount = applications.filter((a) => a.status === 'pending').length;
 
+  interface NavItem {
+    id: string;
+    label: string;
+    icon: any;
+    count?: string | number;
+    isHighlight?: boolean;
+  }
+  interface NavSection {
+    group: string;
+    items: NavItem[];
+  }
+
   // Categorized CMS Modules
-  const navSections = [
+  const navSections: NavSection[] = [
     {
       group: 'Pusat Kawalan & Ahli',
       items: [
@@ -226,6 +240,12 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     {
       group: 'Sistem & Konfigurasi',
       items: [
+        {
+          id: 'audit-data',
+          label: 'Audit Data & Integriti',
+          icon: Database,
+          count: 'Live Audit',
+        },
         {
           id: 'tetapan',
           label: 'Tetapan Laman & Hubungan',
@@ -434,6 +454,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
             {activeTab === 'galeri' && <AdminMediaManagement />}
             {activeTab === 'amanat-cta' && <CMSAmanatCta />}
             {activeTab === 'sumber' && <CMSResources />}
+            {activeTab === 'audit-data' && <AdminDataAuditManagement />}
             {activeTab === 'tetapan' && <AdminSiteSettings />}
           </main>
         </div>
