@@ -12,6 +12,7 @@ import { StrategicFocusSection } from './components/StrategicFocus';
 import { LatestNewsSection } from './components/LatestNews';
 import { BestPracticeSection } from './components/BestPractice';
 import { UpcomingProgramsSection } from './components/UpcomingPrograms';
+import { ExamPublicSection } from './components/exams/ExamPublicSection';
 import { SchoolNetworkSection } from './components/SchoolNetwork';
 import { LeadershipSection } from './components/LeadershipSection';
 import { AlumniPublicSection } from './components/alumni/AlumniPublicSection';
@@ -65,6 +66,7 @@ function AppContent() {
         'berita',
         'best-practice',
         'program',
+        'peperiksaan',
         'sekolah-ahli',
         'kepimpinan',
         'sumber',
@@ -160,6 +162,9 @@ function AppContent() {
             setDetailModalContent({ type: 'program', data: prog })
           }
         />
+
+        {/* KALENDAR PEPERIKSAAN & COUNTDOWN PENDIDIKAN (Live Takwim SPM, UPKK, SPPIM) */}
+        <ExamPublicSection />
 
         {/* 7. SCHOOL NETWORK (Dynamic Statistics & Directory) */}
         <SchoolNetworkSection

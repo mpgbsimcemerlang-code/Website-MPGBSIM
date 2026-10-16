@@ -141,5 +141,10 @@ service cloud.firestore {
     match /test/{testId} {
       allow read: if true;
     }
+
+    // 19. Exam Calendar & Education Countdown
+    match /examCalendar/{examId} {
+      allow read, write: if true;
+    }
   }
 }

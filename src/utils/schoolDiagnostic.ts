@@ -448,10 +448,22 @@ export function repairSchoolIntegrity(
       repairedUser.updatedAt = new Date().toISOString();
       actionsTaken.push('Menyelaraskan profil Portal Ahli dengan kod rasmi MPGB-2026-MJAC011 & data Pengetua.');
     } else {
-      // Find matching school for normal user
-      const matched = finalSchools.find(
-        (s) => (s.code && userMemNo.includes(s.code)) || (s.email && s.email.toLowerCase() === userEmail)
-      );
+      // Find matching school for normal user with strict hierarchical priority
+      const matched =
+        (portalUser.schoolId ? finalSchools.find((s) => s.id === portalUser.schoolId) : undefined) ||
+        finalSchools.find((s) => portalUser.uid === `sch-user-${s.id}` || portalUser.uid === s.id) ||
+        (portalUser.schoolCode ? finalSchools.find((s) => s.code && s.code.toUpperCase() === portalUser.schoolCode?.toUpperCase()) : undefined) ||
+        (userMemNo ? finalSchools.find((s) => s.code && userMemNo.toUpperCase().includes(s.code.toUpperCase())) : undefined) ||
+        (portalUser.school ? finalSchools.find((s) => s.name && s.name.toLowerCase().trim() === portalUser.school?.toLowerCase().trim()) : undefined) ||
+        (portalUser.pgbEmail ? finalSchools.find((s) => s.pgbEmail && s.pgbEmail.toLowerCase().trim() === portalUser.pgbEmail?.toLowerCase().trim()) : undefined) ||
+        (userEmail ? finalSchools.find((s) => {
+          const emailMatches = s.email && s.email.toLowerCase() === userEmail;
+          if (!emailMatches) return false;
+          if (portalUser.schoolType && s.type && portalUser.schoolType.toLowerCase().trim() === s.type.toLowerCase().trim()) return true;
+          if (portalUser.position === 'Guru Besar' && s.type?.toLowerCase().includes('rendah')) return true;
+          if (portalUser.position === 'Pengetua' && s.type?.toLowerCase().includes('menengah')) return true;
+          return false;
+        }) : undefined);
       if (matched) {
         if (matched.principal && !repairedUser.fullName) repairedUser.fullName = matched.principal;
         if (matched.name && !repairedUser.school) repairedUser.school = matched.name;

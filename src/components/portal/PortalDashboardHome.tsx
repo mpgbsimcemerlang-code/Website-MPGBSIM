@@ -28,6 +28,7 @@ import {
   Trophy,
   QrCode,
   Download,
+  CalendarDays,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -60,35 +61,77 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
   const [isDigitalCardModalOpen, setIsDigitalCardModalOpen] = React.useState(false);
 
-  // Match the member's registered school from the live website directory (siteData.memberSchools)
   const currentSchoolData: MemberSchool | null = React.useMemo(() => {
+    const schools = siteData.memberSchools || [];
+    if (!schools.length) return null;
+
     const isMusleh =
       currentUser?.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
       (currentUser?.email && currentUser.email.toLowerCase().includes('imusleh')) ||
       (currentUser?.school && currentUser.school.toLowerCase().includes('musleh')) ||
       (currentUser?.membershipNo && (currentUser.membershipNo.includes('MJAC011') || currentUser.membershipNo.includes('MIA1009')));
 
-    const matched = (siteData.memberSchools || []).find((s) => {
-      if (isMusleh && (s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh'))) {
-        return true;
-      }
-      if (currentUser?.membershipNo && s.code && currentUser.membershipNo.includes(s.code)) return true;
-      if (currentUser?.email && s.email && s.email.toLowerCase() === currentUser.email.toLowerCase()) return true;
-      if (currentUser?.school && s.name && s.name.toLowerCase() === currentUser.school.toLowerCase()) return true;
-      return false;
-    });
-
-    if (matched) return matched;
     if (isMusleh) {
       return (
-        (siteData.memberSchools || []).find((s) => s.code === 'MJAC011') ||
+        schools.find((s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh')) ||
         null
       );
     }
-    return (siteData.memberSchools || [])[0] || null;
+
+    // Strict Priority:
+    // 1. Direct schoolId match
+    if (currentUser?.schoolId) {
+      const byId = schools.find((s) => s.id === currentUser.schoolId);
+      if (byId) return byId;
+    }
+
+    // 2. Direct uid match
+    if (currentUser?.uid) {
+      const byUid = schools.find((s) => currentUser.uid === `sch-user-${s.id}` || currentUser.uid === s.id);
+      if (byUid) return byUid;
+    }
+
+    // 3. Direct schoolCode match
+    if (currentUser?.schoolCode) {
+      const byCode = schools.find((s) => s.code && s.code.toUpperCase() === currentUser.schoolCode?.toUpperCase());
+      if (byCode) return byCode;
+    }
+
+    // 4. Membership number containing school code
+    if (currentUser?.membershipNo) {
+      const byMem = schools.find((s) => s.code && currentUser.membershipNo?.toUpperCase().includes(s.code.toUpperCase()));
+      if (byMem) return byMem;
+    }
+
+    // 5. Exact school name match
+    if (currentUser?.school) {
+      const byName = schools.find((s) => s.name && s.name.toLowerCase().trim() === currentUser.school?.toLowerCase().trim());
+      if (byName) return byName;
+    }
+
+    // 6. Personal PGB Email match
+    if (currentUser?.pgbEmail) {
+      const byPgbEmail = schools.find((s) => s.pgbEmail && s.pgbEmail.toLowerCase().trim() === currentUser.pgbEmail?.toLowerCase().trim());
+      if (byPgbEmail) return byPgbEmail;
+    }
+
+    // 7. Generic school email with matching school type / position
+    if (currentUser?.email) {
+      const byEmail = schools.find((s) => {
+        const emailMatches = s.email && s.email.toLowerCase() === currentUser.email.toLowerCase();
+        if (!emailMatches) return false;
+        if (currentUser.schoolType && s.type && currentUser.schoolType.toLowerCase().trim() === s.type.toLowerCase().trim()) return true;
+        if (currentUser.position === 'Guru Besar' && s.type?.toLowerCase().includes('rendah')) return true;
+        if (currentUser.position === 'Pengetua' && s.type?.toLowerCase().includes('menengah')) return true;
+        return false;
+      });
+      if (byEmail) return byEmail;
+    }
+
+    return null;
   }, [siteData.memberSchools, currentUser]);
 
-  // 8 Quick Access Items specified in Prompt Section F
+  // Quick Access Items
   const quickAccessCards: {
     id: PortalTab;
     title: string;
@@ -103,6 +146,13 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
       sub: 'Surat rasmi, AGM & pekeliling',
       icon: Bell,
       color: 'from-amber-500 to-amber-600',
+    },
+    {
+      id: 'peperiksaan',
+      title: 'Kalendar Peperiksaan',
+      sub: 'Countdown SPM, UPKK & SPPIM',
+      icon: CalendarDays,
+      color: 'from-slate-900 to-teal-950',
     },
     {
       id: 'program',
@@ -267,11 +317,11 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
               <button
                 type="button"
-                onClick={() => setPortalTab('profil')}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-2 border border-slate-700 transition cursor-pointer"
+                onClick={() => setPortalTab('peperiksaan')}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-extrabold text-xs flex items-center gap-2 border border-amber-400/30 transition cursor-pointer"
               >
-                <User className="w-4 h-4 text-teal-400" />
-                <span>Sunting Profil Kepimpinan</span>
+                <CalendarDays className="w-4 h-4 text-amber-400" />
+                <span>Countdown 3 Ujian Bertulis (UPKK • SPPIM • SPM)</span>
               </button>
             </div>
           </div>

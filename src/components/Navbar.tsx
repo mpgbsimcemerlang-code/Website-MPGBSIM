@@ -50,6 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenPortal, activeSection }) =
     { label: 'Sekolah Ahli', href: '#sekolah-ahli' },
     { label: 'Alumni PGB', href: '#alumni' },
     { label: 'Program', href: '#program' },
+    { label: 'Peperiksaan', href: '#peperiksaan' },
     { label: 'Best Practice', href: '#best-practice' },
     { label: 'Hubungi Kami', href: '#hubungi' },
   ];

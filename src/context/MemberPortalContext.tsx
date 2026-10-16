@@ -66,6 +66,7 @@ import {
 export type PortalTab =
   | 'dashboard'
   | 'pengumuman'
+  | 'peperiksaan'
   | 'program'
   | 'direktori'
   | 'dokumen'
@@ -316,10 +317,28 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           }
           user.photoURL = user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
           user.schoolPhotoUrl = user.schoolPhotoUrl || 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80';
-          user.logoUrl = user.logoUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&w=400&q=80';
           safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
         } else if (memNo.includes('MIA1009')) {
           user.membershipNo = memNo.replace('MIA1009', 'MJAC011');
+          safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+        } else if (
+          (user?.schoolCode === 'KJA3002' ||
+            memNo.includes('KJA3002') ||
+            user?.uid === 'sch-user-school-1791963595619-k4xh' ||
+            user?.schoolId === 'school-1791963595619-k4xh') &&
+          (user?.school?.toLowerCase().includes('menengah') || user?.position === 'Pengetua')
+        ) {
+          // Auto-heal Sekolah Rendah Al-Azhar if corrupted by shared email
+          user.school = 'SEKOLAH RENDAH AL-AZHAR';
+          user.schoolId = 'school-1791963595619-k4xh';
+          user.schoolCode = 'KJA3002';
+          user.schoolType = 'Sekolah Rendah';
+          user.position = 'Guru Besar';
+          user.fullName = 'MOHD RAZMAN BIN RAMZAN (Guru Besar)';
+          user.pgbEmail = 'razman2015@gmail.com';
+          user.pgbPhone = '013-4365669';
+          user.membershipNo = 'MPGB-2026-KJA3002';
+          user.uid = 'sch-user-school-1791963595619-k4xh';
           safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
         }
 
@@ -492,19 +511,19 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             prev.membershipNo?.includes('MJAC011') ||
             prev.membershipNo?.includes('MIA1009'));
         const matchId =
+          (prev.schoolId && prev.schoolId === detail.id) ||
           prev.uid === `sch-user-${detail.id}` ||
-          prev.uid?.includes(detail.id);
+          prev.uid === detail.id;
         const matchCode =
-          (prev.membershipNo && detail.updated.code && prev.membershipNo.includes(detail.updated.code)) ||
-          (prev.membershipNo && detail.school?.code && prev.membershipNo.includes(detail.school.code));
-        const matchEmail =
-          (prev.email && detail.updated.email && prev.email.toLowerCase() === detail.updated.email.toLowerCase()) ||
-          (prev.email && detail.school?.email && prev.email.toLowerCase() === detail.school.email.toLowerCase());
+          (prev.schoolCode && detail.updated.code && prev.schoolCode.toUpperCase() === detail.updated.code.toUpperCase()) ||
+          (prev.membershipNo && detail.updated.code && prev.membershipNo.toUpperCase().includes(detail.updated.code.toUpperCase()));
         const matchSchoolName =
           (prev.school && detail.updated.name && prev.school.toLowerCase().trim() === detail.updated.name.toLowerCase().trim()) ||
           (prev.school && detail.school?.name && prev.school.toLowerCase().trim() === detail.school.name.toLowerCase().trim());
+        const matchPgbEmail =
+          prev.pgbEmail && detail.updated.pgbEmail && prev.pgbEmail.toLowerCase().trim() === detail.updated.pgbEmail.toLowerCase().trim();
 
-        if (matchMusleh || matchId || matchCode || matchEmail || matchSchoolName) {
+        if (matchMusleh || matchId || matchCode || matchSchoolName || matchPgbEmail) {
           const updated: UserProfile = {
             ...prev,
             ...(detail.updated.principal ? { fullName: detail.updated.principal } : {}),
@@ -713,19 +732,28 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       // Synchronize currentUser in real-time if matching school profile was updated in CMS
       setCurrentUser((prev) => {
         if (!prev) return prev;
-        const matched = repairedSchools.find((s) => {
-          const matchMusleh =
-            (s.id === 'sch-musleh-1' || s.code === 'MJAC011') &&
-            (prev.email?.includes('imusleh') ||
-              prev.school?.toLowerCase().includes('musleh') ||
-              prev.membershipNo?.includes('MJAC011') ||
-              prev.membershipNo?.includes('MIA1009'));
-          const matchId = prev.uid === `sch-user-${s.id}` || prev.uid?.includes(s.id);
-          const matchCode = prev.membershipNo && s.code && prev.membershipNo.includes(s.code);
-          const matchEmail = prev.email && s.email && prev.email.toLowerCase() === s.email.toLowerCase();
-          const matchSchoolName = prev.school && s.name && prev.school.toLowerCase().trim() === s.name.toLowerCase().trim();
-          return matchMusleh || matchId || matchCode || matchEmail || matchSchoolName;
-        });
+        const isMusleh =
+          prev.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+          (prev.email && prev.email.toLowerCase().includes('imusleh')) ||
+          (prev.school && prev.school.toLowerCase().includes('musleh')) ||
+          (prev.membershipNo && (prev.membershipNo.includes('MJAC011') || prev.membershipNo.includes('MIA1009')));
+
+        const matched = isMusleh
+          ? repairedSchools.find((s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh'))
+          : (prev.schoolId ? repairedSchools.find((s) => s.id === prev.schoolId) : null) ||
+            repairedSchools.find((s) => prev.uid === `sch-user-${s.id}` || prev.uid === s.id) ||
+            (prev.schoolCode ? repairedSchools.find((s) => s.code && s.code.toUpperCase() === prev.schoolCode?.toUpperCase()) : null) ||
+            (prev.membershipNo ? repairedSchools.find((s) => s.code && prev.membershipNo?.toUpperCase().includes(s.code.toUpperCase())) : null) ||
+            (prev.school ? repairedSchools.find((s) => s.name && s.name.toLowerCase().trim() === prev.school?.toLowerCase().trim()) : null) ||
+            (prev.pgbEmail ? repairedSchools.find((s) => s.pgbEmail && s.pgbEmail.toLowerCase().trim() === prev.pgbEmail?.toLowerCase().trim()) : null) ||
+            (prev.email ? repairedSchools.find((s) => {
+              const emailMatches = s.email && s.email.toLowerCase() === prev.email.toLowerCase();
+              if (!emailMatches) return false;
+              if (prev.schoolType && s.type && prev.schoolType.toLowerCase().trim() === s.type.toLowerCase().trim()) return true;
+              if (prev.position === 'Guru Besar' && s.type?.toLowerCase().includes('rendah')) return true;
+              if (prev.position === 'Pengetua' && s.type?.toLowerCase().includes('menengah')) return true;
+              return false;
+            }) : null);
 
         if (matched) {
           const needsUpdate =
@@ -1080,39 +1108,62 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     const registeredSchools = await getLatestRegisteredSchools();
 
     const inputClean = input.toLowerCase().replace(/[^a-z0-9]/g, '');
-    let matched = registeredSchools.find((s) => s.code && s.code.toLowerCase().trim() === input.toLowerCase());
+    
+    // Step 2a: Match by exact School ID or exact School Code
+    let matched = registeredSchools.find(
+      (s) => s.id === input || (s.code && s.code.toLowerCase().trim() === input.toLowerCase())
+    );
 
+    // Step 2b: Match by personal PGB Email (unique to individual headmaster/principal)
     if (!matched) {
+      matched = registeredSchools.find(
+        (s) => s.pgbEmail && s.pgbEmail.toLowerCase().trim() === input.toLowerCase()
+      );
+    }
+
+    // Step 2c: Match by exact School Name
+    if (!matched) {
+      matched = registeredSchools.find(
+        (s) => s.name && s.name.toLowerCase().trim() === input.toLowerCase()
+      );
+    }
+
+    // Step 2d: Match by clean alphanumeric code
+    if (!matched && inputClean.length >= 3) {
       matched = registeredSchools.find((s) => {
         const schCodeClean = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const codeMatch = Boolean(
-          s.code && (
-            (inputClean.length >= 4 && (schCodeClean === inputClean || schCodeClean.includes(inputClean))) ||
-            (input.toLowerCase() === 'mjac011' && (s.code.toLowerCase() === 'mjac011' || s.code.toLowerCase() === 'mia1009')) ||
-            (input.toLowerCase() === 'mia1009' && (s.code.toLowerCase() === 'mjac011' || s.code.toLowerCase() === 'mia1009'))
-          )
-        );
-        const emailMatch =
-          (s.email && s.email.toLowerCase().trim() === input.toLowerCase()) ||
-          (s.pgbEmail && s.pgbEmail.toLowerCase().trim() === input.toLowerCase());
-        const nameMatch = s.name.toLowerCase().trim() === input.toLowerCase();
-        const muslehMatch =
-          (input.toLowerCase() === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-            input.toLowerCase() === 'mjac011' ||
-            input.toLowerCase() === 'mia1009' ||
-            input.toLowerCase().includes('imusleh')) &&
-          (s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh'));
-        return codeMatch || emailMatch || nameMatch || muslehMatch;
+        return Boolean(schCodeClean && schCodeClean === inputClean);
       });
     }
 
+    // Step 2e: Musleh special handler
     if (!matched && (
       input.toLowerCase() === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
       input.toLowerCase() === 'mjac011' ||
       input.toLowerCase() === 'mia1009' ||
       input.toLowerCase().includes('imusleh')
     )) {
-      matched = registeredSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1' || s.name.toLowerCase().includes('musleh'));
+      matched = registeredSchools.find(
+        (s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1' || s.name.toLowerCase().includes('musleh')
+      );
+    }
+
+    // Step 2f: Match by generic school email (handling shared emails safely)
+    if (!matched) {
+      const emailMatches = registeredSchools.filter(
+        (s) =>
+          (s.email && s.email.toLowerCase().trim() === input.toLowerCase()) ||
+          (s.schoolEmail && s.schoolEmail.toLowerCase().trim() === input.toLowerCase())
+      );
+
+      if (emailMatches.length === 1) {
+        matched = emailMatches[0];
+      } else if (emailMatches.length > 1) {
+        // Disambiguation needed: multiple schools share this office email (e.g. Al-Azhar primary and secondary)
+        throw new Error(
+          `Alamat emel "${input}" dikongsi oleh ${emailMatches.length} institusi: ${emailMatches.map((s) => `${s.name} [Kod: ${s.code}]`).join(' & ')}. Sila gunakan Kod Sekolah anda (cth: KJA3002 untuk Sekolah Rendah / KO5E103 untuk Sekolah Menengah) atau Emel PGB peribadi anda di ruangan Emel/Kod Sekolah untuk log masuk.`
+        );
+      }
     }
 
     if (!matched) {
@@ -1256,6 +1307,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     const profile: UserProfile = {
       uid: `sch-user-${liveSchool.id}`,
+      schoolId: liveSchool.id,
       email,
       fullName: principalName || `${pos} ${schoolName}`,
       role: 'MEMBER',

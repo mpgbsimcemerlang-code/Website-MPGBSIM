@@ -15,6 +15,7 @@ import {
   EventRegistration,
   AlumniRecord,
   AnnouncementItem,
+  ExamCalendarItem,
 } from '../types';
 
 import {
@@ -32,6 +33,7 @@ import { sortNewsByPublishedDate } from '../utils/dateUtils';
 import faizLeaderPhoto from '../assets/images/mohamad_faiz_azizan_leader.webp';
 import { INITIAL_BEST_PRACTICES, INITIAL_ANNOUNCEMENTS } from '../data/portalMockData';
 import { INITIAL_DEMO_ALUMNI } from '../data/alumniMockData';
+import { DEFAULT_EXAM_CALENDAR } from '../data/defaultExamCalendar';
 
 import {
   auth,
@@ -157,6 +159,7 @@ export interface SiteContentState {
   eventRegistrations?: EventRegistration[];
   alumni?: AlumniRecord[];
   announcements?: AnnouncementItem[];
+  examCalendar?: ExamCalendarItem[];
 }
 
 export interface AdminUser {
@@ -267,6 +270,11 @@ interface AdminContentContextType {
   approveAlumniRecord: (id: string, verifiedBy?: string) => Promise<void>;
   rejectAlumniRecord: (id: string, reason: string, verifiedBy?: string) => Promise<void>;
   toggleFeatureAlumniRecord: (id: string) => Promise<void>;
+  // Exam Calendar Management
+  addExamItem: (item: Omit<ExamCalendarItem, 'id' | 'createdAt' | 'updatedAt'> | ExamCalendarItem) => Promise<string>;
+  updateExamItem: (id: string, item: Partial<ExamCalendarItem>) => Promise<void>;
+  deleteExamItem: (id: string) => Promise<void>;
+  resetExamCalendarToDefault: () => Promise<void>;
   purgeMockData: () => void;
   resetAllContent: () => void;
 }
@@ -701,7 +709,7 @@ export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
   {
     id: 'school-1791963595619-k4xh',
     name: 'SEKOLAH RENDAH AL-AZHAR',
-    code: 'SCH-5619',
+    code: 'KJA3002',
     type: 'Sekolah Rendah',
     state: 'Kedah',
     district: 'KUBANG PASU',
@@ -1353,6 +1361,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     const cachedMedia = getCachedFirestoreCollection<MediaItem[]>('media');
     const cachedAlumni = getCachedFirestoreCollection<AlumniRecord[]>('alumni');
     const cachedAnnouncements = getCachedFirestoreCollection<AnnouncementItem[]>('announcements');
+    const cachedExams = getCachedFirestoreCollection<ExamCalendarItem[]>('examCalendar');
     const cachedSubmissions = getCachedFirestoreCollection<ContactSubmission[]>('submissions');
     const cachedApplications = getCachedFirestoreCollection<MemberApplication[]>('memberApplications');
 
@@ -1403,6 +1412,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       (initialSync?.announcements?.length ? initialSync.announcements : null) ||
       (prev?.announcements?.length ? prev.announcements : INITIAL_ANNOUNCEMENTS);
 
+    const rawExams =
+      (cachedExams && cachedExams.length > 0 ? cachedExams : null) ||
+      (initialSync?.examCalendar?.length ? initialSync.examCalendar : null) ||
+      (prev?.examCalendar?.length ? prev.examCalendar : DEFAULT_EXAM_CALENDAR);
+
     const rawSubmissions =
       (cachedSubmissions && cachedSubmissions.length > 0 ? cachedSubmissions : null) ||
       (initialSync?.submissions?.length ? initialSync.submissions : null) ||
@@ -1442,6 +1456,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       dashboardConfig: cachedCms?.dashboardConfig || initialSync?.dashboardConfig || prev?.dashboardConfig || DEFAULT_DASHBOARD_CONFIG,
       alumni: rawAlumni,
       announcements: rawAnnouncements,
+      examCalendar: rawExams,
     };
   };
 
@@ -1617,6 +1632,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               dashboardConfig: cached.dashboardConfig || prev.dashboardConfig,
               alumni: Array.isArray(cached.alumni) ? cached.alumni : prev.alumni,
               announcements: Array.isArray(cached.announcements) ? cached.announcements : prev.announcements,
+              examCalendar: Array.isArray(cached.examCalendar) ? cached.examCalendar : prev.examCalendar,
             };
           });
         }
@@ -2146,6 +2162,39 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Announcements listener setup:', e);
     }
 
+    // 6e. Exam Calendar listener
+    try {
+      const unsubExams = onSnapshot(
+        collection(db, 'examCalendar'),
+        (snapshot) => {
+          const list: ExamCalendarItem[] = [];
+          if (!snapshot.empty) {
+            snapshot.forEach((docSnap) => {
+              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+            });
+            list.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+          }
+          if (list.length > 0) {
+            cacheFirestoreCollection('examCalendar', list);
+          }
+          setSiteData((prev) => {
+            if (list.length > 0) {
+              return { ...prev, examCalendar: list };
+            }
+            return {
+              ...prev,
+              examCalendar: prev.examCalendar?.length ? prev.examCalendar : DEFAULT_EXAM_CALENDAR,
+            };
+          });
+          setIsLoading(false);
+        },
+        (err) => handleListenerError('ExamCalendar', err)
+      );
+      unsubscribes.push(unsubExams);
+    } catch (e) {
+      console.warn('Exam calendar listener setup:', e);
+    }
+
     // 7. Submissions listener
     try {
       const unsubSubmissions = onSnapshot(
@@ -2426,6 +2475,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     cacheFirestoreCollection('media', siteData.media);
     cacheFirestoreCollection('alumni', siteData.alumni || []);
     cacheFirestoreCollection('announcements', siteData.announcements || []);
+    cacheFirestoreCollection('examCalendar', siteData.examCalendar || []);
 
     if (isFirestoreQuotaExceeded()) {
       activateQuotaReadOnlyMode('syncAllToFirestore');
@@ -2546,6 +2596,19 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       for (const item of siteData.resources) {
         await setDoc(
           doc(db, 'resources', item.id),
+          {
+            ...item,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        count++;
+      }
+
+      // 7b. Sync Exam Calendar
+      for (const item of siteData.examCalendar || []) {
+        await setDoc(
+          doc(db, 'examCalendar', item.id),
           {
             ...item,
             updatedAt: new Date().toISOString(),
@@ -3187,19 +3250,21 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             portalUser.membershipNo?.includes('MJAC011') ||
             portalUser.membershipNo?.includes('MIA1009'));
         const matchId =
+          (portalUser.schoolId && portalUser.schoolId === id) ||
           portalUser.uid === `sch-user-${id}` ||
-          portalUser.uid?.includes(id);
+          portalUser.uid === id;
         const matchCode =
-          (portalUser.membershipNo && updated.code && portalUser.membershipNo.includes(updated.code)) ||
-          (portalUser.membershipNo && updatedSchoolObj && (updatedSchoolObj as MemberSchool).code && portalUser.membershipNo.includes((updatedSchoolObj as MemberSchool).code!));
-        const matchEmail =
-          (portalUser.email && updated.email && portalUser.email.toLowerCase() === updated.email.toLowerCase()) ||
-          (portalUser.email && updatedSchoolObj && (updatedSchoolObj as MemberSchool).email && portalUser.email.toLowerCase() === (updatedSchoolObj as MemberSchool).email?.toLowerCase());
+          (portalUser.schoolCode && updated.code && portalUser.schoolCode.toUpperCase() === updated.code.toUpperCase()) ||
+          (portalUser.membershipNo && updated.code && portalUser.membershipNo.toUpperCase().includes(updated.code.toUpperCase())) ||
+          (portalUser.membershipNo && updatedSchoolObj && (updatedSchoolObj as MemberSchool).code && portalUser.membershipNo.toUpperCase().includes((updatedSchoolObj as MemberSchool).code!.toUpperCase()));
         const matchSchoolName =
           (portalUser.school && updated.name && portalUser.school.toLowerCase().trim() === updated.name.toLowerCase().trim()) ||
           (portalUser.school && updatedSchoolObj && (updatedSchoolObj as MemberSchool).name && portalUser.school.toLowerCase().trim() === (updatedSchoolObj as MemberSchool).name.toLowerCase().trim());
+        const matchPgbEmail =
+          (portalUser.pgbEmail && updated.pgbEmail && portalUser.pgbEmail.toLowerCase().trim() === updated.pgbEmail.toLowerCase().trim()) ||
+          (portalUser.pgbEmail && updatedSchoolObj && (updatedSchoolObj as MemberSchool).pgbEmail && portalUser.pgbEmail.toLowerCase().trim() === (updatedSchoolObj as MemberSchool).pgbEmail?.toLowerCase().trim());
 
-        if (matchMusleh || matchId || matchCode || matchEmail || matchSchoolName) {
+        if (matchMusleh || matchId || matchCode || matchSchoolName || matchPgbEmail) {
           if (updated.principal) {
             portalUser.fullName = updated.principal;
           }
@@ -3905,6 +3970,137 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  // Exam Calendar CRUD Implementations
+  const addExamItem = async (
+    item: Omit<ExamCalendarItem, 'id' | 'createdAt' | 'updatedAt'> | ExamCalendarItem
+  ): Promise<string> => {
+    const timeSuffix = Date.now().toString(36).toLowerCase();
+    const id = (item as ExamCalendarItem).id || `exam-${item.category?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'general'}-${timeSuffix}`;
+    const now = new Date().toISOString();
+    const newRecord: ExamCalendarItem = {
+      ...item,
+      id,
+      category: item.category || 'Umum',
+      academicYear: item.academicYear || 2026,
+      startDate: item.startDate || new Date().toISOString().split('T')[0],
+      endDate: item.endDate || item.startDate || new Date().toISOString().split('T')[0],
+      status: item.status || 'published',
+      isPublished: item.isPublished !== undefined ? item.isPublished : item.status !== 'draft',
+      createdAt: (item as ExamCalendarItem).createdAt || now,
+      updatedAt: now,
+      createdBy: (item as ExamCalendarItem).createdBy || adminUser?.name || 'Pentadbir Peperiksaan MPGBSIM',
+    };
+
+    setSiteData((prev) => {
+      const updated = [...(prev.examCalendar || []), newRecord];
+      updated.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      cacheFirestoreCollection('examCalendar', updated);
+      return { ...prev, examCalendar: updated };
+    });
+
+    try {
+      if (!isFirestoreQuotaExceeded()) {
+        await ensureFirebaseAuth().catch(() => null);
+        await setDoc(doc(db, 'examCalendar', id), newRecord, { merge: true });
+      }
+    } catch (e: any) {
+      if (isQuotaExceededError(e)) {
+        activateQuotaReadOnlyMode('addExamItem');
+      } else {
+        console.warn('Firestore addExamItem notice:', e);
+      }
+    }
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_exam_updated'));
+    } catch (e) {}
+
+    return id;
+  };
+
+  const updateExamItem = async (
+    id: string,
+    item: Partial<ExamCalendarItem>
+  ): Promise<void> => {
+    const now = new Date().toISOString();
+    const patch = { ...item, updatedAt: now, updatedBy: adminUser?.name || 'Pentadbir Peperiksaan MPGBSIM' };
+
+    setSiteData((prev) => {
+      const updated = (prev.examCalendar || []).map((e) => (e.id === id ? { ...e, ...patch } : e));
+      updated.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      cacheFirestoreCollection('examCalendar', updated);
+      return { ...prev, examCalendar: updated };
+    });
+
+    try {
+      if (!isFirestoreQuotaExceeded()) {
+        await ensureFirebaseAuth().catch(() => null);
+        await updateDoc(doc(db, 'examCalendar', id), patch);
+      }
+    } catch (e: any) {
+      if (isQuotaExceededError(e)) {
+        activateQuotaReadOnlyMode('updateExamItem');
+      } else {
+        console.warn('Firestore updateExamItem notice:', e);
+      }
+    }
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_exam_updated'));
+    } catch (e) {}
+  };
+
+  const deleteExamItem = async (id: string): Promise<void> => {
+    setSiteData((prev) => {
+      const updated = (prev.examCalendar || []).filter((e) => e.id !== id);
+      cacheFirestoreCollection('examCalendar', updated);
+      return { ...prev, examCalendar: updated };
+    });
+
+    try {
+      if (!isFirestoreQuotaExceeded()) {
+        await ensureFirebaseAuth().catch(() => null);
+        await deleteDoc(doc(db, 'examCalendar', id));
+      }
+    } catch (e: any) {
+      if (isQuotaExceededError(e)) {
+        activateQuotaReadOnlyMode('deleteExamItem');
+      } else {
+        console.warn('Firestore deleteExamItem notice:', e);
+      }
+    }
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_exam_updated'));
+    } catch (e) {}
+  };
+
+  const resetExamCalendarToDefault = async (): Promise<void> => {
+    setSiteData((prev) => {
+      cacheFirestoreCollection('examCalendar', DEFAULT_EXAM_CALENDAR);
+      return { ...prev, examCalendar: DEFAULT_EXAM_CALENDAR };
+    });
+
+    try {
+      if (!isFirestoreQuotaExceeded()) {
+        await ensureFirebaseAuth().catch(() => null);
+        for (const item of DEFAULT_EXAM_CALENDAR) {
+          await setDoc(doc(db, 'examCalendar', item.id), item, { merge: true });
+        }
+      }
+    } catch (e: any) {
+      if (isQuotaExceededError(e)) {
+        activateQuotaReadOnlyMode('resetExamCalendarToDefault');
+      } else {
+        console.warn('Firestore resetExamCalendarToDefault notice:', e);
+      }
+    }
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_exam_updated'));
+    } catch (e) {}
+  };
+
   const purgeMockData = () => {
     localStorage.setItem('mpgbsim_mock_cleared', 'true');
     const defaultNewsIds = new Set(DEFAULT_NEWS.map((n) => n.id));
@@ -4051,6 +4247,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         approveAlumniRecord,
         rejectAlumniRecord,
         toggleFeatureAlumniRecord,
+        addExamItem,
+        updateExamItem,
+        deleteExamItem,
+        resetExamCalendarToDefault,
         purgeMockData,
         resetAllContent,
       }}

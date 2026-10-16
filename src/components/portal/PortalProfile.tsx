@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
+import { MemberSchool } from '../../types';
 import { Logo } from '../Logo';
 import QRCode from 'qrcode';
 import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
@@ -127,13 +128,23 @@ export const PortalProfile: React.FC = () => {
       (currentUser?.membershipNo && (currentUser.membershipNo.includes('MIA1009') || currentUser.membershipNo.includes('MJAC011'))) ||
       !currentUser;
 
-    const matchedSchool = allSchools.find((s) => {
-      if (isMusleh && (s.code === 'MJAC011' || s.id === 'sch-musleh-1' || s.name.toLowerCase().includes('musleh'))) return true;
-      if (currentUser?.membershipNo && s.code && currentUser.membershipNo.includes(s.code)) return true;
-      if (currentUser?.email && s.email && currentUser.email.toLowerCase() === s.email.toLowerCase()) return true;
-      if (currentUser?.school && s.name && currentUser.school.toLowerCase().trim() === s.name.toLowerCase().trim()) return true;
-      return false;
-    }) || allSchools[0];
+    const matchedSchool: MemberSchool | undefined = isMusleh
+      ? allSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1' || s.name.toLowerCase().includes('musleh'))
+      : (currentUser?.schoolId ? allSchools.find((s) => s.id === currentUser.schoolId) : undefined) ||
+        allSchools.find((s) => currentUser?.uid === `sch-user-${s.id}` || currentUser?.uid === s.id) ||
+        (currentUser?.schoolCode ? allSchools.find((s) => s.code && s.code.toUpperCase() === currentUser.schoolCode?.toUpperCase()) : undefined) ||
+        (currentUser?.membershipNo ? allSchools.find((s) => s.code && currentUser.membershipNo?.toUpperCase().includes(s.code.toUpperCase())) : undefined) ||
+        (currentUser?.school ? allSchools.find((s) => s.name && s.name.toLowerCase().trim() === currentUser.school?.toLowerCase().trim()) : undefined) ||
+        (currentUser?.pgbEmail ? allSchools.find((s) => s.pgbEmail && s.pgbEmail.toLowerCase().trim() === currentUser.pgbEmail?.toLowerCase().trim()) : undefined) ||
+        (currentUser?.email ? allSchools.find((s) => {
+          const emailMatches = s.email && s.email.toLowerCase() === currentUser.email.toLowerCase();
+          if (!emailMatches) return false;
+          if (currentUser.schoolType && s.type && currentUser.schoolType.toLowerCase().trim() === s.type.toLowerCase().trim()) return true;
+          if (currentUser.position === 'Guru Besar' && s.type?.toLowerCase().includes('rendah')) return true;
+          if (currentUser.position === 'Pengetua' && s.type?.toLowerCase().includes('menengah')) return true;
+          return false;
+        }) : undefined) ||
+        allSchools[0];
 
     const effectiveFullName = currentUser?.fullName || matchedSchool?.principal || (isMusleh ? 'Ustaz Abdul Qayyum bin Yaakop' : '');
     const effectiveSchool = currentUser?.school || matchedSchool?.name || (isMusleh ? 'Sekolah Rendah Islam I Musleh' : '');
@@ -337,21 +348,15 @@ export const PortalProfile: React.FC = () => {
         (currentUser?.school && currentUser.school.toLowerCase().includes('musleh')) ||
         (currentUser?.membershipNo && (currentUser.membershipNo.includes('MJAC011') || currentUser.membershipNo.includes('MIA1009')));
 
-      const matchedSchool = (siteData.memberSchools || []).find((s) => {
-        if (isMusleh && (s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh'))) {
-          return true;
-        }
-        if (currentUser?.membershipNo && s.code && currentUser.membershipNo.includes(s.code)) {
-          return true;
-        }
-        if (currentUser?.email && s.email && currentUser.email.toLowerCase() === s.email.toLowerCase()) {
-          return true;
-        }
-        if (currentUser?.school && s.name && currentUser.school.toLowerCase().trim() === s.name.toLowerCase().trim()) {
-          return true;
-        }
-        return false;
-      });
+      const schoolsList = siteData.memberSchools || [];
+      const matchedSchool: MemberSchool | undefined = isMusleh
+        ? schoolsList.find((s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh'))
+        : (currentUser?.schoolId ? schoolsList.find((s) => s.id === currentUser.schoolId) : undefined) ||
+          schoolsList.find((s) => currentUser?.uid === `sch-user-${s.id}` || currentUser?.uid === s.id) ||
+          (currentUser?.schoolCode ? schoolsList.find((s) => s.code && s.code.toUpperCase() === currentUser.schoolCode?.toUpperCase()) : undefined) ||
+          (currentUser?.membershipNo ? schoolsList.find((s) => s.code && currentUser.membershipNo?.toUpperCase().includes(s.code.toUpperCase())) : undefined) ||
+          (currentUser?.school ? schoolsList.find((s) => s.name && s.name.toLowerCase().trim() === currentUser.school?.toLowerCase().trim()) : undefined) ||
+          (currentUser?.pgbEmail ? schoolsList.find((s) => s.pgbEmail && s.pgbEmail.toLowerCase().trim() === currentUser.pgbEmail?.toLowerCase().trim()) : undefined);
 
       if (matchedSchool) {
         await updateMemberSchool(matchedSchool.id, {

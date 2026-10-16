@@ -3,6 +3,7 @@ import { useMemberPortal } from '../../context/MemberPortalContext';
 import { PortalHeader } from './PortalHeader';
 import { PortalDashboardHome } from './PortalDashboardHome';
 import { PortalAnnouncements } from './PortalAnnouncements';
+import { PortalExamCalendar } from './PortalExamCalendar';
 import { PortalPrograms } from './PortalPrograms';
 import { PortalDirectory } from './PortalDirectory';
 import { PortalDocuments } from './PortalDocuments';
@@ -32,6 +33,8 @@ export const PortalMainLayout: React.FC = () => {
         return <PortalDashboardHome />;
       case 'pengumuman':
         return <PortalAnnouncements />;
+      case 'peperiksaan':
+        return <PortalExamCalendar />;
       case 'program':
         return <PortalPrograms />;
       case 'direktori':

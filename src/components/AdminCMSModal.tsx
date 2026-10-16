@@ -25,6 +25,7 @@ import {
   GraduationCap,
   Megaphone,
   Database,
+  CalendarDays,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { AdminDashboardOverview } from './admin/AdminDashboardOverview';
@@ -40,6 +41,7 @@ import { AdminStatsManagement } from './admin/AdminStatsManagement';
 import { AdminAlumniManagement } from './admin/AdminAlumniManagement';
 import { AdminAnnouncementsManagement } from './admin/AdminAnnouncementsManagement';
 import { AdminDataAuditManagement } from './admin/AdminDataAuditManagement';
+import { AdminExamManagement } from './admin/AdminExamManagement';
 import { CMSHero } from './cms/CMSHero';
 import { CMSVisionMission } from './cms/CMSVisionMission';
 import { CMSStrategicFocus } from './cms/CMSStrategicFocus';
@@ -210,6 +212,12 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           label: 'Pusat Pengumuman & Pekeliling Ahli',
           icon: Megaphone,
           count: siteData.announcements?.length || 0,
+        },
+        {
+          id: 'peperiksaan',
+          label: 'Kalendar Peperiksaan & Countdown',
+          icon: CalendarDays,
+          count: siteData.examCalendar?.length || 11,
         },
         {
           id: 'berita',
@@ -449,6 +457,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
             {activeTab === 'statistik' && <AdminStatsManagement />}
             {activeTab === 'berita' && <AdminNewsManagement />}
             {activeTab === 'pengumuman-portal' && <AdminAnnouncementsManagement />}
+            {activeTab === 'peperiksaan' && <AdminExamManagement />}
             {activeTab === 'program' && <AdminEventManagement />}
             {activeTab === 'amalan' && <AdminBestPracticeManagement />}
             {activeTab === 'galeri' && <AdminMediaManagement />}

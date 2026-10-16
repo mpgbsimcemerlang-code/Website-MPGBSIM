@@ -69,6 +69,7 @@ export interface UserProfile {
   position?: string;
   icNumber?: string;
   school?: string;
+  schoolId?: string;
   schoolCode?: string;
   schoolType?: string;
   state?: string;
@@ -487,4 +488,25 @@ export interface DashboardConfig {
   adminMemo: string;
   adminMemoAuthor?: string;
   adminMemoDate?: string;
+}
+
+export type ExamPublishStatus = 'published' | 'draft' | 'archived';
+
+export interface ExamCalendarItem {
+  id: string;
+  title: string;
+  category: 'SPM' | 'UPKK/KAFA' | 'SPPIM' | string;
+  academicYear: number | string;
+  startDate: string; // ISO format YYYY-MM-DD
+  endDate: string; // ISO format YYYY-MM-DD
+  description?: string;
+  notes?: string;
+  sourceUrl?: string;
+  status: ExamPublishStatus;
+  isPublished: boolean;
+  initialStatusNotice?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+  updatedBy?: string;
 }
