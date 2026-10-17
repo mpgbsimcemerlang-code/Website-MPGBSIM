@@ -23,6 +23,7 @@ import {
   Radio,
   RotateCcw,
 } from 'lucide-react';
+import { SchoolNetworkCharts } from './SchoolNetworkCharts';
 
 interface SchoolNetworkProps {
   stats: NetworkStats;
@@ -38,28 +39,39 @@ export const isPrimarySchoolRecord = (school: MemberSchool): boolean => {
   const desigLower = (school.designation || '').toLowerCase();
   const principalLower = (school.principal || '').toLowerCase();
 
-  // Check explicit primary school naming first (e.g. "Sekolah Rendah Islam I Musleh" with type "Rakan Musleh")
-  if (
-    typeLower === 'sekolah rendah' ||
-    typeLower.includes('rendah') ||
-    nameLower.includes('rendah') ||
-    /\bsri\b|\bsriti\b|\bsra\b|\bsrai\b|\bsr\b/i.test(nameLower)
-  ) {
-    return true;
-  }
-
-  // Check explicit secondary / tahfiz indicators
+  // 1. Explicit secondary school indicators take strict precedence.
+  // Any institution labeled "Sekolah Menengah", "SMK", "SMKA", "SMA", "SMI", "SMABK", "Maahad Tahfiz",
+  // or designated under Pengetua leadership is a Secondary School.
+  // "SEKOLAH MENENGAH SRI AL-AMIN BANGI" contains "sri", but its level is unmistakably secondary.
   if (
     typeLower === 'sekolah menengah' ||
     typeLower.includes('menengah') ||
     typeLower.includes('smka') ||
     typeLower.includes('sabk') ||
     typeLower.includes('tahfiz') ||
+    nameLower.includes('sekolah menengah') ||
+    nameLower.includes('menengah') ||
     /\bsmk\b|\bsmka\b|\bsma\b|\bsmi\b|\bsmabk\b|\bmaahad\b/i.test(nameLower)
   ) {
     return false;
   }
 
+  // 2. Explicit primary school indicators
+  if (
+    typeLower === 'sekolah rendah' ||
+    typeLower.includes('rendah') ||
+    nameLower.includes('sekolah rendah') ||
+    nameLower.includes('rendah') ||
+    /\bsriti\b|\bsra\b|\bsrai\b|\bsr\b/i.test(nameLower) ||
+    (/\bsri\b/i.test(nameLower) && !nameLower.includes('menengah'))
+  ) {
+    return true;
+  }
+
+  // 3. Designation check: Pengetua is secondary, Guru Besar is primary
+  if (desigLower.includes('pengetua') || principalLower.includes('pengetua')) {
+    return false;
+  }
   if (desigLower.includes('guru besar') || principalLower.includes('guru besar')) {
     return true;
   }
@@ -239,14 +251,12 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
   const [liveCardFilter, setLiveCardFilter] = useState<LiveCardFilter>('ALL');
 
   // Filter schools
-  const normalizeCategory = (t?: string) => {
-    if (!t) return 'Sekolah Menengah';
-    const c = t.trim();
-    if (c === 'Sekolah Rendah' || c === 'Sekolah Menengah' || c === 'Maahad Tahfiz' || c === 'Rakan Musleh') return c;
-    if (c.includes('Rendah') || c.includes('SRI')) return 'Sekolah Rendah';
-    if (c.includes('Tahfiz')) return 'Maahad Tahfiz';
-    if (c.includes('Musleh')) return 'Rakan Musleh';
-    return 'Sekolah Menengah';
+  const normalizeCategory = (school: MemberSchool) => {
+    const isPrimary = isPrimarySchoolRecord(school);
+    const t = (school.type || '').trim();
+    if (t === 'Maahad Tahfiz' || t.toLowerCase().includes('tahfiz')) return 'Maahad Tahfiz';
+    if (t === 'Rakan Musleh' || t.toLowerCase().includes('musleh')) return 'Rakan Musleh';
+    return isPrimary ? 'Sekolah Rendah' : 'Sekolah Menengah';
   };
 
   const filteredSchools = effectiveSchools.filter((school) => {
@@ -257,7 +267,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
       school.district.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesState = selectedState === 'Semua Negeri' || school.state === selectedState;
-    const matchesType = selectedType === 'Semua Jenis Sekolah' || normalizeCategory(school.type) === selectedType;
+    const matchesType = selectedType === 'Semua Jenis Sekolah' || normalizeCategory(school) === selectedType;
 
     let matchesLiveCard = true;
     if (liveCardFilter === 'PENGETUA') {
@@ -536,6 +546,9 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
           </div>
         </div>
 
+        {/* Visualisasi Data Taburan Sekolah & Enrolmen (Recharts) */}
+        <SchoolNetworkCharts schools={effectiveSchools} />
+
         {/* Member Schools Sample Directory & Filters */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -656,10 +669,15 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
                           {sch.code}
                         </td>
                         <td className="py-3 px-4 text-xs text-slate-600">
-                          <span className="font-semibold text-slate-800">{sch.type}</span>
-                          <span className="block text-[11px] text-slate-500">
+                          <span className="font-semibold text-slate-800 block">
                             {isPrimary ? 'Sekolah Rendah' : 'Sekolah Menengah'}
                           </span>
+                          {sch.type &&
+                            sch.type.toLowerCase().trim() !== (isPrimary ? 'sekolah rendah' : 'sekolah menengah') && (
+                              <span className="inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60">
+                                {sch.type}
+                              </span>
+                            )}
                         </td>
                         <td className="py-3 px-4 text-slate-600">
                           {sch.district ? `${sch.district}, ${sch.state}` : sch.state}
@@ -839,7 +857,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
                         {activeSchool.principal}
                       </h4>
                       <p className="text-xs font-semibold text-teal-800 mt-0.5">
-                        Pengetua / Guru Besar (PGB) Berdaftar MPGBSIM
+                        {isGuruBesarRecord(activeSchool) ? 'Guru Besar' : 'Pengetua'} Berdaftar MPGBSIM
                       </p>
                     </div>
 
@@ -866,7 +884,9 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
                   <div className="text-base sm:text-lg font-black text-slate-900">
                     {activeSchool.studentCount ? `${activeSchool.studentCount}+` : '-'}
                   </div>
-                  <span className="text-[11px] text-slate-500 font-medium">Bilangan Murid</span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    {isPrimarySchoolRecord(activeSchool) ? 'Bilangan Murid' : 'Bilangan Pelajar'}
+                  </span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-center">

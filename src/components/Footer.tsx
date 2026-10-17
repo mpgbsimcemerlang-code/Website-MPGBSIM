@@ -149,6 +149,11 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
                 </a>
               </li>
               <li>
+                <a href="#bayar-yuran" className="text-amber-300 hover:text-amber-200 font-semibold transition-colors">
+                  Bayar Yuran PGB (HerePay)
+                </a>
+              </li>
+              <li>
                 <a href="#best-practice" className="hover:text-teal-400 transition-colors">
                   Amalan Terbaik
                 </a>
@@ -185,6 +190,17 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
                   <span>Portal Ahli PGB (Log Masuk)</span>
                   <ExternalLink className="w-3 h-3" />
                 </button>
+              </li>
+              <li>
+                <a
+                  href="https://app.herepay.org/mpgbsim"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-teal-300 hover:text-teal-200 font-semibold transition-colors flex items-center gap-1"
+                >
+                  <span>Bayar Yuran (HerePay Rasmi)</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               </li>
               <li>
                 <button

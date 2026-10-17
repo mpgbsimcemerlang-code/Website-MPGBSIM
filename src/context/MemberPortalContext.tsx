@@ -12,6 +12,8 @@ import {
   ProgramEvent,
   MemberSchool,
   NewsItem,
+  FeePaymentRecord,
+  FeeCategory,
 } from '../types';
 import {
   sortNewsByPublishedDate,
@@ -65,6 +67,7 @@ import {
 
 export type PortalTab =
   | 'dashboard'
+  | 'yuran'
   | 'pengumuman'
   | 'peperiksaan'
   | 'program'
@@ -78,6 +81,78 @@ export type PortalTab =
   | 'profil'
   | 'admin-hub'
   | 'ajk-admin';
+
+export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
+  {
+    id: 'pay-2026-blad001',
+    schoolId: 'school-1791789043737-cace',
+    schoolCode: 'BLAD001',
+    schoolName: 'SEKOLAH MENENGAH SRI AL-AMIN BANGI',
+    payerName: 'NOOR ASYIKIN BINTI AHMAT (Pengetua)',
+    payerEmail: 'srialaminbangi@gmail.com',
+    payerPhone: '019-3543665',
+    category: 'YURAN_TAHUNAN_MENENGAH',
+    categoryLabel: 'Yuran Tahunan Sekolah Menengah Sesi 2026/2027',
+    amount: 500.0,
+    paymentMethod: 'HerePay (FPX)',
+    transactionRef: 'HP-MPGB-2026-98124',
+    paymentDate: '2026-02-15',
+    status: 'BERJAYA',
+    academicSession: '2026/2027',
+    gateway: 'HerePay',
+    gatewayUrl: 'https://app.herepay.org/mpgbsim',
+    verifiedBy: 'Bendahari Kehormat MPGBSIM',
+    verifiedAt: '2026-02-15T10:30:00Z',
+    notes: 'Keahlian Sesi 2026/2027 diperbaharui dengan gerbang HerePay FPX.',
+    createdAt: '2026-02-15T10:28:00Z',
+  },
+  {
+    id: 'pay-2026-mjac011',
+    schoolId: 'sch-musleh-1',
+    schoolCode: 'MJAC011',
+    schoolName: 'SEKOLAH RENDAH ISLAM I MUSLEH',
+    payerName: 'Ustaz Abdul Qayyum bin Yaakop (Guru Besar)',
+    payerEmail: 'abdulqayyumyaakop@imuslehmelaka.edu.my',
+    payerPhone: '+60 6-335 1290',
+    category: 'YURAN_TAHUNAN_RENDAH',
+    categoryLabel: 'Yuran Tahunan Sekolah Rendah Sesi 2026/2027',
+    amount: 300.0,
+    paymentMethod: 'HerePay (FPX)',
+    transactionRef: 'HP-MPGB-2026-87112',
+    paymentDate: '2026-01-20',
+    status: 'BERJAYA',
+    academicSession: '2026/2027',
+    gateway: 'HerePay',
+    gatewayUrl: 'https://app.herepay.org/mpgbsim',
+    verifiedBy: 'Bendahari Kehormat MPGBSIM',
+    verifiedAt: '2026-01-20T14:15:00Z',
+    notes: 'Yuran tahunan keahlian berdaftar MPGBSIM.',
+    createdAt: '2026-01-20T14:10:00Z',
+  },
+  {
+    id: 'pay-2026-kja3002',
+    schoolId: 'school-1791963595619-k4xh',
+    schoolCode: 'KJA3002',
+    schoolName: 'SEKOLAH RENDAH AL-AZHAR',
+    payerName: 'MOHD RAZMAN BIN RAMZAN (Guru Besar)',
+    payerEmail: 'razman2015@gmail.com',
+    payerPhone: '013-4365669',
+    category: 'YURAN_TAHUNAN_RENDAH',
+    categoryLabel: 'Yuran Tahunan Sekolah Rendah Sesi 2026/2027',
+    amount: 300.0,
+    paymentMethod: 'HerePay (DuitNow QR)',
+    transactionRef: 'HP-MPGB-2026-76431',
+    paymentDate: '2026-03-01',
+    status: 'BERJAYA',
+    academicSession: '2026/2027',
+    gateway: 'HerePay',
+    gatewayUrl: 'https://app.herepay.org/mpgbsim',
+    verifiedBy: 'Bendahari Kehormat MPGBSIM',
+    verifiedAt: '2026-03-01T09:45:00Z',
+    notes: 'Keahlian aktif Sesi 2026/2027.',
+    createdAt: '2026-03-01T09:40:00Z',
+  },
+];
 
 interface MemberPortalContextType {
   currentUser: UserProfile | null;
@@ -101,11 +176,22 @@ interface MemberPortalContextType {
   schools: MemberSchool[];
   getLatestRegisteredSchools: () => Promise<MemberSchool[]>;
   schoolNews: NewsItem[];
+  feePayments: FeePaymentRecord[];
 
   // Quick Notification metrics
   unreadNotificationsCount: number;
   isNotificationOpen: boolean;
   setIsNotificationOpen: (open: boolean) => void;
+
+  // Fee Payment Actions
+  recordFeePayment: (
+    payment: Omit<FeePaymentRecord, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<FeePaymentRecord>;
+  updateFeePaymentStatus: (
+    id: string,
+    status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN'
+  ) => Promise<void>;
+  deleteFeePayment: (id: string) => Promise<void>;
 
   // Auth & Role Actions
   loginWithGoogle: () => Promise<void>;
@@ -340,6 +426,21 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           user.membershipNo = 'MPGB-2026-KJA3002';
           user.uid = 'sch-user-school-1791963595619-k4xh';
           safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+        } else if (
+          (user?.schoolCode === 'BLAD001' ||
+            memNo.includes('BLAD001') ||
+            user?.schoolId === 'school-1791789043737-cace' ||
+            user?.school?.includes('SEKOLAH MENENGAH SRI AL-AMIN BANGI')) &&
+          (user?.position === 'Guru Besar' || user?.schoolType?.toLowerCase().includes('rendah'))
+        ) {
+          // Auto-heal SEKOLAH MENENGAH SRI AL-AMIN BANGI as Secondary School and Pengetua
+          user.school = 'SEKOLAH MENENGAH SRI AL-AMIN BANGI';
+          user.schoolId = 'school-1791789043737-cace';
+          user.schoolCode = 'BLAD001';
+          user.schoolType = 'Sekolah Menengah';
+          user.position = 'Pengetua';
+          user.fullName = user.fullName?.includes('Pengetua') ? user.fullName : 'NOOR ASYIKIN BINTI AHMAT (Pengetua)';
+          safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
         }
 
         return user;
@@ -433,6 +534,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return [];
+  });
+
+  const [feePayments, setFeePayments] = useState<FeePaymentRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('mpgbsim_fee_payments');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return INITIAL_FEE_PAYMENTS;
   });
 
   // Registered Member Schools state directly synced with AdminContentContext 'siteData.memberSchools' (zero duplicate Firestore reads)
@@ -888,6 +997,27 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Notifications listener error:', e);
     }
 
+    // 4. Fee Payments
+    try {
+      const unsubFee = onSnapshot(
+        collection(db, 'feePayments'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: FeePaymentRecord[] = [];
+            snapshot.forEach((docSnap) => {
+              list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+            });
+            setFeePayments(list);
+            safeLocalStorageSet('mpgbsim_fee_payments', JSON.stringify(list));
+          }
+        },
+        (err) => handlePortalListenerError('feePayments', err)
+      );
+      unsubscribes.push(unsubFee);
+    } catch (e) {
+      console.warn('Fee payments listener error:', e);
+    }
+
     return () => {
       cleanupPortalListeners();
     };
@@ -975,10 +1105,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       const role: UserRole = isSuper ? 'ADMIN' : 'MEMBER';
 
       const isPrimary =
-        matchedSchool?.type?.includes('Rendah') ||
-        matchedSchool?.name?.toLowerCase().includes('rendah') ||
-        matchedSchool?.name?.toLowerCase().includes('sri') ||
-        isMuslehUser;
+        !matchedSchool?.name?.toLowerCase().includes('menengah') &&
+        !matchedSchool?.type?.toLowerCase().includes('menengah') &&
+        (matchedSchool?.type?.includes('Rendah') ||
+          matchedSchool?.name?.toLowerCase().includes('rendah') ||
+          isMuslehUser);
 
       const pos = isMuslehUser
         ? 'Guru Besar'
@@ -986,7 +1117,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         ? 'Pegawai Pentadbir MPGBSIM'
         : isPrimary
         ? 'Guru Besar'
-        : matchedSchool?.type === 'SMKA' || matchedSchool?.type === 'SABK'
+        : matchedSchool?.type === 'SMKA' || matchedSchool?.type === 'SABK' || matchedSchool?.type === 'Sekolah Menengah'
         ? 'Pengetua'
         : savedProfile?.position || 'Pengetua / Guru Besar';
 
@@ -1299,10 +1430,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     const phone = liveSchool.phone || (isMusleh ? '+60 6-335 1290' : '03-8888 2026');
 
     const isPrimary =
-      isMusleh ||
-      liveSchool.type?.includes('Rendah') ||
-      liveSchool.name?.toLowerCase().includes('rendah') ||
-      liveSchool.name?.toLowerCase().includes('sri');
+      !liveSchool.type?.toLowerCase().includes('menengah') &&
+      !liveSchool.name?.toLowerCase().includes('menengah') &&
+      (isMusleh ||
+        liveSchool.type?.includes('Rendah') ||
+        liveSchool.name?.toLowerCase().includes('rendah'));
     const pos = isPrimary ? 'Guru Besar' : 'Pengetua';
 
     const profile: UserProfile = {
@@ -2031,6 +2163,104 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  const recordFeePayment = async (
+    paymentInput: Omit<FeePaymentRecord, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<FeePaymentRecord> => {
+    await ensureFirebaseAuth();
+    const id = `pay-${Date.now()}`;
+    const newRecord: FeePaymentRecord = {
+      ...paymentInput,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      await setDoc(doc(db, 'feePayments', id), newRecord);
+    } catch (err) {
+      console.warn('Save fee payment to Firestore error:', err);
+    }
+
+    setFeePayments((prev) => {
+      const updated = [newRecord, ...prev.filter((p) => p.id !== id)];
+      safeLocalStorageSet('mpgbsim_fee_payments', JSON.stringify(updated));
+      return updated;
+    });
+
+    recordAuditLog(
+      'Pembayaran Yuran Keahlian',
+      `Yuran ${newRecord.categoryLabel} (Ref: ${newRecord.transactionRef}) bernilai RM ${newRecord.amount} direkodkan.`
+    );
+
+    const notif: PortalNotification = {
+      id: `notif-${Date.now()}`,
+      userId: currentUser?.uid || 'all',
+      title: 'Pembayaran Yuran Direkodkan',
+      message: `Resit rujukan ${newRecord.transactionRef} bagi ${newRecord.categoryLabel} (RM ${newRecord.amount}) telah disimpan.`,
+      type: 'info',
+      date: new Date().toISOString(),
+      read: false,
+      linkTab: 'yuran',
+    };
+    setNotifications((prev) => [notif, ...prev]);
+
+    window.dispatchEvent(
+      new CustomEvent('mpgbsim_content_updated', { detail: { feePayment: newRecord } })
+    );
+
+    return newRecord;
+  };
+
+  const updateFeePaymentStatus = async (
+    id: string,
+    status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN'
+  ): Promise<void> => {
+    await ensureFirebaseAuth();
+    try {
+      await updateDoc(doc(db, 'feePayments', id), {
+        status,
+        updatedAt: new Date().toISOString(),
+        verifiedAt: status === 'BERJAYA' ? new Date().toISOString() : undefined,
+        verifiedBy: status === 'BERJAYA' ? (currentUser?.fullName || 'Bendahari Kehormat MPGBSIM') : undefined,
+      });
+    } catch (err) {
+      console.warn('Update fee payment status error:', err);
+    }
+
+    setFeePayments((prev) => {
+      const updated = prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              status,
+              updatedAt: new Date().toISOString(),
+              verifiedAt: status === 'BERJAYA' ? new Date().toISOString() : p.verifiedAt,
+              verifiedBy: status === 'BERJAYA' ? (currentUser?.fullName || 'Bendahari Kehormat MPGBSIM') : p.verifiedBy,
+            }
+          : p
+      );
+      safeLocalStorageSet('mpgbsim_fee_payments', JSON.stringify(updated));
+      return updated;
+    });
+
+    recordAuditLog('Status Yuran Dikemas Kini', `Status bayaran #${id} ditukar kepada ${status}.`);
+  };
+
+  const deleteFeePayment = async (id: string): Promise<void> => {
+    await ensureFirebaseAuth();
+    try {
+      await deleteDoc(doc(db, 'feePayments', id));
+    } catch (err) {
+      console.warn('Delete fee payment error:', err);
+    }
+    setFeePayments((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      safeLocalStorageSet('mpgbsim_fee_payments', JSON.stringify(updated));
+      return updated;
+    });
+    recordAuditLog('Padam Rekod Yuran', `Rekod pembayaran #${id} dipadam.`);
+  };
+
   return (
     <MemberPortalContext.Provider
       value={{
@@ -2083,6 +2313,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         submitSchoolNews,
         updateSchoolNews,
         deleteSchoolNews,
+        feePayments,
+        recordFeePayment,
+        updateFeePaymentStatus,
+        deleteFeePayment,
         isSearchOpen,
         setIsSearchOpen,
       }}

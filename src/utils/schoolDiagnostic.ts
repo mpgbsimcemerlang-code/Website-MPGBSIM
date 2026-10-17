@@ -375,6 +375,20 @@ export function repairSchoolIntegrity(
     }
   });
 
+  // Enforce correct school level & designation for institutions with potential legacy cache drift
+  schoolsMap.forEach((s) => {
+    if (s.code === 'BLAD001' || s.name?.includes('SEKOLAH MENENGAH SRI AL-AMIN BANGI')) {
+      s.type = 'Sekolah Menengah';
+      s.designation = 'Pengetua';
+      if (!s.principal?.includes('Pengetua') && s.principal) {
+        s.principal = `${s.principal} (Pengetua)`;
+      }
+    } else if (s.code === 'AYR2001' || s.name?.includes('SEKOLAH RENDAH ISLAM AL HIDAYAH IPOH')) {
+      s.type = 'Sekolah Rendah';
+      s.designation = 'Guru Besar';
+    }
+  });
+
   // Ensure Sekolah Rendah Islam I Musleh exists
   let musleh = Array.from(schoolsMap.values()).find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1');
   if (!musleh) {

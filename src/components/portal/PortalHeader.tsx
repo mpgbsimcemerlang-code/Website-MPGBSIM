@@ -21,6 +21,7 @@ import {
   School,
   Trophy,
   CalendarDays,
+  CreditCard,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { Logo } from '../Logo';
@@ -46,6 +47,7 @@ export const PortalHeader: React.FC = () => {
 
   const navItems: { id: PortalTab; label: string; icon: any }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: User },
+    { id: 'yuran', label: 'Bayar Yuran', icon: CreditCard },
     { id: 'pengumuman', label: 'Pengumuman', icon: Bell },
     { id: 'peperiksaan', label: 'Peperiksaan', icon: CalendarDays },
     { id: 'program', label: 'Program', icon: Calendar },

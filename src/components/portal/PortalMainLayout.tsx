@@ -13,6 +13,7 @@ import { PortalResources } from './PortalResources';
 import { PortalSubmitPractice } from './PortalSubmitPractice';
 import { PortalSchoolNewsSubmit } from './PortalSchoolNewsSubmit';
 import { PortalProfile } from './PortalProfile';
+import { PortalFeePayment } from './PortalFeePayment';
 import { PortalAdminDashboard } from './PortalAdminDashboard';
 import { PortalGlobalSearchModal } from './PortalGlobalSearchModal';
 import { PortalNotificationModal } from './PortalNotificationModal';
@@ -31,6 +32,8 @@ export const PortalMainLayout: React.FC = () => {
     switch (portalTab) {
       case 'dashboard':
         return <PortalDashboardHome />;
+      case 'yuran':
+        return <PortalFeePayment />;
       case 'pengumuman':
         return <PortalAnnouncements />;
       case 'peperiksaan':

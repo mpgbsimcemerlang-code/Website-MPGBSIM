@@ -11,6 +11,8 @@ import {
   Cpu,
   ArrowRight,
   Trophy,
+  CreditCard,
+  ExternalLink,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -98,7 +100,17 @@ export const PortalGlobalSearchModal: React.FC = () => {
       (n.category || '').toLowerCase().includes(q)
   );
 
+  const isFeeMatch =
+    q.length > 1 &&
+    ('bayar yuran'.includes(q) ||
+      'yuran'.includes(q) ||
+      'herepay'.includes(q) ||
+      'fpx'.includes(q) ||
+      'resit'.includes(q) ||
+      'payment'.includes(q));
+
   const totalResults =
+    (isFeeMatch ? 1 : 0) +
     matchingSchools.length +
     matchingAnnouncements.length +
     matchingPrograms.length +
@@ -167,6 +179,32 @@ export const PortalGlobalSearchModal: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4 text-xs">
+              {/* Fee Payment HerePay Shortcut */}
+              {isFeeMatch && (
+                <div
+                  onClick={() => handleNavigate('yuran')}
+                  className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border border-emerald-500/40 text-white flex items-center justify-between gap-3 cursor-pointer hover:border-emerald-400 transition shadow-md"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <strong className="text-sm font-bold text-white">Bayar Yuran PGB (HerePay)</strong>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950">
+                          Pautan Rasmi
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300">
+                        Gerbang rasmi HerePay (app.herepay.org/mpgbsim) • FPX, DuitNow QR & Penjanaan Resit
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-emerald-300 shrink-0" />
+                </div>
+              )}
+
               {/* Announcements Section */}
               {matchingAnnouncements.length > 0 && (
                 <div>

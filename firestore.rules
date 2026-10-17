@@ -146,5 +146,11 @@ service cloud.firestore {
     match /examCalendar/{examId} {
       allow read, write: if true;
     }
+
+    // 20. Fee Payments & HerePay Transactions
+    match /feePayments/{paymentId} {
+      allow read, write: if true;
+    }
   }
 }
+

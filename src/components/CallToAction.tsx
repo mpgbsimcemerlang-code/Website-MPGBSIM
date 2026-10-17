@@ -1,5 +1,4 @@
-import React from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, Users, Mail, Edit3 } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, Users, Mail, Edit3, CreditCard, ExternalLink } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 
 interface CallToActionProps {
@@ -78,6 +77,19 @@ export const CallToAction: React.FC<CallToActionProps> = ({
             <Mail className="w-4 h-4 text-amber-400" />
             <span>{cta.btnSecondaryText}</span>
           </button>
+
+          <a
+            id="btn-cta-bayar-yuran"
+            href="https://app.herepay.org/mpgbsim"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-teal-800 hover:bg-teal-700 text-teal-100 hover:text-white font-bold text-sm sm:text-base border border-teal-500/50 active:scale-98 transition-all"
+            title="Bayar Yuran PGB di Gerbang HerePay"
+          >
+            <CreditCard className="w-4 h-4 text-amber-300" />
+            <span>Bayar Yuran (HerePay)</span>
+            <ExternalLink className="w-4 h-4 text-teal-300" />
+          </a>
         </div>
 
         <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400">

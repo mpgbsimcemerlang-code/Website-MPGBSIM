@@ -29,6 +29,8 @@ import {
   QrCode,
   Download,
   CalendarDays,
+  CreditCard,
+  Receipt,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -140,6 +142,13 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
     color: string;
     subTab?: string;
   }[] = [
+    {
+      id: 'yuran',
+      title: 'Bayar Yuran PGB',
+      sub: 'Gerbang rasmi HerePay & rekod resit',
+      icon: CreditCard,
+      color: 'from-emerald-600 via-teal-700 to-slate-900',
+    },
     {
       id: 'pengumuman',
       title: 'Pengumuman',
@@ -304,15 +313,24 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
               </div>
             </div>
 
-            {/* Quick Action: Digital Membership Card Download */}
+            {/* Quick Action: Digital Membership Card Download & Fee Payment */}
             <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPortalTab('yuran')}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              >
+                <CreditCard className="w-4 h-4 text-slate-950" />
+                <span>Bayar Yuran PGB (HerePay)</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsDigitalCardModalOpen(true)}
                 className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <QrCode className="w-4 h-4 text-slate-950" />
-                <span>Muat Turun Kad Keahlian Digital (QR Code)</span>
+                <span>Kad Keahlian Digital (QR)</span>
               </button>
 
               <button

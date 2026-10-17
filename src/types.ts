@@ -510,3 +510,39 @@ export interface ExamCalendarItem {
   createdBy?: string;
   updatedBy?: string;
 }
+
+export type FeeCategory =
+  | 'YURAN_TAHUNAN_MENENGAH'
+  | 'YURAN_TAHUNAN_RENDAH'
+  | 'YURAN_PENDAFTARAN_BARU'
+  | 'YURAN_KONVENSYEN_KPSI'
+  | 'SUMBANGAN_DANA_WAKAF'
+  | 'LAIN_LAIN';
+
+export interface FeePaymentRecord {
+  id: string;
+  userId?: string;
+  schoolId?: string;
+  schoolCode: string;
+  schoolName: string;
+  payerName: string;
+  payerEmail: string;
+  payerPhone?: string;
+  category: FeeCategory;
+  categoryLabel: string;
+  amount: number;
+  paymentMethod: string;
+  transactionRef: string;
+  paymentDate: string;
+  status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN';
+  receiptUrl?: string;
+  notes?: string;
+  academicSession: string;
+  gateway: 'HerePay' | 'Manual';
+  gatewayUrl?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+

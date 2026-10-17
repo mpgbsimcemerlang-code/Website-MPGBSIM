@@ -854,7 +854,7 @@ export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
     id: 'school-1792032680560-6vcm',
     name: 'SEKOLAH RENDAH ISLAM AL HIDAYAH IPOH',
     code: 'AYR2001',
-    type: 'Sekolah Menengah',
+    type: 'Sekolah Rendah',
     state: 'Perak',
     district: 'Ipoh',
     principal: 'Suriani binti Suratman (Guru Besar)',

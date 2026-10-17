@@ -13,6 +13,7 @@ import { LatestNewsSection } from './components/LatestNews';
 import { BestPracticeSection } from './components/BestPractice';
 import { UpcomingProgramsSection } from './components/UpcomingPrograms';
 import { ExamPublicSection } from './components/exams/ExamPublicSection';
+import { FeePaymentSection } from './components/FeePaymentSection';
 import { SchoolNetworkSection } from './components/SchoolNetwork';
 import { LeadershipSection } from './components/LeadershipSection';
 import { AlumniPublicSection } from './components/alumni/AlumniPublicSection';
@@ -67,6 +68,7 @@ function AppContent() {
         'best-practice',
         'program',
         'peperiksaan',
+        'bayar-yuran',
         'sekolah-ahli',
         'kepimpinan',
         'sumber',
@@ -124,6 +126,7 @@ function AppContent() {
           onExploreClick={() => handleScrollTo('tentang')}
           onProgramsClick={() => handleScrollTo('program')}
           onOpenPortal={handleOpenPortal}
+          onFeePaymentClick={() => handleScrollTo('bayar-yuran')}
         />
 
         {/* 2. INTRODUCTION (With Dynamic Visi & Misi) */}
@@ -165,6 +168,9 @@ function AppContent() {
 
         {/* KALENDAR PEPERIKSAAN & COUNTDOWN PENDIDIKAN (Live Takwim SPM, UPKK, SPPIM) */}
         <ExamPublicSection />
+
+        {/* PEMBAYARAN YURAN PGB & KEAHLIAN RASMI (Gerbang Rasmi HerePay) */}
+        <FeePaymentSection onOpenPortal={handleOpenPortal} />
 
         {/* 7. SCHOOL NETWORK (Dynamic Statistics & Directory) */}
         <SchoolNetworkSection

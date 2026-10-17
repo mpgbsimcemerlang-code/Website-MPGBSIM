@@ -32,6 +32,9 @@ import {
   X,
   FileText,
   FileDown,
+  CreditCard,
+  Receipt,
+  ExternalLink,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -53,7 +56,7 @@ const normalizeSchoolCategory = (t?: string): string => {
 };
 
 export const PortalProfile: React.FC = () => {
-  const { currentUser, updateUserProfile, changeUserPassword, registeredSchools } = useMemberPortal();
+  const { currentUser, updateUserProfile, changeUserPassword, registeredSchools, setPortalTab } = useMemberPortal();
   const { siteData, updateMemberSchool } = useAdminContent();
 
   const allSchools =
@@ -620,6 +623,12 @@ export const PortalProfile: React.FC = () => {
                 <span className="text-[7px] font-mono font-bold mt-0.5">DISAHKAN</span>
               </div>
             </div>
+
+            {/* Card Preview Footer: Emel & Laman Web Rasmi */}
+            <div className="mt-3 pt-2 border-t border-slate-800 text-[8px] text-slate-400 flex items-center justify-between">
+              <span className="text-teal-300 font-medium">mpgbsim.cemerlang@gmail.com</span>
+              <span className="text-amber-300 font-mono text-[7.5px]">https://website-mpgbsim.vercel.app/</span>
+            </div>
           </div>
 
           <button
@@ -639,6 +648,41 @@ export const PortalProfile: React.FC = () => {
             <p className="text-[11px] text-amber-800 leading-relaxed">
               Profil anda diiktiraf sebagai Ahli Berdaftar Rasmi Majlis Pengetua & Guru Besar Sekolah Islam Malaysia (MPGBSIM). Semua maklumat selaras dengan borang pendaftaran keahlian baharu.
             </p>
+          </div>
+
+          {/* HerePay Official Fee Payment Status Card */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-900 border border-emerald-600/40 text-white space-y-2.5 text-xs shadow-md">
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-1.5 text-emerald-300">
+                <CreditCard className="w-4 h-4 text-emerald-400" />
+                Bayar Yuran PGB (HerePay)
+              </span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Sesi 2026/2027
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Jelaskan yuran tahunan institusi anda secara selamat melalui saluran rasmi <strong>HerePay</strong> (FPX, DuitNow QR, Kad Debit/Kredit).
+            </p>
+            <div className="pt-2 flex flex-col gap-2">
+              <a
+                href="https://app.herepay.org/mpgbsim"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-xs transition"
+              >
+                <span>Buka HerePay Rasmi</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setPortalTab('yuran')}
+                className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Receipt className="w-3.5 h-3.5 text-amber-300" />
+                <span>Lihat Sejarah & Resit Bayaran</span>
+              </button>
+            </div>
           </div>
         </div>
 

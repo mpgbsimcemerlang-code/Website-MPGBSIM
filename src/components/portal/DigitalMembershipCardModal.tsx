@@ -16,6 +16,12 @@ import {
   Calendar,
   Building2,
   CheckCircle2,
+  CreditCard,
+  ExternalLink,
+  MapPin,
+  Phone,
+  Mail,
+  Globe,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import html2canvas from 'html2canvas-pro';
@@ -93,6 +99,22 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
     currentUser?.photoURL ||
     matchedSchool?.principalPhotoUrl ||
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+
+  // Gambar Bangunan Sekolah Masing-Masing (Resolusi Sekolah Ahli)
+  const schoolBuildingPhoto =
+    currentUser?.schoolPhotoUrl ||
+    matchedSchool?.schoolPhotoUrl ||
+    (isMuslehProfile ? 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80' : undefined) ||
+    'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80';
+
+  // Maklumat Rasmi Sekretariat Kebangsaan MPGBSIM Mengikut Arahan Rasmi
+  const MPGBSIM_OFFICIAL_CONTACT = {
+    email: 'mpgbsim.cemerlang@gmail.com',
+    website: 'https://website-mpgbsim.vercel.app/',
+    address: 'D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan 43300 Selangor',
+    phones: '03-4251 6157, 03-4251 6167',
+  };
+
   const joinYear = currentUser?.joinYear || matchedSchool?.joinYear || 2024;
   const serviceStartYear =
     currentUser?.serviceStartYear || currentUser?.pgbStartYear || (matchedSchool as any)?.serviceStartYear || 2018;
@@ -106,7 +128,11 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
     state,
     status: 'AKTIF',
     validUntil: '31/12/2026',
-    verifyUrl: `https://mpgbsim.edu.my/verify?memberId=${encodeURIComponent(membershipNumber)}`,
+    email: MPGBSIM_OFFICIAL_CONTACT.email,
+    phones: MPGBSIM_OFFICIAL_CONTACT.phones,
+    address: MPGBSIM_OFFICIAL_CONTACT.address,
+    website: MPGBSIM_OFFICIAL_CONTACT.website,
+    verifyUrl: `${MPGBSIM_OFFICIAL_CONTACT.website}verify?memberId=${encodeURIComponent(membershipNumber)}`,
   });
 
   // Generate QR Code Data URL on mount / modal open
@@ -175,7 +201,7 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
   };
 
   const handleCopyVerificationLink = () => {
-    const verifyUrl = `https://mpgbsim.edu.my/verify?memberId=${encodeURIComponent(membershipNumber)}`;
+    const verifyUrl = `${MPGBSIM_OFFICIAL_CONTACT.website}verify?memberId=${encodeURIComponent(membershipNumber)}`;
     navigator.clipboard.writeText(verifyUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 3000);
@@ -249,7 +275,7 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
               /* FRONT OF CARD */
               <div
                 ref={cardRef}
-                className="w-full max-w-md rounded-3xl bg-gradient-to-br from-slate-950 via-teal-950 to-slate-900 text-white shadow-2xl border-2 border-amber-400/50 p-6 relative overflow-hidden flex flex-col justify-between min-h-[440px] font-sans"
+                className="w-full max-w-md rounded-3xl bg-gradient-to-br from-slate-950 via-teal-950 to-slate-900 text-white shadow-2xl border-2 border-amber-400/50 p-6 relative overflow-hidden flex flex-col justify-between min-h-[500px] font-sans"
               >
                 {/* Metallic Accent Waves */}
                 <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
@@ -275,12 +301,13 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                 </div>
 
                 {/* Card Middle: Photo & Details */}
-                <div className="relative z-10 my-4 flex items-start gap-4">
+                <div className="relative z-10 mt-3.5 mb-2 flex items-start gap-4">
                   <div className="relative shrink-0">
                     <img
                       src={photoURL}
                       alt={fullName}
                       className="w-20 h-24 rounded-2xl object-cover border-2 border-amber-400 shadow-xl bg-slate-800"
+                      crossOrigin="anonymous"
                     />
                     <div className="absolute -bottom-1.5 -right-1.5 p-1 bg-amber-500 text-slate-950 rounded-full shadow-md">
                       <CheckCircle2 className="w-3.5 h-3.5" />
@@ -311,8 +338,29 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                   </div>
                 </div>
 
+                {/* Gambar Bangunan Sekolah Masing-Masing (Muka Hadapan) */}
+                <div className="relative z-10 my-2.5 rounded-2xl overflow-hidden border border-amber-400/40 shadow-lg h-24 bg-slate-900 group">
+                  <img
+                    src={schoolBuildingPhoto}
+                    alt={`Bangunan Sekolah ${school}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    crossOrigin="anonymous"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/35 to-transparent flex items-end justify-between p-2">
+                    <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                      <Building2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span className="text-[9.5px] font-bold text-amber-200 truncate">
+                        Bangunan: {school}
+                      </span>
+                    </div>
+                    <span className="text-[8px] px-2 py-0.5 rounded-full bg-teal-900/90 text-teal-300 border border-teal-500/50 font-mono font-bold shrink-0">
+                      {effectiveCode}
+                    </span>
+                  </div>
+                </div>
+
                 {/* Card Bottom: Membership No & QR Code */}
-                <div className="relative z-10 pt-3 border-t border-teal-800/60 flex items-end justify-between gap-2">
+                <div className="relative z-10 pt-2.5 border-t border-teal-800/60 flex items-end justify-between gap-2">
                   <div className="space-y-1">
                     <div>
                       <span className="text-[8px] text-slate-400 uppercase tracking-wider block">
@@ -338,9 +386,9 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                   {/* Generated QR Code */}
                   <div className="p-1.5 rounded-2xl bg-white text-slate-900 shadow-lg flex flex-col items-center justify-center shrink-0 border border-amber-400/50">
                     {qrCodeUrl ? (
-                      <img src={qrCodeUrl} alt="QR Code PGB" className="w-16 h-16 object-contain" />
+                      <img src={qrCodeUrl} alt="QR Code PGB" className="w-14 h-14 object-contain" />
                     ) : (
-                      <div className="w-16 h-16 bg-slate-200 animate-pulse rounded" />
+                      <div className="w-14 h-14 bg-slate-200 animate-pulse rounded" />
                     )}
                     <span className="text-[7px] font-mono font-bold text-slate-800 mt-0.5 uppercase tracking-tighter">
                       PENGESAHAN
@@ -348,17 +396,32 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                   </div>
                 </div>
 
-                {/* Bottom Bar Stamp */}
-                <div className="relative z-10 mt-3 pt-2 text-[8px] text-slate-400 flex items-center justify-between border-t border-slate-800/50">
-                  <span>Dikeluarkan oleh Ibu Pejabat MPGBSIM</span>
-                  <span className="text-amber-300 font-semibold">SAH SEHINGGA 2026</span>
+                {/* Bottom Bar: Emel, Laman Web & Telefon Rasmi */}
+                <div className="relative z-10 mt-2.5 pt-2 text-[8px] text-slate-300 border-t border-slate-800/60 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-teal-300 font-medium truncate max-w-[210px] flex items-center gap-1">
+                      <Mail className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                      {MPGBSIM_OFFICIAL_CONTACT.email}
+                    </span>
+                    <span className="text-amber-300 font-mono font-semibold flex items-center gap-1">
+                      <Phone className="w-2.5 h-2.5 text-teal-400 shrink-0" />
+                      03-4251 6157
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span className="truncate max-w-[240px] text-amber-200/90 font-mono text-[7.5px] flex items-center gap-1">
+                      <Globe className="w-2.5 h-2.5 text-teal-400 shrink-0" />
+                      {MPGBSIM_OFFICIAL_CONTACT.website}
+                    </span>
+                    <span className="text-emerald-400 font-semibold text-[7.5px]">SAH 2026</span>
+                  </div>
                 </div>
               </div>
             ) : (
               /* BACK OF CARD */
               <div
                 ref={backCardRef}
-                className="w-full max-w-md rounded-3xl bg-gradient-to-br from-slate-950 via-teal-950 to-slate-900 text-white shadow-2xl border-2 border-amber-400/50 p-6 relative overflow-hidden flex flex-col justify-between min-h-[440px] font-sans"
+                className="w-full max-w-md rounded-3xl bg-gradient-to-br from-slate-950 via-teal-950 to-slate-900 text-white shadow-2xl border-2 border-amber-400/50 p-6 relative overflow-hidden flex flex-col justify-between min-h-[500px] font-sans"
               >
                 <div className="relative z-10 border-b border-amber-500/30 pb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -370,39 +433,134 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                   <span className="text-[9px] text-amber-300 font-mono">MPGBSIM-VERIFIED</span>
                 </div>
 
-                <div className="relative z-10 my-4 space-y-3 text-[10px] text-slate-300 leading-relaxed">
-                  <p>
-                    1. Kad Digital ini adalah hak milik rasmi Majlis Pengetua & Guru Besar Sekolah Islam Malaysia (MPGBSIM).
-                  </p>
-                  <p>
-                    2. Kad ini mengesahkan status pemegang sebagai Pengetua / Guru Besar / Kepimpinan Sekolah Islam yang berdaftar.
-                  </p>
-                  <p>
-                    3. Imbas Kod QR di muka hadapan untuk pengesahan identiti dan ketelusan status keahlian dalam talian.
-                  </p>
+                <div className="relative z-10 my-3 space-y-2.5 text-[9.5px] text-slate-300 leading-relaxed">
+                  <div className="space-y-1 text-slate-300 text-[9px]">
+                    <p>1. Kad Digital ini adalah hak milik rasmi Majlis Pengetua & Guru Besar Sekolah Islam Malaysia (MPGBSIM).</p>
+                    <p>2. Kad ini mengesahkan status pemegang sebagai Pengetua / Guru Besar institusi berdaftar.</p>
+                  </div>
 
-                  <div className="p-3 rounded-2xl bg-teal-900/40 border border-teal-700/50 text-[9px] text-teal-200 space-y-1">
-                    <span className="font-bold text-amber-300 block">SEKRETARIAT KEBANGSAAN MPGBSIM:</span>
-                    <p>Pejabat Agong MPGBSIM, Kompleks Pendidikan Islam, Melaka</p>
-                    <p>Emel: info@mpgbsim.edu.my | Tel: +60 6-335 1290</p>
-                    <p>Laman Web Rasmi: https://mpgbsim.edu.my</p>
+                  {/* Gambar Bangunan Sekolah Masing-Masing Pada Muka Belakang */}
+                  <div className="p-2 rounded-2xl bg-slate-900/90 border border-amber-400/40 flex items-center gap-2.5 shadow-md">
+                    <img
+                      src={schoolBuildingPhoto}
+                      alt={`Bangunan Institusi ${school}`}
+                      className="w-16 h-12 rounded-xl object-cover border border-amber-400/60 shrink-0 shadow-sm"
+                      crossOrigin="anonymous"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[7.5px] font-bold text-teal-300 uppercase tracking-wider block">
+                        INSTITUSI SEKOLAH BERDAFTAR
+                      </span>
+                      <h5 className="text-[10px] font-black text-white truncate leading-tight">
+                        {school}
+                      </h5>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[8px] text-slate-300 font-mono">
+                        <span className="text-amber-300 font-bold">Kod: {effectiveCode}</span>
+                        <span>•</span>
+                        <span>{state}</span>
+                        <span>•</span>
+                        <span className="text-emerald-300">{schoolType}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Maklumat Rasmi Sekretariat Kebangsaan MPGBSIM */}
+                  <div className="p-3 rounded-2xl bg-teal-950/80 border border-teal-700/60 text-[8.5px] text-teal-100 space-y-1.5 shadow-inner">
+                    <div className="flex items-center justify-between border-b border-teal-800/80 pb-1">
+                      <span className="font-extrabold text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                        <Building2 className="w-3 h-3 text-amber-400" />
+                        SEKRETARIAT KEBANGSAAN MPGBSIM
+                      </span>
+                      <span className="text-[7.5px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-bold">
+                        IBU PEJABAT
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 text-slate-200">
+                      <p className="flex items-start gap-1 leading-tight">
+                        <MapPin className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                        <span>
+                          <strong className="text-white">Alamat:</strong> {MPGBSIM_OFFICIAL_CONTACT.address}
+                        </span>
+                      </p>
+
+                      <p className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-teal-300 shrink-0" />
+                        <span>
+                          <strong className="text-white">No. Telefon:</strong> {MPGBSIM_OFFICIAL_CONTACT.phones}
+                        </span>
+                      </p>
+
+                      <p className="flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-amber-300 shrink-0" />
+                        <span>
+                          <strong className="text-white">Emel:</strong>{' '}
+                          <a
+                            href={`mailto:${MPGBSIM_OFFICIAL_CONTACT.email}`}
+                            className="text-amber-300 hover:underline font-medium"
+                          >
+                            {MPGBSIM_OFFICIAL_CONTACT.email}
+                          </a>
+                        </span>
+                      </p>
+
+                      <p className="flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-teal-300 shrink-0" />
+                        <span>
+                          <strong className="text-white">Laman Web:</strong>{' '}
+                          <a
+                            href={MPGBSIM_OFFICIAL_CONTACT.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-300 underline font-mono text-[8px]"
+                          >
+                            {MPGBSIM_OFFICIAL_CONTACT.website}
+                          </a>
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="relative z-10 pt-3 border-t border-teal-800/60 flex items-center justify-between">
+                <div className="relative z-10 pt-2.5 border-t border-teal-800/60 flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <span className="text-[8px] text-slate-400 block">MOTO UMMAT:</span>
-                    <span className="text-[10px] font-bold text-amber-300">
-                      "Memimpin Transformasi Pendidikan Islam Kebangsaan"
+                    <span className="text-[7.5px] text-slate-400 block">MOTO KEPIMPINAN:</span>
+                    <span className="text-[9.5px] font-bold text-amber-300">
+                      "Memperkasa Kepimpinan Pendidikan, Membina Generasi Rabbani"
                     </span>
                   </div>
 
-                  <div className="w-12 h-12 rounded-full border border-amber-400/40 bg-amber-400/10 flex items-center justify-center text-amber-300">
-                    <Award className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-full border border-amber-400/40 bg-amber-400/10 flex items-center justify-center text-amber-300 shrink-0">
+                    <Award className="w-5 h-5" />
                   </div>
                 </div>
               </div>
             )}
+          </div>
+
+          {/* HerePay Official Fee Payment Strip */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border border-emerald-600/40 text-white flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shrink-0">
+                <CreditCard className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="font-bold text-emerald-300 block">Status Yuran Keahlian Sesi 2026/2027</span>
+                <span className="text-[11px] text-slate-300">Bayar yuran tahunan institusi secara selamat melalui gerbang rasmi HerePay</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="https://app.herepay.org/mpgbsim"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black text-xs inline-flex items-center gap-1.5 shadow-md transition cursor-pointer"
+              >
+                <span>Bayar di HerePay</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
 
           {/* Action Buttons */}

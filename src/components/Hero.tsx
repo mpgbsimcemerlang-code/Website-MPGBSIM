@@ -8,7 +8,8 @@ import {
   BookOpen,
   Sparkles,
   ChevronDown,
-  Camera
+  Camera,
+  CreditCard,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 
@@ -16,12 +17,14 @@ interface HeroProps {
   onExploreClick: () => void;
   onProgramsClick: () => void;
   onOpenPortal: () => void;
+  onFeePaymentClick?: () => void;
 }
 
 export const Hero: React.FC<HeroProps> = ({
   onExploreClick,
   onProgramsClick,
-  onOpenPortal
+  onOpenPortal,
+  onFeePaymentClick,
 }) => {
   const { siteData, isAdmin, setIsLogoModalOpen, setIsCMSOpen } = useAdminContent();
   const branding = siteData?.branding || {
@@ -180,6 +183,31 @@ export const Hero: React.FC<HeroProps> = ({
             <Sparkles className="w-4 h-4" />
             <span>{btnPortalText}</span>
           </button>
+
+          {/* Quick HerePay Fee Payment CTA - Navigates to Gerbang Rasmi Pembayaran Yuran PGB */}
+          <a
+            href="#bayar-yuran"
+            id="btn-hero-herepay"
+            onClick={(e) => {
+              e.preventDefault();
+              if (onFeePaymentClick) {
+                onFeePaymentClick();
+              } else {
+                const el = document.getElementById('bayar-yuran');
+                if (el) {
+                  const navOffset = 80;
+                  const pos = el.getBoundingClientRect().top + window.pageYOffset;
+                  window.scrollTo({ top: Math.max(0, pos - navOffset), behavior: 'smooth' });
+                }
+              }
+            }}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-teal-900/90 hover:bg-teal-800 text-teal-200 hover:text-white font-bold text-sm sm:text-base transition-all shadow-md active:scale-98 border border-teal-500/50 cursor-pointer"
+            title="Navigasi ke Gerbang Rasmi Pembayaran Yuran PGB di laman ini"
+          >
+            <CreditCard className="w-4 h-4 text-amber-400" />
+            <span>Bayar Yuran (HerePay)</span>
+            <ArrowRight className="w-4 h-4 text-teal-300" />
+          </a>
         </div>
 
         {/* Trust Indicators / Credentials Grid */}
