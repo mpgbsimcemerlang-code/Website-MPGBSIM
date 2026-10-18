@@ -57,15 +57,22 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
       ? registeredSchools
       : siteData.memberSchools || [];
 
-  const isMuslehProfile =
-    currentUser?.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-    (currentUser?.email && currentUser.email.toLowerCase().includes('imusleh')) ||
-    (currentUser?.school && currentUser.school.toLowerCase().includes('musleh')) ||
-    (currentUser?.membershipNo &&
-      (currentUser.membershipNo.includes('MIA1009') || currentUser.membershipNo.includes('MJAC011')));
+  const isSecondaryMusleh =
+    currentUser?.email === 'smimmelaka@gmail.com' ||
+    (currentUser?.membershipNo && currentUser.membershipNo.includes('MIA1009')) ||
+    (currentUser?.school && (currentUser.school.toLowerCase().includes('menengah') || currentUser.school.toLowerCase().includes('sma')) && currentUser.school.toLowerCase().includes('musleh'));
 
-  const matchedSchool: MemberSchool | undefined = isMuslehProfile
-    ? allSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1' || s.name.toLowerCase().includes('musleh'))
+  const isPrimaryMusleh =
+    !isSecondaryMusleh &&
+    (currentUser?.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+      (currentUser?.email && currentUser.email.toLowerCase().includes('imuslehmelaka')) ||
+      (currentUser?.membershipNo && currentUser.membershipNo.includes('MJAC011')) ||
+      (currentUser?.school && (currentUser.school.toLowerCase().includes('rendah') || currentUser.school.toLowerCase().includes('sri')) && currentUser.school.toLowerCase().includes('musleh')));
+
+  const matchedSchool: MemberSchool | undefined = isSecondaryMusleh
+    ? allSchools.find((s) => s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')
+    : isPrimaryMusleh
+    ? allSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1')
     : (currentUser?.schoolId ? allSchools.find((s) => s.id === currentUser.schoolId) : undefined) ||
       allSchools.find((s) => currentUser?.uid === `sch-user-${s.id}` || currentUser?.uid === s.id) ||
       (currentUser?.schoolCode ? allSchools.find((s) => s.code && s.code.toUpperCase() === currentUser.schoolCode?.toUpperCase()) : undefined) ||
@@ -82,29 +89,49 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
       }) : undefined) ||
       allSchools[0];
 
-  const fullName = currentUser?.fullName || matchedSchool?.principal || 'Ustaz Abdul Qayyum bin Yaakop';
-  const position = currentUser?.position || (isMuslehProfile ? 'Guru Besar' : 'Pengetua');
-  const school = currentUser?.school || matchedSchool?.name || 'Sekolah Rendah Islam I Musleh';
-  const schoolType = currentUser?.schoolType || matchedSchool?.type || (isMuslehProfile ? 'Rakan Musleh' : 'Sekolah Menengah');
+  const fullName =
+    currentUser?.fullName ||
+    matchedSchool?.principal ||
+    (isSecondaryMusleh ? 'Masitah Binti Seikh Omar (Pengetua)' : isPrimaryMusleh ? 'Ustaz Abdul Qayyum bin Yaakop' : 'Ahli PGB MPGBSIM');
+
+  const position =
+    currentUser?.position ||
+    matchedSchool?.designation ||
+    (isSecondaryMusleh ? 'Pengetua' : isPrimaryMusleh ? 'Guru Besar' : 'Pengetua');
+
+  const school =
+    currentUser?.school ||
+    matchedSchool?.name ||
+    (isSecondaryMusleh ? 'SEKOLAH MENENGAH AGAMA I-MUSLEH' : isPrimaryMusleh ? 'Sekolah Rendah Islam I Musleh' : 'Sekolah Ahli Berdaftar MPGBSIM');
+
+  const schoolType =
+    currentUser?.schoolType ||
+    matchedSchool?.type ||
+    (isSecondaryMusleh ? 'Sekolah Menengah' : isPrimaryMusleh ? 'Sekolah Rendah' : 'Sekolah Menengah');
+
   const state = currentUser?.state || matchedSchool?.state || 'Melaka';
-  const rawCode = currentUser?.membershipNo?.split('-').pop() || matchedSchool?.code || 'MJAC011';
-  const effectiveCode = isMuslehProfile || rawCode === 'MIA1009' ? 'MJAC011' : rawCode;
+  const rawCode = currentUser?.schoolCode || currentUser?.membershipNo?.split('-').pop() || matchedSchool?.code || (isSecondaryMusleh ? 'MIA1009' : 'MJAC011');
+  const effectiveCode = isSecondaryMusleh ? 'MIA1009' : isPrimaryMusleh ? 'MJAC011' : rawCode;
 
-  const membershipNumber = isMuslehProfile
+  const membershipNumber = isSecondaryMusleh
+    ? 'MPGB-2026-MIA1009'
+    : isPrimaryMusleh
     ? 'MPGB-2026-MJAC011'
-    : currentUser?.membershipNo?.replace('MIA1009', 'MJAC011') || `MPGB-2026-${effectiveCode}`;
+    : currentUser?.membershipNo || `MPGB-2026-${effectiveCode}`;
 
-  const icNumber = currentUser?.icNumber || (matchedSchool as any)?.icNumber || '850312-04-5123';
+  const icNumber = currentUser?.icNumber || (matchedSchool as any)?.icNumber || (isSecondaryMusleh ? '730627-01-5156' : '850312-04-5123');
   const photoURL =
     currentUser?.photoURL ||
     matchedSchool?.principalPhotoUrl ||
+    (isSecondaryMusleh ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80' : '') ||
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
 
   // Gambar Bangunan Sekolah Masing-Masing (Resolusi Sekolah Ahli)
   const schoolBuildingPhoto =
     currentUser?.schoolPhotoUrl ||
     matchedSchool?.schoolPhotoUrl ||
-    (isMuslehProfile ? 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80' : undefined) ||
+    (isSecondaryMusleh ? 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1000&q=80' : undefined) ||
+    (isPrimaryMusleh ? 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80' : undefined) ||
     'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80';
 
   // Maklumat Rasmi Sekretariat Kebangsaan MPGBSIM Mengikut Arahan Rasmi

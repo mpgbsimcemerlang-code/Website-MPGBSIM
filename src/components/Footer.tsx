@@ -30,10 +30,10 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
     secondaryContext: '',
   };
   const contactInfo = siteData?.contactInfo || {
-    address: 'Kolej Islam Malaya (KIK), Jalan Universiti, 46350 Petaling Jaya, Selangor',
+    address: 'D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan 43300 Selangor',
     email: 'mpgbsim.cemerlang@gmail.com',
-    phone: '+60 3-7956 1234',
-    whatsapp: '+60 19-345 6789',
+    phone: '03-4251 6157, 03-4251 6167',
+    whatsapp: '03-4251 6157',
     operatingHours: 'Isnin - Jumaat: 8:30 Pagi - 5:00 Petang',
     socialFacebook: 'https://facebook.com',
     socialYoutube: 'https://youtube.com',

@@ -365,9 +365,9 @@ const DEFAULT_CTA: CtaData = {
 
 const DEFAULT_CONTACT_INFO: ContactInfoData = {
   email: 'mpgbsim.cemerlang@gmail.com',
-  phone: '+60 3-8925 7890',
-  whatsapp: '+60 19-345 6789',
-  address: 'Kompleks Pendidikan Islam Antarabangsa, Jalan Universiti, 43600 Bangi, Selangor Darul Ehsan.',
+  phone: '03-4251 6157, 03-4251 6167',
+  whatsapp: '03-4251 6157',
+  address: 'D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan 43300 Selangor',
   operatingHours: 'Isnin – Jumaat: 8:30 Pagi – 5:00 Petang (Kecuali Cuti Umum)',
 };
 
@@ -609,6 +609,33 @@ export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
     schoolEmail: 'admin@imuslehmelaka.edu.my',
     pgbPhone: '+60 19-665 4321',
     pgbEmail: 'abdulqayyumyaakop@imuslehmelaka.edu.my',
+  },
+  {
+    id: 'school-musleh-menengah-1',
+    name: 'SEKOLAH MENENGAH AGAMA I-MUSLEH',
+    code: 'MIA1009',
+    type: 'Sekolah Menengah',
+    state: 'Melaka',
+    district: 'Ayer Keroh',
+    principal: 'Masitah Binti Seikh Omar (Pengetua)',
+    designation: 'Pengetua',
+    studentCount: 79,
+    teacherCount: 10,
+    joinYear: 2023,
+    serviceStartYear: 2023,
+    pgbStartYear: 2023,
+    website: 'https://i-musleh.com',
+    description: 'Sekolah Ahli Berdaftar MPGBSIM di bawah kepimpinan Masitah Binti Seikh Omar (Pengetua).',
+    address: 'Jalan TU 49A, Kompleks Komersial Boulevard, 75450 Ayer Keroh, Melaka',
+    phone: '06-2349405',
+    email: 'smimmelaka@gmail.com',
+    schoolPhone: '06-2349405',
+    schoolEmail: 'smimmelaka@gmail.com',
+    pgbPhone: '013-2695286',
+    pgbEmail: 'smimmelaka@gmail.com',
+    logoUrl: '/mpgbsim-official-logo.png',
+    schoolPhotoUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1000&q=80',
+    principalPhotoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
   },
   {
     id: 'school-1791789043737-cace',
@@ -1166,9 +1193,42 @@ const getPendingRegistrationsFromStorage = (): MemberApplication[] => {
   return [];
 };
 
+export const DEFAULT_MEMBER_APPLICATIONS: MemberApplication[] = [
+  {
+    id: 'MPGB-2026-BJROO-6440',
+    refId: 'MPGB-2026-BJROO-6440',
+    fullName: 'Masitah Binti Seikh Omar',
+    icNumber: '730627-01-5156',
+    email: 'smimmelaka@gmail.com',
+    phoneNumber: '013-2695286',
+    pgbEmail: 'smimmelaka@gmail.com',
+    pgbPhone: '013-2695286',
+    schoolEmail: 'smimmelaka@gmail.com',
+    schoolPhone: '06-2349405',
+    designation: 'Pengetua',
+    serviceStartYear: 2023,
+    pgbStartYear: 2023,
+    joinYear: 2023,
+    schoolJoinYear: 2023,
+    schoolName: 'SEKOLAH MENENGAH AGAMA I-MUSLEH',
+    schoolCode: 'MIA1009',
+    schoolType: 'Sekolah Menengah',
+    state: 'Melaka',
+    district: 'Ayer Keroh',
+    address: 'Jalan TU 49A, Kompleks Komersial Boulevard, 75450 Ayer Keroh, Melaka',
+    website: 'https://i-musleh.com',
+    studentCount: 79,
+    teacherCount: 10,
+    status: 'approved',
+    submittedAt: '2026-10-17T11:34:14.760Z',
+    approvedAt: '2026-10-18T07:45:31.198Z',
+    approvedBy: 'mpgbsim.cemerlang@gmail.com',
+  },
+];
+
 const sanitizeMemberApplicationsList = (apps: MemberApplication[] = []): MemberApplication[] => {
   const pendingFromLocal = getPendingRegistrationsFromStorage();
-  const combined = [...pendingFromLocal, ...(apps || [])];
+  const combined = [...pendingFromLocal, ...DEFAULT_MEMBER_APPLICATIONS, ...(apps || [])];
   const map = new Map<string, MemberApplication>();
 
   const normalizeStatus = (st?: string): 'pending' | 'approved' | 'rejected' => {
@@ -1183,10 +1243,7 @@ const sanitizeMemberApplicationsList = (apps: MemberApplication[] = []): MemberA
     if (!app || !app.id) return;
     const isAlreadyRegisteredMusleh =
       app.id === 'app-musleh-01' ||
-      app.schoolCode === 'MJAC011' ||
-      app.schoolCode === 'MIA1009' ||
-      app.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-      (app.schoolName && app.schoolName.toLowerCase().includes('musleh'));
+      (app.schoolCode === 'MJAC011' && app.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my');
 
     if (isAlreadyRegisteredMusleh) return;
 
@@ -1425,7 +1482,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     const rawApplications =
       (cachedApplications && cachedApplications.length > 0 ? cachedApplications : null) ||
       (initialSync?.memberApplications?.length ? initialSync.memberApplications : null) ||
-      (prev?.memberApplications?.length ? prev.memberApplications : []);
+      (prev?.memberApplications?.length ? prev.memberApplications : DEFAULT_MEMBER_APPLICATIONS);
 
     return {
       branding: cachedCms?.branding || initialSync?.branding || prev?.branding || DEFAULT_BRANDING,
@@ -2243,10 +2300,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               const d = docSnap.data();
               if (
                 docSnap.id === 'app-musleh-01' ||
-                d.schoolCode === 'MJAC011' ||
-                d.schoolCode === 'MIA1009' ||
-                d.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-                (d.schoolName && d.schoolName.toLowerCase().includes('musleh'))
+                (d.schoolCode === 'MJAC011' && d.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my')
               ) {
                 return;
               }
@@ -3168,7 +3222,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         const isMatch =
           s.id === id ||
           (safeUpdated.code && s.code && s.code.toLowerCase().trim() === safeUpdated.code.toLowerCase().trim()) ||
-          (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.code === 'MIA1009' || s.id === 'sch-musleh-1')) ||
+          (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) ||
           (safeUpdated.name && s.name && s.name.toLowerCase().trim() === safeUpdated.name.toLowerCase().trim());
 
         if (isMatch) {
@@ -3227,7 +3281,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             const isMatch =
               s.id === id ||
               (updated.code && s.code && s.code.toLowerCase().trim() === updated.code.toLowerCase().trim()) ||
-              (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.code === 'MIA1009' || s.id === 'sch-musleh-1')) ||
+              (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) ||
               (updated.name && s.name && s.name.toLowerCase().trim() === updated.name.toLowerCase().trim());
             return isMatch ? { ...s, ...updated, updatedAt: new Date().toISOString() } : s;
           });
@@ -3243,12 +3297,19 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       const portalUserRaw = localStorage.getItem('mpgbsim_portal_user_v1');
       if (portalUserRaw) {
         const portalUser = JSON.parse(portalUserRaw);
-        const matchMusleh =
+        const matchPrimaryMusleh =
           (id === 'sch-musleh-1' || updated.code === 'MJAC011') &&
-          (portalUser.email?.includes('imusleh') ||
-            portalUser.school?.toLowerCase().includes('musleh') ||
+          (portalUser.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+            portalUser.email?.includes('imuslehmelaka') ||
             portalUser.membershipNo?.includes('MJAC011') ||
-            portalUser.membershipNo?.includes('MIA1009'));
+            (portalUser.school?.toLowerCase().includes('musleh') && (portalUser.school?.toLowerCase().includes('rendah') || portalUser.school?.toLowerCase().includes('sri'))));
+
+        const matchSecondaryMusleh =
+          (id === 'school-musleh-menengah-1' || id === 'sch-musleh-menengah-1' || updated.code === 'MIA1009') &&
+          (portalUser.email === 'smimmelaka@gmail.com' ||
+            portalUser.membershipNo?.includes('MIA1009') ||
+            (portalUser.school?.toLowerCase().includes('musleh') && (portalUser.school?.toLowerCase().includes('menengah') || portalUser.school?.toLowerCase().includes('sma'))));
+
         const matchId =
           (portalUser.schoolId && portalUser.schoolId === id) ||
           portalUser.uid === `sch-user-${id}` ||
@@ -3264,7 +3325,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           (portalUser.pgbEmail && updated.pgbEmail && portalUser.pgbEmail.toLowerCase().trim() === updated.pgbEmail.toLowerCase().trim()) ||
           (portalUser.pgbEmail && updatedSchoolObj && (updatedSchoolObj as MemberSchool).pgbEmail && portalUser.pgbEmail.toLowerCase().trim() === (updatedSchoolObj as MemberSchool).pgbEmail?.toLowerCase().trim());
 
-        if (matchMusleh || matchId || matchCode || matchSchoolName || matchPgbEmail) {
+        if (matchPrimaryMusleh || matchSecondaryMusleh || matchId || matchCode || matchSchoolName || matchPgbEmail) {
           if (updated.principal) {
             portalUser.fullName = updated.principal;
           }

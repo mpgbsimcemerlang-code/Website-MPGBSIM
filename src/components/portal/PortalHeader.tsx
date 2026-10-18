@@ -263,7 +263,7 @@ export const PortalHeader: React.FC = () => {
                     <div className="mt-2.5 flex items-center justify-between">
                       {getRoleBadge()}
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {currentUser?.membershipNo?.replace('MIA1009', 'MJAC011') || 'MPGB-AHLI'}
+                        {currentUser?.membershipNo || 'MPGB-AHLI'}
                       </span>
                     </div>
                   </div>

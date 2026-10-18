@@ -63,19 +63,40 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
   const [isDigitalCardModalOpen, setIsDigitalCardModalOpen] = React.useState(false);
 
+  const isSecondaryMusleh = React.useMemo(() => {
+    return Boolean(
+      currentUser?.email === 'smimmelaka@gmail.com' ||
+      currentUser?.schoolCode === 'MIA1009' ||
+      currentUser?.membershipNo?.includes('MIA1009') ||
+      (currentUser?.school && (currentUser.school.toLowerCase().includes('menengah') || currentUser.school.toLowerCase().includes('sma')) && currentUser.school.toLowerCase().includes('musleh'))
+    );
+  }, [currentUser]);
+
+  const isPrimaryMusleh = React.useMemo(() => {
+    if (isSecondaryMusleh) return false;
+    return Boolean(
+      currentUser?.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+      currentUser?.schoolCode === 'MJAC011' ||
+      currentUser?.email?.toLowerCase().includes('imuslehmelaka') ||
+      currentUser?.membershipNo?.includes('MJAC011') ||
+      (currentUser?.school && (currentUser.school.toLowerCase().includes('rendah') || currentUser.school.toLowerCase().includes('sri')) && currentUser.school.toLowerCase().includes('musleh'))
+    );
+  }, [currentUser, isSecondaryMusleh]);
+
   const currentSchoolData: MemberSchool | null = React.useMemo(() => {
     const schools = siteData.memberSchools || [];
     if (!schools.length) return null;
 
-    const isMusleh =
-      currentUser?.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-      (currentUser?.email && currentUser.email.toLowerCase().includes('imusleh')) ||
-      (currentUser?.school && currentUser.school.toLowerCase().includes('musleh')) ||
-      (currentUser?.membershipNo && (currentUser.membershipNo.includes('MJAC011') || currentUser.membershipNo.includes('MIA1009')));
-
-    if (isMusleh) {
+    if (isSecondaryMusleh) {
       return (
-        schools.find((s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.code === 'MIA1009' || s.name.toLowerCase().includes('musleh')) ||
+        schools.find((s) => s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com' || (s.name?.toLowerCase().includes('menengah') && s.name?.toLowerCase().includes('musleh'))) ||
+        null
+      );
+    }
+
+    if (isPrimaryMusleh) {
+      return (
+        schools.find((s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.email?.toLowerCase() === 'abdulqayyumyaakop@imuslehmelaka.edu.my' || (s.name?.toLowerCase().includes('rendah') && s.name?.toLowerCase().includes('musleh'))) ||
         null
       );
     }
@@ -292,19 +313,19 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
                 <School className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span className="text-slate-400">Institusi:</span>
                 <span className="font-semibold text-white truncate max-w-[200px] sm:max-w-none">
-                  {currentSchoolData?.name || currentUser?.school || 'Sekolah Rendah Islam I Musleh'}
+                  {currentSchoolData?.name || currentUser?.school || (isSecondaryMusleh ? 'SEKOLAH MENENGAH AGAMA I-MUSLEH' : 'Sekolah Rendah Islam I Musleh')}
                 </span>
               </div>
               <div className="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 flex items-center gap-2">
                 <span className="text-slate-400">Kod:</span>
                 <span className="font-mono font-bold text-amber-300">
-                  {currentSchoolData?.code || 'MJAC011'}
+                  {currentSchoolData?.code || currentUser?.schoolCode || (isSecondaryMusleh ? 'MIA1009' : 'MJAC011')}
                 </span>
               </div>
               <div className="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 flex items-center gap-2">
                 <span className="text-slate-400">No. Ahli:</span>
                 <span className="font-mono font-bold text-teal-300">
-                  {currentUser?.membershipNo?.replace('MIA1009', 'MJAC011') || `MPGB-2026-${currentSchoolData?.code || 'MJAC011'}`}
+                  {currentUser?.membershipNo || (currentSchoolData?.code ? `MPGB-2026-${currentSchoolData.code}` : (isSecondaryMusleh ? 'MPGB-2026-MIA1009' : 'MPGB-2026-MJAC011'))}
                 </span>
               </div>
               <div className="px-3 py-1.5 rounded-xl bg-emerald-950/70 border border-emerald-700/50 text-emerald-300 font-semibold flex items-center gap-1.5">
@@ -582,7 +603,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Bilangan Murid & Guru</span>
               <strong className="text-xs font-bold text-slate-800 mt-0.5 block">
-                {currentSchoolData?.studentCount || 420} Murid | {currentSchoolData?.teacherCount || 32} Guru
+                {currentSchoolData?.studentCount ?? (isSecondaryMusleh ? 79 : 420)} Murid | {currentSchoolData?.teacherCount ?? (isSecondaryMusleh ? 10 : 32)} Guru
               </strong>
               <span className="text-[10px] text-slate-500">Kapasiti Sesi 2026</span>
             </div>
@@ -590,25 +611,25 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">No. Keahlian Rasmi</span>
               <strong className="text-xs font-bold text-amber-700 font-mono mt-0.5 block truncate">
-                {currentUser?.membershipNo?.replace('MIA1009', 'MJAC011') || `MPGB-2026-${currentSchoolData?.code || 'MJAC011'}`}
+                {currentUser?.membershipNo || (currentSchoolData?.code ? `MPGB-2026-${currentSchoolData.code}` : (isSecondaryMusleh ? 'MPGB-2026-MIA1009' : 'MPGB-2026-MJAC011'))}
               </strong>
-              <span className="text-[10px] text-emerald-600 font-semibold">Tahun: {currentSchoolData?.joinYear || 2026}</span>
+              <span className="text-[10px] text-emerald-600 font-semibold">Tahun: {currentSchoolData?.joinYear || (isSecondaryMusleh ? 2023 : 2026)}</span>
             </div>
 
             <div className="col-span-2 p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
               <div className="min-w-0 pr-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Hubungan & Laman Web</span>
                 <span className="text-xs font-semibold text-slate-800 block truncate">
-                  Tel: {currentSchoolData?.phone || '+60 6-335 1290'}
+                  Tel: {currentSchoolData?.phone || (isSecondaryMusleh ? '06-2349405' : '+60 6-335 1290')}
                 </span>
                 <a
-                  href={currentSchoolData?.website || 'https://sri-imusleh.edu.my'}
+                  href={currentSchoolData?.website || (isSecondaryMusleh ? 'https://i-musleh.com' : 'https://imuslehmelaka.edu.my')}
                   target="_blank"
                   rel="noreferrer"
                   className="text-[11px] text-teal-700 hover:underline flex items-center gap-1 font-medium truncate"
                 >
                   <Globe className="w-3 h-3 shrink-0" />
-                  <span>{currentSchoolData?.website || 'https://sri-imusleh.edu.my'}</span>
+                  <span>{currentSchoolData?.website || (isSecondaryMusleh ? 'https://i-musleh.com' : 'https://imuslehmelaka.edu.my')}</span>
                 </a>
               </div>
               <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-xs">

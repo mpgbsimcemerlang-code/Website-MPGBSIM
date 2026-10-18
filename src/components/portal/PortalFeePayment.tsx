@@ -1055,7 +1055,7 @@ NO. KEAHLIAN: ${currentUser?.membershipNo || 'MPGB-2026-MEMBER'}`;
                       (MPGBSIM) • KOD PENDAFTARAN KEBANGSAAN
                     </p>
                     <p className="text-[10px] text-slate-500">
-                      Pejabat Agong, Kompleks Pendidikan Islam, Batu 4 1/2, Jalan Peringgit, 75400 Melaka
+                      D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan 43300 Selangor • Tel: 03-4251 6157 / 03-4251 6167
                     </p>
                   </div>
                 </div>
