@@ -613,7 +613,7 @@ export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
   {
     id: 'school-musleh-menengah-1',
     name: 'SEKOLAH MENENGAH AGAMA I-MUSLEH',
-    code: 'MIA1009',
+    code: 'JAIM/SAS(M)130',
     type: 'Sekolah Menengah',
     state: 'Melaka',
     district: 'Ayer Keroh',
@@ -1147,6 +1147,64 @@ const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[]
   }
 };
 
+/**
+ * Ensures schoolPhotoUrl, logoUrl, and principalPhotoUrl are never lost when merging from stripped caches
+ * and cross-hydrates any missing media from existing state or approved memberApplications.
+ */
+const mergeSchoolsPreservingMedia = (
+  incoming: MemberSchool[],
+  fallbackSchools?: MemberSchool[],
+  applications?: MemberApplication[]
+): MemberSchool[] => {
+  if (!incoming || incoming.length === 0) return fallbackSchools || [];
+  const fbList = fallbackSchools || [];
+  const appList = applications || [];
+
+  return incoming.map((sch) => {
+    const codeNorm = (sch.code || '').trim().toLowerCase();
+    const nameNorm = (sch.name || '').trim().toLowerCase();
+    const pgbEmailNorm = (sch.pgbEmail || sch.email || '').trim().toLowerCase();
+
+    const prevMatch = fbList.find(
+      (f) =>
+        f.id === sch.id ||
+        (codeNorm && (f.code || '').trim().toLowerCase() === codeNorm) ||
+        (nameNorm && (f.name || '').trim().toLowerCase() === nameNorm)
+    );
+
+    const appMatch = appList.find(
+      (a) =>
+        (codeNorm && (a.schoolCode || '').trim().toLowerCase() === codeNorm) ||
+        (nameNorm && (a.schoolName || '').trim().toLowerCase() === nameNorm) ||
+        (pgbEmailNorm && (a.email || a.pgbEmail || '').trim().toLowerCase() === pgbEmailNorm) ||
+        (nameNorm.includes('wilayah persekutuan') && (a.schoolName || '').toLowerCase().includes('wilayah persekutuan'))
+    );
+
+    const schoolPhotoUrl =
+      sch.schoolPhotoUrl ||
+      prevMatch?.schoolPhotoUrl ||
+      appMatch?.schoolPhotoUrl ||
+      '';
+    const logoUrl =
+      sch.logoUrl ||
+      prevMatch?.logoUrl ||
+      appMatch?.logoUrl ||
+      '';
+    const principalPhotoUrl =
+      sch.principalPhotoUrl ||
+      prevMatch?.principalPhotoUrl ||
+      appMatch?.pgbPhotoUrl ||
+      '';
+
+    return {
+      ...sch,
+      ...(schoolPhotoUrl ? { schoolPhotoUrl } : {}),
+      ...(logoUrl ? { logoUrl } : {}),
+      ...(principalPhotoUrl ? { principalPhotoUrl } : {}),
+    };
+  });
+};
+
 const getPendingRegistrationsFromStorage = (): MemberApplication[] => {
   try {
     const raw = typeof window !== 'undefined' ? localStorage.getItem('mpgbsim_pending_registrations') : null;
@@ -1211,7 +1269,7 @@ export const DEFAULT_MEMBER_APPLICATIONS: MemberApplication[] = [
     joinYear: 2023,
     schoolJoinYear: 2023,
     schoolName: 'SEKOLAH MENENGAH AGAMA I-MUSLEH',
-    schoolCode: 'MIA1009',
+    schoolCode: 'JAIM/SAS(M)130',
     schoolType: 'Sekolah Menengah',
     state: 'Melaka',
     district: 'Ayer Keroh',
@@ -1498,7 +1556,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         (initialSync?.stats?.schoolsCount ? initialSync.stats : null) ||
         prev?.stats ||
         DEFAULT_NETWORK_STATS,
-      memberSchools: sanitizeMemberSchoolsList(rawSchools),
+      memberSchools: mergeSchoolsPreservingMedia(
+        sanitizeMemberSchoolsList(rawSchools),
+        prev?.memberSchools,
+        rawApplications
+      ),
       news: sortNewsByPublishedDate(rawNews),
       programs: rawPrograms,
       practices: rawPractices,
@@ -1670,9 +1732,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               visionMission: cached.visionMission || prev.visionMission,
               strategicFocus: Array.isArray(cached.strategicFocus) ? cached.strategicFocus : prev.strategicFocus,
               stats: cached.stats || prev.stats,
-              memberSchools: Array.isArray(cached.memberSchools) && cached.memberSchools.length > 0
-                ? sanitizeMemberSchoolsList(cached.memberSchools)
-                : prev.memberSchools,
+              memberSchools:
+                prev.memberSchools && prev.memberSchools.length > 0
+                  ? mergeSchoolsPreservingMedia(
+                      prev.memberSchools,
+                      Array.isArray(cached.memberSchools) ? sanitizeMemberSchoolsList(cached.memberSchools) : [],
+                      Array.isArray(cached.memberApplications) ? cached.memberApplications : prev.memberApplications
+                    )
+                  : Array.isArray(cached.memberSchools) && cached.memberSchools.length > 0
+                  ? mergeSchoolsPreservingMedia(
+                      sanitizeMemberSchoolsList(cached.memberSchools),
+                      prev.memberSchools,
+                      Array.isArray(cached.memberApplications) ? cached.memberApplications : prev.memberApplications
+                    )
+                  : prev.memberSchools,
               news: Array.isArray(cached.news) ? sortNewsByPublishedDate(cached.news) : prev.news,
               programs: Array.isArray(cached.programs) ? cached.programs : prev.programs,
               practices: Array.isArray(cached.practices) ? cached.practices : prev.practices,
@@ -1688,7 +1761,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                 : prev.memberApplications,
               dashboardConfig: cached.dashboardConfig || prev.dashboardConfig,
               alumni: Array.isArray(cached.alumni) ? cached.alumni : prev.alumni,
-              announcements: Array.isArray(cached.announcements) ? cached.announcements : prev.announcements,
+              announcements:
+                getCachedFirestoreCollection<AnnouncementItem[]>('announcements') ||
+                (prev.announcements && prev.announcements.length > 0
+                  ? prev.announcements
+                  : Array.isArray(cached.announcements)
+                  ? cached.announcements
+                  : prev.announcements),
               examCalendar: Array.isArray(cached.examCalendar) ? cached.examCalendar : prev.examCalendar,
             };
           });
@@ -1708,7 +1787,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         setSiteData((prev) => ({
           ...prev,
           memberSchools: parsed.memberSchools && parsed.memberSchools.length > 0
-            ? sanitizeMemberSchoolsList(parsed.memberSchools)
+            ? mergeSchoolsPreservingMedia(
+                sanitizeMemberSchoolsList(parsed.memberSchools),
+                prev.memberSchools,
+                prev.memberApplications
+              )
             : prev.memberSchools,
           memberApplications: sanitizeMemberApplicationsList(
             parsed.memberApplications?.length ? parsed.memberApplications : prev.memberApplications
@@ -2092,7 +2175,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           }
           setSiteData((prev) => {
             if (sanitizedSchools.length > 0) {
-              return { ...prev, memberSchools: sanitizedSchools };
+              const enrichedSchools = mergeSchoolsPreservingMedia(
+                sanitizedSchools,
+                prev.memberSchools,
+                prev.memberApplications
+              );
+              return { ...prev, memberSchools: enrichedSchools };
             }
             if (isMockCleared) {
               return { ...prev, memberSchools: [] };
@@ -2344,10 +2432,19 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           if (sanitizedApps.length > 0) {
             cacheFirestoreCollection('memberApplications', sanitizedApps);
           }
-          setSiteData((prev) => ({
-            ...prev,
-            memberApplications: sanitizedApps.length > 0 ? sanitizedApps : prev.memberApplications,
-          }));
+          setSiteData((prev) => {
+            const nextApps = sanitizedApps.length > 0 ? sanitizedApps : prev.memberApplications;
+            const enrichedSchools = mergeSchoolsPreservingMedia(
+              prev.memberSchools,
+              prev.memberSchools,
+              nextApps
+            );
+            return {
+              ...prev,
+              memberApplications: nextApps,
+              memberSchools: enrichedSchools,
+            };
+          });
           setIsLoading(false);
         },
         (err) => handleListenerError('MemberApplications', err)
@@ -2620,14 +2717,19 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         count++;
       }
 
-      // 5. Sync Schools
+      // 5. Sync Schools (never overwrite Firestore photos with empty strings from stripped cache)
       for (const item of siteData.memberSchools) {
+        const safeSchoolPayload: Record<string, any> = {
+          ...item,
+          updatedAt: new Date().toISOString(),
+        };
+        if (!safeSchoolPayload.schoolPhotoUrl) delete safeSchoolPayload.schoolPhotoUrl;
+        if (!safeSchoolPayload.logoUrl) delete safeSchoolPayload.logoUrl;
+        if (!safeSchoolPayload.principalPhotoUrl) delete safeSchoolPayload.principalPhotoUrl;
+
         await setDoc(
           doc(db, 'schools', item.id),
-          {
-            ...item,
-            updatedAt: new Date().toISOString(),
-          },
+          safeSchoolPayload,
           { merge: true }
         );
         count++;
@@ -3305,8 +3407,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             (portalUser.school?.toLowerCase().includes('musleh') && (portalUser.school?.toLowerCase().includes('rendah') || portalUser.school?.toLowerCase().includes('sri'))));
 
         const matchSecondaryMusleh =
-          (id === 'school-musleh-menengah-1' || id === 'sch-musleh-menengah-1' || updated.code === 'MIA1009') &&
+          (id === 'school-musleh-menengah-1' || id === 'sch-musleh-menengah-1' || id === 'school-1792309529681-bv4d' || updated.code === 'JAIM/SAS(M)130' || updated.code === 'MIA1009') &&
           (portalUser.email === 'smimmelaka@gmail.com' ||
+            portalUser.membershipNo?.includes('JAIM/SAS') ||
             portalUser.membershipNo?.includes('MIA1009') ||
             (portalUser.school?.toLowerCase().includes('musleh') && (portalUser.school?.toLowerCase().includes('menengah') || portalUser.school?.toLowerCase().includes('sma'))));
 
@@ -3423,13 +3526,17 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
     } catch (e) {}
 
-    // 2. Persist ONLY genuinely modified schools to Firestore (avoid writing all 150 schools)
+    // 2. Persist ONLY genuinely modified schools to Firestore (avoid writing all 150 schools and never overwrite photos with empty strings)
     const prevSchoolMap = new Map((siteData.memberSchools || []).map((s) => [s.id, s]));
     repairedSchools.forEach((sch) => {
       const prev = prevSchoolMap.get(sch.id);
       const isModified = !prev || JSON.stringify(prev) !== JSON.stringify(sch);
       if (isModified) {
-        setDoc(doc(db, 'schools', sch.id), sch, { merge: true }).catch(() => {});
+        const safePayload: Record<string, any> = { ...sch };
+        if (!safePayload.schoolPhotoUrl) delete safePayload.schoolPhotoUrl;
+        if (!safePayload.logoUrl) delete safePayload.logoUrl;
+        if (!safePayload.principalPhotoUrl) delete safePayload.principalPhotoUrl;
+        setDoc(doc(db, 'schools', sch.id), safePayload, { merge: true }).catch(() => {});
       }
     });
     if (repairedUser?.uid) {

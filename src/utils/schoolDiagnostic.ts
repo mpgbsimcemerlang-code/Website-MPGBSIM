@@ -90,12 +90,13 @@ export function runSchoolDiagnostic(
     });
   }
 
-  // 2. Specific Verification for Musleh Schools (Primary SRI MJAC011 & Secondary SMA MIA1009)
+  // 2. Specific Verification for Musleh Schools (Primary SRI MJAC011 & Secondary SMA JAIM/SAS(M)130)
   const sriMusleh = schools.find(
     (s) => s.code?.toUpperCase() === 'MJAC011' || s.id === 'sch-musleh-1'
   );
   const smaMusleh = schools.find(
     (s) =>
+      s.code?.toUpperCase() === 'JAIM/SAS(M)130' ||
       s.code?.toUpperCase() === 'MIA1009' ||
       s.code?.toUpperCase().includes('JAIM/SAS') ||
       s.email?.toLowerCase() === 'smimmelaka@gmail.com' ||
@@ -106,10 +107,10 @@ export function runSchoolDiagnostic(
     checks.push({
       id: 'musleh-code-integrity',
       category: 'code',
-      title: 'Integriti Institusi Musleh (SRI MJAC011 & SMA MIA1009)',
+      title: 'Integriti Institusi Musleh (SRI MJAC011 & SMA JAIM/SAS(M)130)',
       description: 'Pengesahan integriti kedua-dua institusi berasingan: Sekolah Rendah Islam I Musleh dan Sekolah Menengah Agama I-Musleh.',
       status: 'passed',
-      message: `Kedua-dua institusi Musleh berdaftar dengan rekod dan kod berasingan yang sah: SRI I Musleh [MJAC011] dan SMA I-Musleh [MIA1009].`,
+      message: `Kedua-dua institusi Musleh berdaftar dengan rekod dan kod berasingan yang sah: SRI I Musleh [MJAC011] dan SMA I-Musleh [JAIM/SAS(M)130].`,
       details: [
         `SRI I Musleh: ${sriMusleh.name} (Kod: ${sriMusleh.code}) - Guru Besar: ${sriMusleh.principal}`,
         `SMA I-Musleh: ${smaMusleh.name} (Kod: ${smaMusleh.code}) - Pengetua: ${smaMusleh.principal} | Emel: ${smaMusleh.email}`,
@@ -119,17 +120,17 @@ export function runSchoolDiagnostic(
     checks.push({
       id: 'musleh-code-integrity',
       category: 'code',
-      title: 'Integriti Institusi Musleh (SRI MJAC011 & SMA MIA1009)',
+      title: 'Integriti Institusi Musleh (SRI MJAC011 & SMA JAIM/SAS(M)130)',
       description: 'Pengesahan institusi SRI I Musleh dan SMA I-Musleh.',
       status: 'warning',
-      message: `SRI I Musleh [MJAC011] ditemui, manakala Sekolah Menengah Agama I-Musleh [MIA1009] perlu dipastikan dalam direktori.`,
+      message: `SRI I Musleh [MJAC011] ditemui, manakala Sekolah Menengah Agama I-Musleh [JAIM/SAS(M)130] perlu dipastikan dalam direktori.`,
       details: [`SRI I Musleh: ${sriMusleh.name} [Kod: ${sriMusleh.code}]`],
     });
   } else {
     checks.push({
       id: 'musleh-code-integrity',
       category: 'code',
-      title: 'Integriti Institusi Musleh (SRI MJAC011 & SMA MIA1009)',
+      title: 'Integriti Institusi Musleh (SRI MJAC011 & SMA JAIM/SAS(M)130)',
       description: 'Pengesahan rekod sekolah Musleh.',
       status: 'warning',
       message: 'Perlu semakan rekod institusi Musleh dalam senarai direktori.',
@@ -187,8 +188,9 @@ export function runSchoolDiagnostic(
           (userSchool.toLowerCase().includes('musleh') && (userSchool.toLowerCase().includes('rendah') || userSchool.toLowerCase().includes('sri'))));
 
       const isSecondaryMuslehMatch =
-        (s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email === 'smimmelaka@gmail.com') &&
-        (userMemNo.includes('MIA1009') ||
+        (s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email === 'smimmelaka@gmail.com') &&
+        (userMemNo.includes('JAIM/SAS') ||
+          userMemNo.includes('MIA1009') ||
           userEmail === 'smimmelaka@gmail.com' ||
           (userSchool.toLowerCase().includes('musleh') && (userSchool.toLowerCase().includes('menengah') || userSchool.toLowerCase().includes('sma'))));
 
@@ -344,7 +346,7 @@ export function repairSchoolIntegrity(
       targetCode = 'MJAC011';
     } else if (isSecondaryMusleh) {
       targetId = sch.id.startsWith('school-') ? sch.id : 'sch-musleh-menengah-1';
-      targetCode = rawCode || 'MIA1009';
+      targetCode = 'JAIM/SAS(M)130';
     }
 
     const key = `code:${targetCode || targetId}`;
@@ -432,9 +434,10 @@ export function repairSchoolIntegrity(
     actionsTaken.push('Memastikan entiti rasmi Sekolah Rendah Islam I Musleh (Kod: MJAC011) terpelihara');
   }
 
-  // 2. Ensure Sekolah Menengah Agama I-Musleh exists (MIA1009)
+  // 2. Ensure Sekolah Menengah Agama I-Musleh exists (JAIM/SAS(M)130)
   let smaMusleh = Array.from(schoolsMap.values()).find(
     (s) =>
+      s.code === 'JAIM/SAS(M)130' ||
       s.code === 'MIA1009' ||
       s.email?.toLowerCase() === 'smimmelaka@gmail.com' ||
       s.code?.includes('JAIM/SAS') ||
@@ -444,7 +447,7 @@ export function repairSchoolIntegrity(
     smaMusleh = {
       id: 'sch-musleh-menengah-1',
       name: 'SEKOLAH MENENGAH AGAMA I-MUSLEH',
-      code: 'MIA1009',
+      code: 'JAIM/SAS(M)130',
       type: 'Sekolah Menengah',
       state: 'Melaka',
       district: 'Ayer Keroh',
@@ -470,8 +473,10 @@ export function repairSchoolIntegrity(
       updatedAt: new Date().toISOString(),
     };
     schoolsMap.set('sch-musleh-menengah-1', smaMusleh);
-    schoolsMap.set('code:MIA1009', smaMusleh);
-    actionsTaken.push('Memastikan entiti rasmi Sekolah Menengah Agama I-Musleh (Kod: MIA1009) terpelihara');
+    schoolsMap.set('code:JAIM/SAS(M)130', smaMusleh);
+    actionsTaken.push('Memastikan entiti rasmi Sekolah Menengah Agama I-Musleh (Kod: JAIM/SAS(M)130) terpelihara');
+  } else {
+    smaMusleh.code = 'JAIM/SAS(M)130';
   }
 
   // Deduplicate array
@@ -497,6 +502,7 @@ export function repairSchoolIntegrity(
     const userSchool = (portalUser.school || '').toLowerCase().trim();
 
     const isSecondaryMuslehUser =
+      userMemNo.includes('JAIM/SAS') ||
       userMemNo.includes('MIA1009') ||
       userEmail === 'smimmelaka@gmail.com' ||
       (userSchool.includes('musleh') && (userSchool.includes('menengah') || userSchool.includes('sma') || userSchool.includes('smim')));
@@ -509,7 +515,8 @@ export function repairSchoolIntegrity(
         (userSchool.includes('musleh') && (userSchool.includes('rendah') || userSchool.includes('sri'))));
 
     if (isSecondaryMuslehUser && smaMusleh) {
-      repairedUser.membershipNo = 'MPGB-2026-MIA1009';
+      repairedUser.membershipNo = 'MPGB-2026-JAIM/SAS(M)130';
+      repairedUser.schoolCode = 'JAIM/SAS(M)130';
       repairedUser.school = smaMusleh.name;
       repairedUser.schoolType = smaMusleh.type;
       repairedUser.position = 'Pengetua';
@@ -524,7 +531,7 @@ export function repairSchoolIntegrity(
         repairedUser.schoolPhotoUrl = smaMusleh.schoolPhotoUrl;
       }
       repairedUser.updatedAt = new Date().toISOString();
-      actionsTaken.push('Menyelaraskan profil Portal Ahli dengan Sekolah Menengah Agama I-Musleh [MPGB-2026-MIA1009].');
+      actionsTaken.push('Menyelaraskan profil Portal Ahli dengan Sekolah Menengah Agama I-Musleh [MPGB-2026-JAIM/SAS(M)130].');
     } else if (isPrimaryMuslehUser && sriMusleh) {
       repairedUser.membershipNo = 'MPGB-2026-MJAC011';
       repairedUser.school = sriMusleh.name;

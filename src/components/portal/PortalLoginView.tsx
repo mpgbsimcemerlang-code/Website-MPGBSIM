@@ -682,9 +682,17 @@ export const PortalLoginView: React.FC = () => {
                         </div>
 
                         {/* Principal & Info Box */}
-                        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5 text-xs text-slate-300 my-3">
-                          <div className="flex items-center gap-2">
-                            <GraduationCap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2 text-xs text-slate-300 my-3">
+                          <div className="flex items-center gap-2.5">
+                            {school.principalPhotoUrl ? (
+                              <img
+                                src={school.principalPhotoUrl}
+                                alt={school.principal || 'PGB'}
+                                className="w-7 h-7 rounded-full object-cover border border-amber-400/50 shrink-0 bg-slate-800"
+                              />
+                            ) : (
+                              <GraduationCap className="w-4 h-4 text-amber-400 shrink-0" />
+                            )}
                             <span className="truncate">
                               PGB: <strong className="text-white">{school.principal || 'Pengetua / Guru Besar'}</strong>
                             </span>
@@ -732,21 +740,28 @@ export const PortalLoginView: React.FC = () => {
                         <img
                           src={schoolToAuth.logoUrl}
                           alt={schoolToAuth.name}
-                          className="w-full h-full object-contain p-1"
+                          className="w-full h-full object-contain p-1 bg-white"
                         />
                       ) : (
                         <School className="w-6 h-6 text-amber-400" />
                       )}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-400/10 text-amber-300 border border-amber-400/20">
                         KOD: {schoolToAuth.code}
                       </span>
                       <h3 className="font-extrabold text-sm text-white truncate mt-0.5">
                         {schoolToAuth.name}
                       </h3>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        PGB: {schoolToAuth.principal}
+                      <p className="text-[11px] text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
+                        {schoolToAuth.principalPhotoUrl && (
+                          <img
+                            src={schoolToAuth.principalPhotoUrl}
+                            alt={schoolToAuth.principal || 'PGB'}
+                            className="w-4 h-4 rounded-full object-cover border border-amber-400/50 shrink-0"
+                          />
+                        )}
+                        <span className="truncate">PGB: {schoolToAuth.principal}</span>
                       </p>
                     </div>
                   </div>

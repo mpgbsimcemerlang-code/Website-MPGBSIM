@@ -59,7 +59,9 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
 
   const isSecondaryMusleh =
     currentUser?.email === 'smimmelaka@gmail.com' ||
-    (currentUser?.membershipNo && currentUser.membershipNo.includes('MIA1009')) ||
+    currentUser?.schoolCode === 'JAIM/SAS(M)130' ||
+    currentUser?.schoolCode === 'MIA1009' ||
+    (currentUser?.membershipNo && (currentUser.membershipNo.includes('JAIM/SAS') || currentUser.membershipNo.includes('MIA1009'))) ||
     (currentUser?.school && (currentUser.school.toLowerCase().includes('menengah') || currentUser.school.toLowerCase().includes('sma')) && currentUser.school.toLowerCase().includes('musleh'));
 
   const isPrimaryMusleh =
@@ -70,7 +72,7 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
       (currentUser?.school && (currentUser.school.toLowerCase().includes('rendah') || currentUser.school.toLowerCase().includes('sri')) && currentUser.school.toLowerCase().includes('musleh')));
 
   const matchedSchool: MemberSchool | undefined = isSecondaryMusleh
-    ? allSchools.find((s) => s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')
+    ? allSchools.find((s) => s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.id === 'school-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')
     : isPrimaryMusleh
     ? allSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1')
     : (currentUser?.schoolId ? allSchools.find((s) => s.id === currentUser.schoolId) : undefined) ||
@@ -110,14 +112,14 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
     (isSecondaryMusleh ? 'Sekolah Menengah' : isPrimaryMusleh ? 'Sekolah Rendah' : 'Sekolah Menengah');
 
   const state = currentUser?.state || matchedSchool?.state || 'Melaka';
-  const rawCode = currentUser?.schoolCode || currentUser?.membershipNo?.split('-').pop() || matchedSchool?.code || (isSecondaryMusleh ? 'MIA1009' : 'MJAC011');
-  const effectiveCode = isSecondaryMusleh ? 'MIA1009' : isPrimaryMusleh ? 'MJAC011' : rawCode;
+  const rawCode = currentUser?.schoolCode || currentUser?.membershipNo?.replace(/^MPGB-\d{4}-/, '') || matchedSchool?.code || (isSecondaryMusleh ? 'JAIM/SAS(M)130' : 'MJAC011');
+  const effectiveCode = isSecondaryMusleh ? 'JAIM/SAS(M)130' : isPrimaryMusleh ? 'MJAC011' : (rawCode === 'MIA1009' ? 'JAIM/SAS(M)130' : rawCode);
 
   const membershipNumber = isSecondaryMusleh
-    ? 'MPGB-2026-MIA1009'
+    ? 'MPGB-2026-JAIM/SAS(M)130'
     : isPrimaryMusleh
     ? 'MPGB-2026-MJAC011'
-    : currentUser?.membershipNo || `MPGB-2026-${effectiveCode}`;
+    : currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || `MPGB-2026-${effectiveCode}`;
 
   const icNumber = currentUser?.icNumber || (matchedSchool as any)?.icNumber || (isSecondaryMusleh ? '730627-01-5156' : '850312-04-5123');
   const photoURL =

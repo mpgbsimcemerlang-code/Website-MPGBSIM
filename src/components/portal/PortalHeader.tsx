@@ -22,6 +22,7 @@ import {
   Trophy,
   CalendarDays,
   CreditCard,
+  MessageSquare,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { Logo } from '../Logo';
@@ -47,6 +48,7 @@ export const PortalHeader: React.FC = () => {
 
   const navItems: { id: PortalTab; label: string; icon: any }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: User },
+    { id: 'sembang-live', label: 'Sembang Live PGB', icon: MessageSquare },
     { id: 'yuran', label: 'Bayar Yuran', icon: CreditCard },
     { id: 'pengumuman', label: 'Pengumuman', icon: Bell },
     { id: 'peperiksaan', label: 'Peperiksaan', icon: CalendarDays },
@@ -127,6 +129,21 @@ export const PortalHeader: React.FC = () => {
 
           {/* Right Action Icons & User Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Live Chat Quick Button */}
+            <button
+              onClick={() => setPortalTab('sembang-live')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
+                portalTab === 'sembang-live'
+                  ? 'bg-teal-700 text-white border-teal-500'
+                  : 'bg-slate-800 hover:bg-teal-900/80 text-emerald-300 hover:text-white border-slate-700'
+              }`}
+              title="Ruang Sembang Live Semua PGB"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <MessageSquare className="w-4 h-4 text-amber-400" />
+              <span className="hidden md:inline">Sembang Live</span>
+            </button>
+
             {/* Global Search Button */}
             <button
               onClick={() => setIsSearchOpen(true)}
@@ -263,7 +280,7 @@ export const PortalHeader: React.FC = () => {
                     <div className="mt-2.5 flex items-center justify-between">
                       {getRoleBadge()}
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {currentUser?.membershipNo || 'MPGB-AHLI'}
+                        {currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || 'MPGB-AHLI'}
                       </span>
                     </div>
                   </div>

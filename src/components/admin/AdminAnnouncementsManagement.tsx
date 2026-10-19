@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Megaphone,
   Plus,
@@ -18,10 +18,13 @@ import {
   Download,
   ExternalLink,
   Sparkles,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { AnnouncementItem } from '../../types';
+import { compressImageFile } from '../../utils/imageCompressor';
 
 export const AdminAnnouncementsManagement: React.FC = () => {
   const {
@@ -68,8 +71,35 @@ export const AdminAnnouncementsManagement: React.FC = () => {
   const [formImageUrl, setFormImageUrl] = useState('');
   const [formAttachmentName, setFormAttachmentName] = useState('');
   const [formAttachmentUrl, setFormAttachmentUrl] = useState('');
+  const [isUploadingPoster, setIsUploadingPoster] = useState(false);
+  const [posterUploadError, setPosterUploadError] = useState<string | null>(null);
+  const [uploadedPosterName, setUploadedPosterName] = useState<string | null>(null);
+  const posterInputRef = useRef<HTMLInputElement>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handlePosterFileUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setPosterUploadError('Sila pilih fail imej yang sah (PNG, JPG, JPEG atau WebP).');
+      return;
+    }
+    setPosterUploadError(null);
+    setIsUploadingPoster(true);
+    try {
+      const compressedDataUrl = await compressImageFile(file, 1000, 1400, 0.85);
+      setFormImageUrl(compressedDataUrl);
+      setUploadedPosterName(file.name);
+    } catch (err) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFormImageUrl((e.target?.result as string) || '');
+        setUploadedPosterName(file.name);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingPoster(false);
+    }
+  };
 
   const categories = ['Semua', 'Rasmi', 'Mesyuarat', 'Program', 'Kebajikan', 'Peluang', 'Penting'];
 
@@ -106,6 +136,8 @@ export const AdminAnnouncementsManagement: React.FC = () => {
     setFormImageUrl('');
     setFormAttachmentName('');
     setFormAttachmentUrl('');
+    setPosterUploadError(null);
+    setUploadedPosterName(null);
     setIsEditorOpen(true);
   };
 
@@ -123,6 +155,8 @@ export const AdminAnnouncementsManagement: React.FC = () => {
     setFormImageUrl(item.imageUrl || '');
     setFormAttachmentName(item.attachmentName || '');
     setFormAttachmentUrl(item.attachmentUrl || '');
+    setPosterUploadError(null);
+    setUploadedPosterName(item.imageUrl?.startsWith('data:image') ? 'Poster_Dimuat_Naik.webp' : null);
     setIsEditorOpen(true);
   };
 
@@ -584,15 +618,115 @@ export const AdminAnnouncementsManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Pautan Gambar Banner / Poster (Pilihan)</label>
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block font-bold text-slate-700">
+                    Gambar Banner / Poster (Pilihan) — Muat Naik atau Pautan
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => posterInputRef.current?.click()}
+                    disabled={isUploadingPoster}
+                    className="px-3.5 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer disabled:opacity-60"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isUploadingPoster ? 'Memproses Poster...' : 'Muat Naik Poster'}</span>
+                  </button>
+                </div>
+
                 <input
-                  type="url"
-                  value={formImageUrl}
-                  onChange={(e) => setFormImageUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/photo-..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                  ref={posterInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePosterFileUpload(file);
+                    if (e.target) e.target.value = '';
+                  }}
                 />
+
+                {posterUploadError && (
+                  <p className="text-[11px] font-semibold text-rose-600">{posterUploadError}</p>
+                )}
+
+                {formImageUrl ? (
+                  <div className="rounded-2xl border-2 border-teal-500/40 bg-slate-900 p-3.5 flex flex-col sm:flex-row items-center gap-4 overflow-hidden shadow-inner">
+                    <div className="relative w-32 h-40 sm:w-28 sm:h-32 shrink-0 rounded-xl overflow-hidden bg-slate-950 border border-slate-700 shadow-md">
+                      <img
+                        src={formImageUrl}
+                        alt="Pratonton Poster / Banner"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-2 min-w-0">
+                      <div className="flex items-center justify-center sm:justify-start gap-1.5 text-teal-400 text-xs font-bold">
+                        <CheckCircle className="w-4 h-4 shrink-0" />
+                        <span className="truncate">
+                          {uploadedPosterName
+                            ? `Poster dimuat naik: ${uploadedPosterName}`
+                            : 'Poster / Gambar Banner sedia dipaparkan'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        Gambar poster atau banner ini akan dipaparkan pada kad dan paparan penuh pengumuman di Portal PGB.
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => posterInputRef.current?.click()}
+                          disabled={isUploadingPoster}
+                          className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{isUploadingPoster ? 'Memproses...' : 'Tukar Poster'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormImageUrl('');
+                            setUploadedPosterName(null);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/70 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+                        >
+                          Buang Poster
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => posterInputRef.current?.click()}
+                    className="rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-500 bg-slate-50 hover:bg-teal-50/40 p-4 text-center transition cursor-pointer group"
+                  >
+                    <div className="w-10 h-10 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center mx-auto mb-2 group-hover:scale-105 transition-transform">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-800">
+                      Klik di sini untuk Muat Naik Poster / Gambar Banner dari peranti
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Format PNG, JPG atau WebP (Atau masukkan pautan URL gambar di bawah)
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={formImageUrl.startsWith('data:image') ? '' : formImageUrl}
+                    onChange={(e) => {
+                      setUploadedPosterName(null);
+                      setFormImageUrl(e.target.value);
+                    }}
+                    placeholder={
+                      formImageUrl.startsWith('data:image')
+                        ? 'Poster telah dimuat naik dari peranti (atau tampal URL di sini untuk ganti)...'
+                        : 'Atau tampal pautan URL Gambar Banner / Poster (https://...)'
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                  />
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">

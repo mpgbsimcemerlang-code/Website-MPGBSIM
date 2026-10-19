@@ -97,12 +97,15 @@ export function stripLargeBase64(obj: any, customLimit?: number): any {
   const copy: any = {};
   for (const key of Object.keys(obj)) {
     const val = obj[key];
-    const isProfilePhoto =
+    const isProtectedPhoto =
       key === 'avatarUrl' ||
       key === 'photoUrl' ||
       key === 'photoURL' ||
-      key === 'principalPhotoUrl';
-    const limit = isProfilePhoto ? Math.max(customLimit ?? 0, 160000) : (customLimit ?? 25000);
+      key === 'principalPhotoUrl' ||
+      key === 'pgbPhotoUrl' ||
+      key === 'logoUrl' ||
+      key === 'schoolPhotoUrl';
+    const limit = isProtectedPhoto ? Math.max(customLimit ?? 0, 160000) : (customLimit ?? 25000);
 
     if (typeof val === 'string' && val.startsWith('data:') && val.length > limit) {
       copy[key] = '';

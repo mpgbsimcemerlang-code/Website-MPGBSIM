@@ -126,8 +126,9 @@ export const PortalProfile: React.FC = () => {
   useEffect(() => {
     const isSecondaryMusleh =
       currentUser?.email === 'smimmelaka@gmail.com' ||
+      currentUser?.schoolCode === 'JAIM/SAS(M)130' ||
       currentUser?.schoolCode === 'MIA1009' ||
-      (currentUser?.membershipNo && currentUser.membershipNo.includes('MIA1009')) ||
+      (currentUser?.membershipNo && (currentUser.membershipNo.includes('JAIM/SAS') || currentUser.membershipNo.includes('MIA1009'))) ||
       (currentUser?.school && (currentUser.school.toLowerCase().includes('menengah') || currentUser.school.toLowerCase().includes('sma')) && currentUser.school.toLowerCase().includes('musleh'));
 
     const isPrimaryMusleh =
@@ -140,7 +141,7 @@ export const PortalProfile: React.FC = () => {
         (!currentUser && !currentUser?.email));
 
     const matchedSchool: MemberSchool | undefined = isSecondaryMusleh
-      ? allSchools.find((s) => s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com' || (s.name?.toLowerCase().includes('menengah') && s.name?.toLowerCase().includes('musleh')))
+      ? allSchools.find((s) => s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.id === 'school-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com' || (s.name?.toLowerCase().includes('menengah') && s.name?.toLowerCase().includes('musleh')))
       : isPrimaryMusleh
       ? allSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1' || (s.name?.toLowerCase().includes('rendah') && s.name?.toLowerCase().includes('musleh')))
       : (currentUser?.schoolId ? allSchools.find((s) => s.id === currentUser.schoolId) : undefined) ||
@@ -213,9 +214,11 @@ export const PortalProfile: React.FC = () => {
       (isSecondaryMusleh ? 'smimmelaka@gmail.com' : isPrimaryMusleh ? 'abdulqayyumyaakop@imuslehmelaka.edu.my' : '');
 
     const effectiveSchoolCode =
-      currentUser?.schoolCode ||
-      matchedSchool?.code ||
-      (isSecondaryMusleh ? 'MIA1009' : isPrimaryMusleh ? 'MJAC011' : '');
+      isSecondaryMusleh
+        ? 'JAIM/SAS(M)130'
+        : currentUser?.schoolCode ||
+          matchedSchool?.code ||
+          (isPrimaryMusleh ? 'MJAC011' : '');
 
     const effectiveSchoolType = normalizeSchoolCategory(
       currentUser?.schoolType ||
@@ -437,7 +440,9 @@ export const PortalProfile: React.FC = () => {
       // Synchronize directly with website member schools directory
       const isSecondaryUser = Boolean(
         currentUser?.email === 'smimmelaka@gmail.com' ||
+        currentUser?.schoolCode === 'JAIM/SAS(M)130' ||
         currentUser?.schoolCode === 'MIA1009' ||
+        currentUser?.membershipNo?.includes('JAIM/SAS') ||
         currentUser?.membershipNo?.includes('MIA1009') ||
         (currentUser?.school && (currentUser.school.toLowerCase().includes('menengah') || currentUser.school.toLowerCase().includes('sma')) && currentUser.school.toLowerCase().includes('musleh'))
       );
@@ -453,7 +458,7 @@ export const PortalProfile: React.FC = () => {
 
       const schoolsList = siteData.memberSchools || [];
       const matchedSchool: MemberSchool | undefined = isSecondaryUser
-        ? schoolsList.find((s) => s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com' || (s.name?.toLowerCase().includes('menengah') && s.name?.toLowerCase().includes('musleh')))
+        ? schoolsList.find((s) => s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.id === 'school-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com' || (s.name?.toLowerCase().includes('menengah') && s.name?.toLowerCase().includes('musleh')))
         : isPrimaryUser
         ? schoolsList.find((s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011' || s.email?.toLowerCase() === 'abdulqayyumyaakop@imuslehmelaka.edu.my' || (s.name?.toLowerCase().includes('rendah') && s.name?.toLowerCase().includes('musleh')))
         : (currentUser?.schoolId ? schoolsList.find((s) => s.id === currentUser.schoolId) : undefined) ||
@@ -532,9 +537,11 @@ export const PortalProfile: React.FC = () => {
 
   const isSecondaryMuslehCard =
     currentUser?.email === 'smimmelaka@gmail.com' ||
+    schoolCode === 'JAIM/SAS(M)130' ||
     schoolCode === 'MIA1009' ||
+    currentUser?.schoolCode === 'JAIM/SAS(M)130' ||
     currentUser?.schoolCode === 'MIA1009' ||
-    (currentUser?.membershipNo && currentUser.membershipNo.includes('MIA1009')) ||
+    (currentUser?.membershipNo && (currentUser.membershipNo.includes('JAIM/SAS') || currentUser.membershipNo.includes('MIA1009'))) ||
     (school && (school.toLowerCase().includes('menengah') || school.toLowerCase().includes('sma')) && school.toLowerCase().includes('musleh'));
 
   const isPrimaryMuslehCard =
@@ -546,13 +553,13 @@ export const PortalProfile: React.FC = () => {
       (school && (school.toLowerCase().includes('rendah') || school.toLowerCase().includes('sri')) && school.toLowerCase().includes('musleh')) ||
       (currentUser?.membershipNo && currentUser.membershipNo.includes('MJAC011')));
 
-  const rawCode = schoolCode || currentUser?.schoolCode || currentUser?.membershipNo?.split('-').pop() || (isSecondaryMuslehCard ? 'MIA1009' : 'MJAC011');
-  const effectiveCardCode = isSecondaryMuslehCard ? 'MIA1009' : isPrimaryMuslehCard ? 'MJAC011' : rawCode;
+  const rawCode = schoolCode || currentUser?.schoolCode || currentUser?.membershipNo?.replace(/^MPGB-\d{4}-/, '') || (isSecondaryMuslehCard ? 'JAIM/SAS(M)130' : 'MJAC011');
+  const effectiveCardCode = isSecondaryMuslehCard ? 'JAIM/SAS(M)130' : isPrimaryMuslehCard ? 'MJAC011' : (rawCode === 'MIA1009' ? 'JAIM/SAS(M)130' : rawCode);
   const membershipNumber = isSecondaryMuslehCard
-    ? 'MPGB-2026-MIA1009'
+    ? 'MPGB-2026-JAIM/SAS(M)130'
     : isPrimaryMuslehCard
     ? 'MPGB-2026-MJAC011'
-    : currentUser?.membershipNo || `MPGB-2026-${effectiveCardCode}`;
+    : currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || `MPGB-2026-${effectiveCardCode}`;
 
   useEffect(() => {
     const payload = JSON.stringify({

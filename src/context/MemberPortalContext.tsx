@@ -67,6 +67,7 @@ import {
 
 export type PortalTab =
   | 'dashboard'
+  | 'sembang-live'
   | 'yuran'
   | 'pengumuman'
   | 'peperiksaan'
@@ -276,7 +277,15 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
             const existing =
               schoolsMap.get(sch.id) ||
               (sch.code ? schoolsMap.get(`code:${sch.code.toUpperCase()}`) : undefined);
-            const merged = existing ? { ...existing, ...sch } : sch;
+            const merged = existing
+              ? {
+                  ...existing,
+                  ...sch,
+                  schoolPhotoUrl: sch.schoolPhotoUrl || existing.schoolPhotoUrl,
+                  logoUrl: sch.logoUrl || existing.logoUrl,
+                  principalPhotoUrl: sch.principalPhotoUrl || existing.principalPhotoUrl,
+                }
+              : sch;
             schoolsMap.set(sch.id, merged);
             if (sch.code) schoolsMap.set(`code:${sch.code.toUpperCase()}`, merged);
           }
@@ -291,7 +300,7 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
     }
   }
 
-  // 3. Overlay local CMS content if it contains newer local modifications
+  // 3. Overlay local CMS content if it contains newer local modifications (never overwrite non-empty photos with empty strings)
   try {
     const saved = localStorage.getItem('mpgbsim_cms_content_v3') || localStorage.getItem('mpgbsim_cms_content');
     if (saved) {
@@ -306,7 +315,13 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
                 const localTime = sch.updatedAt ? new Date(sch.updatedAt).getTime() : 0;
                 const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
                 if (localTime >= existingTime) {
-                  const merged = { ...existing, ...sch };
+                  const merged: MemberSchool = {
+                    ...existing,
+                    ...sch,
+                    schoolPhotoUrl: sch.schoolPhotoUrl || existing.schoolPhotoUrl,
+                    logoUrl: sch.logoUrl || existing.logoUrl,
+                    principalPhotoUrl: sch.principalPhotoUrl || existing.principalPhotoUrl,
+                  };
                   schoolsMap.set(existing.id, merged);
                   if (existing.code) schoolsMap.set(`code:${existing.code.toUpperCase()}`, merged);
                 }
@@ -376,7 +391,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         const memNo = user?.membershipNo || '';
         const isSecondaryMuslehUser =
           emailLower === 'smimmelaka@gmail.com' ||
+          memNo.includes('JAIM/SAS') ||
           memNo.includes('MIA1009') ||
+          user?.schoolCode === 'JAIM/SAS(M)130' ||
+          user?.schoolCode === 'MIA1009' ||
           (schoolLower.includes('musleh') && (schoolLower.includes('menengah') || schoolLower.includes('sma') || schoolLower.includes('smim')));
 
         const isPrimaryMuslehUser =
@@ -394,8 +412,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           user.state = 'Melaka';
           user.district = 'Ayer Keroh';
           user.role = 'MEMBER';
-          user.membershipNo = 'MPGB-2026-MIA1009';
-          user.schoolCode = 'MIA1009';
+          user.membershipNo = 'MPGB-2026-JAIM/SAS(M)130';
+          user.schoolCode = 'JAIM/SAS(M)130';
           user.phone = user.phone || '013-2695286';
           user.schoolPhone = '06-2349405';
           user.email = user.email || 'smimmelaka@gmail.com';
@@ -497,7 +515,20 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ANNOUNCEMENTS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: AnnouncementItem[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((a) =>
+            a.id === 'ann-1' && (!a.attachmentUrl || a.attachmentUrl === '#')
+              ? {
+                  ...a,
+                  attachmentUrl:
+                    'https://drive.google.com/file/d/1PIemR7HOk9-JC--T1gMLMmMx4pwxDZh9/view?usp=sharing',
+                }
+              : a
+          );
+        }
+      }
     } catch (e) {
       // ignore
     }
@@ -713,7 +744,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         // 3. Detect school if Musleh or registered school
         const isSecondaryMusleh =
           userEmail === 'smimmelaka@gmail.com' ||
-          (savedProfile?.membershipNo && savedProfile.membershipNo.includes('MIA1009')) ||
+          (savedProfile?.membershipNo && (savedProfile.membershipNo.includes('JAIM/SAS') || savedProfile.membershipNo.includes('MIA1009'))) ||
           (savedProfile?.school && (savedProfile.school.toLowerCase().includes('menengah') || savedProfile.school.toLowerCase().includes('sma')) && savedProfile.school.toLowerCase().includes('musleh'));
 
         const isPrimaryMusleh =
@@ -725,13 +756,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             (savedProfile?.membershipNo && savedProfile.membershipNo.includes('MJAC011')));
 
         let matchedSchool = regSchools.find((s) => {
-          if (isSecondaryMusleh && (s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')) return true;
+          if (isSecondaryMusleh && (s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')) return true;
           if (isPrimaryMusleh && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) return true;
           if (s.email && s.email.toLowerCase().trim() === userEmail) return true;
           if (savedProfile?.membershipNo && s.code && savedProfile.membershipNo.includes(s.code)) return true;
           if (savedProfile?.school && s.name && savedProfile.school.toLowerCase().trim() === s.name.toLowerCase().trim()) return true;
           return false;
-        }) || (isSecondaryMusleh ? regSchools.find((s) => s.code === 'MIA1009' || s.email?.toLowerCase() === 'smimmelaka@gmail.com') : undefined)
+        }) || (isSecondaryMusleh ? regSchools.find((s) => s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.email?.toLowerCase() === 'smimmelaka@gmail.com') : undefined)
           || (isPrimaryMusleh ? regSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1') : undefined);
 
         const role: UserRole = isSuperAdmin ? 'ADMIN' : 'MEMBER';
@@ -773,7 +804,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           (isSecondaryMusleh ? 'Masitah Binti Seikh Omar (Pengetua)' : isPrimaryMusleh ? 'Ustaz Abdul Qayyum bin Yaakop' : isSuperAdmin ? 'Pentadbir Utama MPGBSIM' : 'Ahli PGB MPGBSIM');
 
         const membershipNo = isSecondaryMusleh
-          ? 'MPGB-2026-MIA1009'
+          ? 'MPGB-2026-JAIM/SAS(M)130'
           : isPrimaryMusleh
           ? 'MPGB-2026-MJAC011'
           : (matchedSchool?.code
@@ -790,7 +821,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           position: pos,
           icNumber: savedProfile?.icNumber || (matchedSchool as any)?.icNumber || currentUser?.icNumber || '',
           school: schoolName,
-          schoolCode: matchedSchool?.code || savedProfile?.schoolCode || currentUser?.schoolCode || '',
+          schoolCode: isSecondaryMusleh ? 'JAIM/SAS(M)130' : (matchedSchool?.code || savedProfile?.schoolCode || currentUser?.schoolCode || ''),
           schoolType,
           state: stateName,
           district: matchedSchool?.district || savedProfile?.district || currentUser?.district || '',
@@ -854,7 +885,17 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   // Sync shared collections directly from AdminContentContext to avoid duplicate Firestore listeners & read quota waste
   useEffect(() => {
     if (Array.isArray(siteData.announcements) && siteData.announcements.length > 0) {
-      setAnnouncements(siteData.announcements);
+      setAnnouncements(
+        siteData.announcements.map((a) =>
+          a.id === 'ann-1' && (!a.attachmentUrl || a.attachmentUrl === '#')
+            ? {
+                ...a,
+                attachmentUrl:
+                  'https://drive.google.com/file/d/1PIemR7HOk9-JC--T1gMLMmMx4pwxDZh9/view?usp=sharing',
+              }
+            : a
+        )
+      );
     }
   }, [siteData.announcements]);
 
@@ -882,7 +923,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         if (!prev) return prev;
         const isSecondaryMusleh =
           prev.email === 'smimmelaka@gmail.com' ||
-          (prev.membershipNo && prev.membershipNo.includes('MIA1009')) ||
+          prev.schoolCode === 'JAIM/SAS(M)130' ||
+          prev.schoolCode === 'MIA1009' ||
+          (prev.membershipNo && (prev.membershipNo.includes('JAIM/SAS') || prev.membershipNo.includes('MIA1009'))) ||
           (prev.school && (prev.school.toLowerCase().includes('menengah') || prev.school.toLowerCase().includes('sma')) && prev.school.toLowerCase().includes('musleh'));
 
         const isPrimaryMusleh =
@@ -893,7 +936,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             (prev.membershipNo && prev.membershipNo.includes('MJAC011')));
 
         const matched = isSecondaryMusleh
-          ? repairedSchools.find((s) => s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')
+          ? repairedSchools.find((s) => s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')
           : isPrimaryMusleh
           ? repairedSchools.find((s) => s.id === 'sch-musleh-1' || s.code === 'MJAC011')
           : (prev.schoolId ? repairedSchools.find((s) => s.id === prev.schoolId) : null) ||
@@ -912,7 +955,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             }) : null);
 
         if (matched) {
+          const targetCode = isSecondaryMusleh ? 'JAIM/SAS(M)130' : (matched.code || prev.schoolCode);
+          const targetMemNo = isSecondaryMusleh ? 'MPGB-2026-JAIM/SAS(M)130' : (prev.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || prev.membershipNo);
           const needsUpdate =
+            (targetCode && targetCode !== prev.schoolCode) ||
+            (targetMemNo && targetMemNo !== prev.membershipNo) ||
             (matched.principal && matched.principal !== prev.fullName) ||
             (matched.name && matched.name !== prev.school) ||
             (matched.state && matched.state !== prev.state) ||
@@ -926,6 +973,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
           const updatedUser: UserProfile = {
             ...prev,
+            ...(targetCode ? { schoolCode: targetCode } : {}),
+            ...(targetMemNo ? { membershipNo: targetMemNo } : {}),
             ...(matched.principal ? { fullName: matched.principal } : {}),
             ...(matched.name ? { school: matched.name } : {}),
             ...(matched.state ? { state: matched.state } : {}),
@@ -1129,7 +1178,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       // 3. Match against registered schools (exact email, domain match, or specific educator email)
       const isSecondaryMusleh =
         userEmail === 'smimmelaka@gmail.com' ||
-        (savedProfile?.membershipNo && savedProfile.membershipNo.includes('MIA1009')) ||
+        (savedProfile?.membershipNo && (savedProfile.membershipNo.includes('JAIM/SAS') || savedProfile.membershipNo.includes('MIA1009'))) ||
         (savedProfile?.school && (savedProfile.school.toLowerCase().includes('menengah') || savedProfile.school.toLowerCase().includes('sma')) && savedProfile.school.toLowerCase().includes('musleh'));
 
       const isPrimaryMusleh =
@@ -1140,7 +1189,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           (savedProfile?.school && (savedProfile.school.toLowerCase().includes('rendah') || savedProfile.school.toLowerCase().includes('sri')) && savedProfile.school.toLowerCase().includes('musleh')));
 
       let matchedSchool: MemberSchool | undefined = registeredSchools.find((s) => {
-        if (isSecondaryMusleh && (s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')) return true;
+        if (isSecondaryMusleh && (s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com')) return true;
         if (isPrimaryMusleh && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) return true;
         if (!s.email) return false;
         const schEmail = s.email.toLowerCase().trim();
@@ -1152,7 +1201,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       });
 
       if (!matchedSchool && isSecondaryMusleh) {
-        matchedSchool = registeredSchools.find((s) => s.code === 'MIA1009' || s.email?.toLowerCase() === 'smimmelaka@gmail.com');
+        matchedSchool = registeredSchools.find((s) => s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.email?.toLowerCase() === 'smimmelaka@gmail.com');
       } else if (!matchedSchool && isPrimaryMusleh) {
         matchedSchool = registeredSchools.find((s) => s.code === 'MJAC011' || s.id === 'sch-musleh-1');
       }
@@ -1192,7 +1241,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       const defaultState = savedProfile?.state || matchedSchool?.state || (isSecondaryMusleh || isPrimaryMusleh ? 'Melaka' : 'Wilayah Persekutuan');
       const defaultSchoolType = savedProfile?.schoolType || matchedSchool?.type || (isSecondaryMusleh ? 'Sekolah Menengah' : isPrimaryMusleh ? 'Sekolah Rendah' : 'SMKA');
       const defaultMembershipNo = isSecondaryMusleh
-        ? 'MPGB-2026-MIA1009'
+        ? 'MPGB-2026-JAIM/SAS(M)130'
         : isPrimaryMusleh
         ? 'MPGB-2026-MJAC011'
         : (savedProfile?.membershipNo ||
@@ -1209,6 +1258,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         role,
         position: pos,
         school: defaultSchoolName,
+        schoolCode: isSecondaryMusleh ? 'JAIM/SAS(M)130' : (matchedSchool?.code || savedProfile?.schoolCode || ''),
         schoolType: defaultSchoolType,
         state: defaultState,
         phone: savedProfile?.phone || matchedSchool?.phone || user.phoneNumber || (isSecondaryMusleh ? '06-2349405' : isPrimaryMusleh ? '+60 6-335 1290' : ''),
@@ -1511,8 +1561,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         (liveSchool.name?.toLowerCase().includes('rendah') && liveSchool.name?.toLowerCase().includes('musleh')) ||
         liveSchool.email?.toLowerCase().includes('imuslehmelaka'));
 
-    const cleanCode = liveSchool.code?.trim().toUpperCase() ||
-      (isSecondaryMusleh ? 'MIA1009' : isPrimaryMusleh ? 'MJAC011' : liveSchool.id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase());
+    const rawCode = liveSchool.code?.trim().toUpperCase();
+    const cleanCode = isSecondaryMusleh
+      ? 'JAIM/SAS(M)130'
+      : (rawCode && rawCode !== 'MIA1009' ? rawCode : (isPrimaryMusleh ? 'MJAC011' : liveSchool.id.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()));
 
     const schoolName = liveSchool.name || (isSecondaryMusleh ? 'SEKOLAH MENENGAH AGAMA I-MUSLEH' : isPrimaryMusleh ? 'Sekolah Rendah Islam I Musleh' : '');
     const principalName = liveSchool.principal || (isSecondaryMusleh ? 'Masitah Binti Seikh Omar (Pengetua)' : isPrimaryMusleh ? 'Ustaz Abdul Qayyum bin Yaakop' : '');
@@ -1664,13 +1716,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           (currentUser.school?.toLowerCase().includes('rendah') && currentUser.school?.toLowerCase().includes('musleh'))
         );
         const isSecondaryUser = Boolean(
+          currentUser.membershipNo?.includes('JAIM/SAS') ||
           currentUser.membershipNo?.includes('MIA1009') ||
           currentUser.email === 'smimmelaka@gmail.com' ||
           (currentUser.school?.toLowerCase().includes('menengah') && currentUser.school?.toLowerCase().includes('musleh'))
         );
         const matchMusleh = Boolean(
           (isPrimaryUser && (sch.code === 'MJAC011' || sch.id === 'sch-musleh-1')) ||
-          (isSecondaryUser && (sch.code === 'MIA1009' || sch.id === 'sch-musleh-menengah-1' || sch.email === 'smimmelaka@gmail.com'))
+          (isSecondaryUser && (sch.code === 'JAIM/SAS(M)130' || sch.code === 'MIA1009' || sch.id === 'sch-musleh-menengah-1' || sch.email === 'smimmelaka@gmail.com'))
         );
         const matchPgbEmail = Boolean(
           sch.pgbEmail && currentUser.email && sch.pgbEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
@@ -1725,13 +1778,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               (currentUser.school?.toLowerCase().includes('rendah') && currentUser.school?.toLowerCase().includes('musleh'))
             );
             const isSecondaryUser = Boolean(
+              currentUser.membershipNo?.includes('JAIM/SAS') ||
               currentUser.membershipNo?.includes('MIA1009') ||
               currentUser.email === 'smimmelaka@gmail.com' ||
               (currentUser.school?.toLowerCase().includes('menengah') && currentUser.school?.toLowerCase().includes('musleh'))
             );
             const matchMusleh = Boolean(
               (isPrimaryUser && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) ||
-              (isSecondaryUser && (s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email === 'smimmelaka@gmail.com'))
+              (isSecondaryUser && (s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email === 'smimmelaka@gmail.com'))
             );
             const matchPgbEmail = Boolean(
               s.pgbEmail && currentUser.email && s.pgbEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
@@ -1820,6 +1874,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       (currentUser.school?.toLowerCase().includes('rendah') && currentUser.school?.toLowerCase().includes('musleh'))
     );
     const isSecondaryUser = Boolean(
+      currentUser.membershipNo?.includes('JAIM/SAS') ||
       currentUser.membershipNo?.includes('MIA1009') ||
       currentUser.email === 'smimmelaka@gmail.com' ||
       (currentUser.school?.toLowerCase().includes('menengah') && currentUser.school?.toLowerCase().includes('musleh'))
@@ -1843,7 +1898,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         );
         const isMuslehMatch = Boolean(
           (isPrimaryUser && (d.id === 'sch-musleh-1' || sch.code === 'MJAC011')) ||
-          (isSecondaryUser && (d.id === 'sch-musleh-menengah-1' || sch.code === 'MIA1009' || sch.email === 'smimmelaka@gmail.com'))
+          (isSecondaryUser && (d.id === 'sch-musleh-menengah-1' || sch.code === 'JAIM/SAS(M)130' || sch.code === 'MIA1009' || sch.email === 'smimmelaka@gmail.com'))
         );
         if (matchCode || isMuslehMatch || (matchExactName && (matchPgbEmail || !sch.pgbEmail)) || matchPgbEmail) {
           targetDocId = d.id;
@@ -1896,7 +1951,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               (s.email && s.email.toLowerCase() === currentUser.email?.toLowerCase()) ||
               (s.name && s.name.toLowerCase() === currentUser.school?.toLowerCase()) ||
               (isPrimaryUser && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) ||
-              (isSecondaryUser && (s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email === 'smimmelaka@gmail.com'))
+              (isSecondaryUser && (s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email === 'smimmelaka@gmail.com'))
             ) {
               return { ...s, password: cleanPass };
             }
@@ -1929,14 +1984,18 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       date: announcementData.date || new Date().toISOString().split('T')[0],
       status: announcementData.status || 'published',
     };
+    const sanitizedAnn = Object.fromEntries(
+      Object.entries(newAnn).filter(([_, v]) => v !== undefined)
+    ) as AnnouncementItem;
+
     setAnnouncements((prev) => {
       const filtered = prev.filter((a) => a.id !== id);
-      return [newAnn, ...filtered];
+      return [sanitizedAnn, ...filtered];
     });
-    recordAuditLog('Cipta Pengumuman', `Mencipta pengumuman baharu: "${newAnn.title}"`);
+    recordAuditLog('Cipta Pengumuman', `Mencipta pengumuman baharu: "${sanitizedAnn.title}"`);
 
     try {
-      await setDoc(doc(db, 'announcements', id), newAnn, { merge: true });
+      await setDoc(doc(db, 'announcements', id), sanitizedAnn, { merge: true });
       localStorage.setItem('mpgbsim_announcements_seeded', 'true');
     } catch (e) {
       console.warn('Firestore createAnnouncement notice:', e);
@@ -1948,11 +2007,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const updateAnnouncement = async (id: string, updates: Partial<AnnouncementItem>) => {
-    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
+    const sanitizedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+    setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, ...sanitizedUpdates } : a)));
     recordAuditLog('Kemas Kini Pengumuman', `Mengemas kini pengumuman ID: ${id}`);
 
     try {
-      await setDoc(doc(db, 'announcements', id), updates, { merge: true });
+      await setDoc(doc(db, 'announcements', id), sanitizedUpdates, { merge: true });
       localStorage.setItem('mpgbsim_announcements_seeded', 'true');
     } catch (e) {
       console.warn('Firestore updateAnnouncement notice:', e);

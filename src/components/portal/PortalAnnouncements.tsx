@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Bell,
   Search,
@@ -16,9 +16,12 @@ import {
   Eye,
   Archive,
   ArrowRight,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { AnnouncementItem } from '../../types';
+import { compressImageFile } from '../../utils/imageCompressor';
 
 export const PortalAnnouncements: React.FC = () => {
   const {
@@ -44,8 +47,50 @@ export const PortalAnnouncements: React.FC = () => {
   const [formPinned, setFormPinned] = useState(false);
   const [formStatus, setFormStatus] = useState<AnnouncementItem['status']>('published');
   const [formImage, setFormImage] = useState('');
+  const [formAttachmentName, setFormAttachmentName] = useState('');
+  const [formAttachmentUrl, setFormAttachmentUrl] = useState('');
+  const [isUploadingPoster, setIsUploadingPoster] = useState(false);
+  const [uploadedPosterName, setUploadedPosterName] = useState<string | null>(null);
+  const posterInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePosterFileUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Sila pilih fail imej yang sah (PNG, JPG, JPEG atau WebP).');
+      return;
+    }
+    setIsUploadingPoster(true);
+    try {
+      const compressedDataUrl = await compressImageFile(file, 1000, 1400, 0.85);
+      setFormImage(compressedDataUrl);
+      setUploadedPosterName(file.name);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFormImage((e.target?.result as string) || '');
+        setUploadedPosterName(file.name);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingPoster(false);
+    }
+  };
 
   const canManage = currentRole === 'ADMIN' || currentRole === 'MEDIA_AJK';
+
+  const getAnnouncementDownloadUrl = (ann: AnnouncementItem): string => {
+    const raw = (ann.attachmentUrl || '').trim();
+    if (raw && raw !== '#') {
+      if (/^(https?:\/\/|data:|\/)/i.test(raw)) return raw;
+      return `https://${raw}`;
+    }
+    if (
+      ann.id === 'ann-1' ||
+      ann.title.toUpperCase().includes('JEMPUTAN MENYERTAI MESYUARAT MPGBSIM')
+    ) {
+      return 'https://drive.google.com/file/d/1PIemR7HOk9-JC--T1gMLMmMx4pwxDZh9/view?usp=sharing';
+    }
+    return 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link';
+  };
 
   const categories = ['Semua', 'Rasmi', 'Mesyuarat', 'Program', 'Kebajikan', 'Peluang', 'Penting'];
 
@@ -75,6 +120,9 @@ export const PortalAnnouncements: React.FC = () => {
     setFormPinned(false);
     setFormStatus('published');
     setFormImage('');
+    setFormAttachmentName('');
+    setFormAttachmentUrl('');
+    setUploadedPosterName(null);
     setIsEditorOpen(true);
   };
 
@@ -88,6 +136,9 @@ export const PortalAnnouncements: React.FC = () => {
     setFormPinned(ann.pinned || false);
     setFormStatus(ann.status || 'published');
     setFormImage(ann.imageUrl || '');
+    setFormAttachmentName(ann.attachmentName || '');
+    setFormAttachmentUrl(ann.attachmentUrl || '');
+    setUploadedPosterName(ann.imageUrl?.startsWith('data:image') ? 'Poster_Dimuat_Naik.webp' : null);
     setIsEditorOpen(true);
   };
 
@@ -108,6 +159,8 @@ export const PortalAnnouncements: React.FC = () => {
         pinned: formPinned,
         status: formStatus,
         imageUrl: formImage || undefined,
+        attachmentName: formAttachmentName.trim() || undefined,
+        attachmentUrl: formAttachmentUrl.trim() || undefined,
       });
     } else {
       await createAnnouncement({
@@ -120,6 +173,8 @@ export const PortalAnnouncements: React.FC = () => {
         pinned: formPinned,
         status: formStatus,
         imageUrl: formImage || undefined,
+        attachmentName: formAttachmentName.trim() || undefined,
+        attachmentUrl: formAttachmentUrl.trim() || undefined,
       });
     }
     setIsEditorOpen(false);
@@ -241,6 +296,27 @@ export const PortalAnnouncements: React.FC = () => {
                 <p className="text-xs text-slate-600 mt-2 line-clamp-3 leading-relaxed">
                   {ann.summary || ann.content}
                 </p>
+
+                {(ann.attachmentName || ann.attachmentUrl) && (
+                  <div className="mt-3 p-2.5 rounded-xl bg-teal-50/70 border border-teal-200/80 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-4 h-4 text-teal-800 shrink-0" />
+                      <span className="text-[11px] font-semibold text-teal-950 truncate">
+                        {ann.attachmentName || 'Dokumen Lampiran Rasmi'}
+                      </span>
+                    </div>
+                    <a
+                      href={getAnnouncementDownloadUrl(ann)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-2.5 py-1 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-[10px] font-bold flex items-center gap-1 shrink-0 transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Muat Turun</span>
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
@@ -337,22 +413,26 @@ export const PortalAnnouncements: React.FC = () => {
               {selectedAnnouncement.content}
             </div>
 
-            {selectedAnnouncement.attachmentName && (
-              <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-6 h-6 text-teal-800" />
-                  <div>
-                    <div className="font-semibold text-xs text-slate-900">{selectedAnnouncement.attachmentName}</div>
-                    <span className="text-[10px] text-slate-500">Dokumen Lampiran Rasmi PDF</span>
+            {(selectedAnnouncement.attachmentName || selectedAnnouncement.attachmentUrl) && (
+              <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <FileText className="w-6 h-6 text-teal-800 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="font-semibold text-xs text-slate-900 truncate">
+                      {selectedAnnouncement.attachmentName || 'Dokumen Lampiran Rasmi PDF'}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Dokumen Lampiran Rasmi PDF (Google Drive)</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => alert(`Memuat turun lampiran: ${selectedAnnouncement.attachmentName}`)}
-                  className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold flex items-center gap-1.5"
+                <a
+                  href={getAnnouncementDownloadUrl(selectedAnnouncement)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Muat Turun
-                </button>
+                  <span>Muat Turun</span>
+                </a>
               </div>
             )}
 
@@ -448,15 +528,120 @@ export const PortalAnnouncements: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">URL Gambar Banner (Pilihan)</label>
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block font-bold text-slate-700">
+                    Pautan Gambar Banner / Poster (Pilihan)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => posterInputRef.current?.click()}
+                    disabled={isUploadingPoster}
+                    className="px-3 py-1.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition cursor-pointer disabled:opacity-60"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isUploadingPoster ? 'Memproses...' : 'Muat Naik Poster'}</span>
+                  </button>
+                </div>
+
                 <input
-                  type="url"
-                  value={formImage}
-                  onChange={(e) => setFormImage(e.target.value)}
-                  placeholder="https://..."
+                  ref={posterInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePosterFileUpload(file);
+                    if (e.target) e.target.value = '';
+                  }}
+                />
+
+                {formImage ? (
+                  <div className="rounded-2xl border border-teal-300 bg-teal-50/50 p-3 flex flex-col sm:flex-row items-center gap-3">
+                    <div className="w-24 h-28 rounded-xl overflow-hidden bg-slate-900 border border-slate-200 shrink-0">
+                      <img src={formImage} alt="Pratonton Poster" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-1.5 min-w-0">
+                      <div className="flex items-center justify-center sm:justify-start gap-1 text-teal-800 font-bold text-xs">
+                        <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">
+                          {uploadedPosterName ? `Poster: ${uploadedPosterName}` : 'Poster / Banner sedia digunakan'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => posterInputRef.current?.click()}
+                          className="px-2.5 py-1 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-[11px] font-bold flex items-center gap-1"
+                        >
+                          <Upload className="w-3 h-3" />
+                          <span>Tukar Poster</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormImage('');
+                            setUploadedPosterName(null);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 text-[11px] font-bold"
+                        >
+                          Buang Poster
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => posterInputRef.current?.click()}
+                    className="rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-500 bg-slate-50 hover:bg-teal-50/30 p-3.5 text-center transition cursor-pointer"
+                  >
+                    <ImageIcon className="w-5 h-5 text-teal-700 mx-auto mb-1" />
+                    <p className="text-xs font-bold text-slate-700">
+                      Klik untuk Muat Naik Poster / Gambar Banner dari peranti
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      PNG, JPG atau WebP (Atau tampal pautan URL gambar di bawah)
+                    </p>
+                  </div>
+                )}
+
+                <input
+                  type="text"
+                  value={formImage.startsWith('data:image') ? '' : formImage}
+                  onChange={(e) => {
+                    setUploadedPosterName(null);
+                    setFormImage(e.target.value);
+                  }}
+                  placeholder={
+                    formImage.startsWith('data:image')
+                      ? 'Poster telah dimuat naik dari peranti (atau tampal URL di sini untuk ganti)...'
+                      : 'Atau tampal pautan URL Gambar Banner / Poster (https://...)'
+                  }
                   className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nama Fail Lampiran (Pilihan)</label>
+                  <input
+                    type="text"
+                    value={formAttachmentName}
+                    onChange={(e) => setFormAttachmentName(e.target.value)}
+                    placeholder="Contoh: Surat_Jemputan_Mesyuarat.pdf"
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Pautan Google Drive / Dokumen (Pilihan)</label>
+                  <input
+                    type="url"
+                    value={formAttachmentUrl}
+                    onChange={(e) => setFormAttachmentUrl(e.target.value)}
+                    placeholder="https://drive.google.com/file/d/..."
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-4 pt-2">

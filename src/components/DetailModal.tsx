@@ -21,10 +21,13 @@ import {
   AlertCircle,
   Printer,
   Copy,
+  Lock,
+  ArrowRight,
 } from 'lucide-react';
 import { NewsItem, StrategicFocus, BestPracticeItem, ProgramEvent } from '../types';
 import { db, doc, setDoc } from '../firebase';
 import { useAdminContent } from '../context/AdminContentContext';
+import { useMemberPortal } from '../context/MemberPortalContext';
 import { checkAndRecordRateLimit } from '../utils/rateLimiter';
 
 export type ModalContentType =
@@ -43,6 +46,7 @@ interface DetailModalProps {
 
 export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) => {
   const { siteData, registerForEvent } = useAdminContent();
+  const { setViewMode, setPortalTab } = useMemberPortal();
 
   // Program registration form state
   const [progName, setProgName] = useState('');
@@ -437,8 +441,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
 
             <div className="p-6 sm:p-8">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-900 border border-blue-200">
-                  Pendaftaran Program MPGBSIM
+                <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-teal-100 text-teal-900 border border-teal-200">
+                  Info Lanjut Program & Konvensyen MPGBSIM
                 </span>
 
                 {isCapacityFull ? (
@@ -528,286 +532,62 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
               </div>
 
               {/* Description preview */}
-              <div className="text-xs text-slate-600 leading-relaxed mb-6 bg-slate-50/60 p-3.5 rounded-xl border border-slate-100">
-                <p>{liveProgram?.description || content.data.description}</p>
+              <div className="text-xs sm:text-sm text-slate-700 leading-relaxed mb-6 bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-2">
+                <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                  Maklumat & Ringkasan Program:
+                </h4>
+                <p className="whitespace-pre-line">
+                  {liveProgram?.description || content.data.description}
+                </p>
+                {(liveProgram?.targetAudience || content.data.targetAudience) && (
+                  <p className="pt-2 border-t border-slate-200/80 text-xs text-slate-600">
+                    <strong className="text-slate-800">Sasaran Peserta:</strong>{' '}
+                    {liveProgram?.targetAudience || content.data.targetAudience}
+                  </p>
+                )}
               </div>
 
-              {/* Registered Success Slip */}
-              {progRegistered && regReceipt ? (
-                <div className="p-6 rounded-2xl bg-teal-50 border-2 border-teal-500/40 text-teal-950 space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                      <CheckCircle2 className="w-7 h-7" />
-                    </div>
-                    <div>
-                      <h4 className="text-base font-extrabold text-teal-950">Pendaftaran Berjaya Diterima & Disahkan!</h4>
-                      <p className="text-xs text-teal-800">
-                        Kapasiti program telah dikemaskini secara langsung ke dalam sistem takwim rasmi.
-                      </p>
-                    </div>
+              {/* Exclusive Registration via PGB Member Portal Notice (No Public Website Form) */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-teal-800/90 border border-teal-600/50 text-amber-400 flex items-center justify-center shrink-0">
+                    <Lock className="w-5 h-5" />
                   </div>
-
-                  {/* Attendance Code Card */}
-                  <div className="bg-white p-4 rounded-xl border border-teal-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                        Kod Rujukan & Kehadiran (Attendance Pass)
-                      </span>
-                      <span className="text-xl font-mono font-black text-teal-900 tracking-wider">
-                        {regReceipt.code}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(regReceipt.code);
-                          setCopiedCode(true);
-                          setTimeout(() => setCopiedCode(false), 2000);
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-900 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {copiedCode ? <Check className="w-3.5 h-3.5 text-teal-700" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedCode ? 'Disalin!' : 'Salin Kod'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Participant Summary */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-white/70 p-3 rounded-xl border border-teal-100 text-slate-700">
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Nama Peserta:</span>
-                      <strong>{progName}</strong> ({progPosition})
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Sekolah / Institusi:</span>
-                      <strong>{progSchool}</strong>, {progState}
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Emel Pengesahan:</span>
-                      <strong>{progEmail}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">No. Telefon / WhatsApp:</span>
-                      <strong>{progPhone || 'Tidak dinyatakan'}</strong>
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-slate-500 italic">
-                    * Sila tunjukkan Kod Rujukan kehadiran semasa pendaftaran meja urus setia pada hari program berlangsung.
-                  </p>
-
-                  <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Cetak Slip Pendaftaran</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <span>Selesai & Tutup</span>
-                    </button>
-                  </div>
-                </div>
-              ) : isCapacityFull ? (
-                /* Capacity Full Notice */
-                <div className="p-6 rounded-2xl bg-rose-50 border border-rose-200 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-                    <AlertCircle className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-base font-extrabold text-rose-950">
-                    Kapasiti Kuota Pendaftaran Telah Penuh
-                  </h4>
-                  <p className="text-xs text-rose-800 max-w-md mx-auto leading-relaxed">
-                    Kuota {spotsTotal} peserta bagi acara ini telah dipenuhi sepenuhnya. Pendaftaran telah ditutup. Untuk pertanyaan senarai menunggu (*waiting list*), sila hubungi urus setia rasmi MPGBSIM.
-                  </p>
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs cursor-pointer"
-                    >
-                      Tutup Maklumat
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Registration Form */
-                <form onSubmit={handleProgramRegisterSubmit} className="space-y-4 text-xs sm:text-sm">
-                  <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-                    <h4 className="font-extrabold text-slate-900 flex items-center gap-1.5">
-                      <UserCheck className="w-4 h-4 text-teal-700" />
-                      Borang Pendaftaran Peserta (PGB / Guru / Wakil)
-                    </h4>
-                    <span className="text-[11px] text-teal-800 font-semibold bg-teal-50 px-2 py-0.5 rounded-md">
-                      Baki: {spotsTotal - spotsFilled} Kekosongan
+                  <div className="space-y-1">
+                    <span className="inline-block text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-400 text-slate-950">
+                      Pendaftaran Eksklusif Ahli PGB
                     </span>
+                    <h4 className="text-sm sm:text-base font-extrabold text-white">
+                      Pendaftaran Hanya Melalui Portal PGB Masing-Masing
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Laman web utama ini hanya memaparkan maklumat lanjut program. Untuk mendaftar penyertaan bagi sekolah anda, sila log masuk ke <strong>Portal Ahli PGB MPGBSIM</strong> masing-masing dan daftar di ruangan <strong>Takwim & Program</strong>.
+                    </p>
                   </div>
+                </div>
 
-                  {progError && (
-                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span>{progError}</span>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Nama Penuh Peserta *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="cth. Pengetua Hj. Kamaruddin bin Wahab"
-                        value={progName}
-                        onChange={(e) => setProgName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none text-xs"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Jawatan / Posisi *
-                      </label>
-                      <select
-                        value={progPosition}
-                        onChange={(e) => setProgPosition(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none text-xs bg-white"
-                      >
-                        <option value="Pengetua">Pengetua</option>
-                        <option value="Guru Besar">Guru Besar</option>
-                        <option value="Penolong Kanan Pentadbiran">Penolong Kanan Pentadbiran</option>
-                        <option value="Penolong Kanan HEM">Penolong Kanan HEM</option>
-                        <option value="Penolong Kanan Kokurikulum">Penolong Kanan Kokurikulum</option>
-                        <option value="Guru Kanan / Guru">Guru Kanan / Guru</option>
-                        <option value="Lembaga Pengelola (LPS)">Lembaga Pengelola (LPS)</option>
-                        <option value="Pegawai Pengiring">Pegawai Pengiring</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="sm:col-span-2">
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Nama Sekolah / Institusi *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="cth. SMKA Maahad Hamidiah Kajang"
-                        value={progSchool}
-                        onChange={(e) => setProgSchool(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none text-xs"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Negeri *
-                      </label>
-                      <select
-                        value={progState}
-                        onChange={(e) => setProgState(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none text-xs bg-white"
-                      >
-                        <option value="Selangor">Selangor</option>
-                        <option value="Kuala Lumpur">Kuala Lumpur</option>
-                        <option value="Putrajaya">Putrajaya</option>
-                        <option value="Johor">Johor</option>
-                        <option value="Kedah">Kedah</option>
-                        <option value="Kelantan">Kelantan</option>
-                        <option value="Melaka">Melaka</option>
-                        <option value="Negeri Sembilan">Negeri Sembilan</option>
-                        <option value="Pahang">Pahang</option>
-                        <option value="Perak">Perak</option>
-                        <option value="Perlis">Perlis</option>
-                        <option value="Pulau Pinang">Pulau Pinang</option>
-                        <option value="Sabah">Sabah</option>
-                        <option value="Sarawak">Sarawak</option>
-                        <option value="Terengganu">Terengganu</option>
-                        <option value="Labuan">Labuan</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        Alamat Emel Rasmi *
-                      </label>
-                      <div className="relative">
-                        <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="email"
-                          required
-                          placeholder="pengetua@sekolah.edu.my"
-                          value={progEmail}
-                          onChange={(e) => setProgEmail(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none text-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-700 font-semibold mb-1">
-                        No. Telefon / WhatsApp *
-                      </label>
-                      <div className="relative">
-                        <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="tel"
-                          required
-                          placeholder="+60 12-345 6789"
-                          value={progPhone}
-                          onChange={(e) => setProgPhone(e.target.value)}
-                          className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none text-xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-semibold mb-1">
-                      Catatan Tambahan (Pilihan)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="cth. Diet vegetarian / memerlukan surat pelepasan rasmi"
-                      value={progNotes}
-                      onChange={(e) => setProgNotes(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 focus:ring-2 focus:ring-teal-500 outline-none text-xs"
-                    />
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={progSubmitting}
-                      className="w-full py-3 px-4 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {progSubmitting ? (
-                        <>
-                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Sedang Mengesahkan Pendaftaran...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Sahkan Pendaftaran Acara ({spotsTotal - spotsFilled} Baki Kuota)</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
+                <div className="pt-1 flex flex-col sm:flex-row items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      setPortalTab('program');
+                      setViewMode('portal');
+                    }}
+                    className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+                  >
+                    <span>Log Masuk Portal PGB Untuk Daftar</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full sm:w-auto py-3 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm border border-slate-700 transition cursor-pointer"
+                  >
+                    Tutup Info Lanjut
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

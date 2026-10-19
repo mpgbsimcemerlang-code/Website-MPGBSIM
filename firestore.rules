@@ -151,6 +151,15 @@ service cloud.firestore {
     match /feePayments/{paymentId} {
       allow read, write: if true;
     }
+
+    // 21. Live Chat PGB Messages & Presence
+    match /pgbChatMessages/{messageId} {
+      allow read, write: if true;
+    }
+
+    match /pgbChatPresence/{presenceId} {
+      allow read, write: if true;
+    }
   }
 }
 

@@ -31,6 +31,7 @@ import {
   CalendarDays,
   CreditCard,
   Receipt,
+  MessageSquare,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -62,11 +63,29 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
   const programs = siteData.programs || [];
 
   const [isDigitalCardModalOpen, setIsDigitalCardModalOpen] = React.useState(false);
+  const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = React.useState<any | null>(null);
+
+  const getAnnouncementDownloadUrl = (ann: any): string => {
+    const raw = (ann?.attachmentUrl || '').trim();
+    if (raw && raw !== '#') {
+      if (/^(https?:\/\/|data:|\/)/i.test(raw)) return raw;
+      return `https://${raw}`;
+    }
+    if (
+      ann?.id === 'ann-1' ||
+      (ann?.title || '').toUpperCase().includes('JEMPUTAN MENYERTAI MESYUARAT MPGBSIM')
+    ) {
+      return 'https://drive.google.com/file/d/1PIemR7HOk9-JC--T1gMLMmMx4pwxDZh9/view?usp=sharing';
+    }
+    return 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link';
+  };
 
   const isSecondaryMusleh = React.useMemo(() => {
     return Boolean(
       currentUser?.email === 'smimmelaka@gmail.com' ||
+      currentUser?.schoolCode === 'JAIM/SAS(M)130' ||
       currentUser?.schoolCode === 'MIA1009' ||
+      currentUser?.membershipNo?.includes('JAIM/SAS') ||
       currentUser?.membershipNo?.includes('MIA1009') ||
       (currentUser?.school && (currentUser.school.toLowerCase().includes('menengah') || currentUser.school.toLowerCase().includes('sma')) && currentUser.school.toLowerCase().includes('musleh'))
     );
@@ -89,7 +108,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
     if (isSecondaryMusleh) {
       return (
-        schools.find((s) => s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com' || (s.name?.toLowerCase().includes('menengah') && s.name?.toLowerCase().includes('musleh'))) ||
+        schools.find((s) => s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.id === 'school-musleh-menengah-1' || s.email?.toLowerCase() === 'smimmelaka@gmail.com' || (s.name?.toLowerCase().includes('menengah') && s.name?.toLowerCase().includes('musleh'))) ||
         null
       );
     }
@@ -163,6 +182,13 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
     color: string;
     subTab?: string;
   }[] = [
+    {
+      id: 'sembang-live',
+      title: 'Sembang Live PGB',
+      sub: 'Ruang interaksi langsung semua PGB',
+      icon: MessageSquare,
+      color: 'from-teal-700 via-emerald-700 to-slate-900',
+    },
     {
       id: 'yuran',
       title: 'Bayar Yuran PGB',
@@ -273,6 +299,10 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           downloads: r.downloads || 0,
           description: r.description,
           visibility: 'PUBLIC',
+          downloadUrl:
+            r.driveUrl ||
+            r.fileUrl ||
+            'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
         });
       }
     });
@@ -319,13 +349,13 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
               <div className="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 flex items-center gap-2">
                 <span className="text-slate-400">Kod:</span>
                 <span className="font-mono font-bold text-amber-300">
-                  {currentSchoolData?.code || currentUser?.schoolCode || (isSecondaryMusleh ? 'MIA1009' : 'MJAC011')}
+                  {isSecondaryMusleh ? 'JAIM/SAS(M)130' : (currentSchoolData?.code || currentUser?.schoolCode || 'MJAC011')}
                 </span>
               </div>
               <div className="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 flex items-center gap-2">
                 <span className="text-slate-400">No. Ahli:</span>
                 <span className="font-mono font-bold text-teal-300">
-                  {currentUser?.membershipNo || (currentSchoolData?.code ? `MPGB-2026-${currentSchoolData.code}` : (isSecondaryMusleh ? 'MPGB-2026-MIA1009' : 'MPGB-2026-MJAC011'))}
+                  {isSecondaryMusleh ? 'MPGB-2026-JAIM/SAS(M)130' : (currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || (currentSchoolData?.code ? `MPGB-2026-${currentSchoolData.code}` : 'MPGB-2026-MJAC011'))}
                 </span>
               </div>
               <div className="px-3 py-1.5 rounded-xl bg-emerald-950/70 border border-emerald-700/50 text-emerald-300 font-semibold flex items-center gap-1.5">
@@ -551,7 +581,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           <div className="md:col-span-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 flex flex-col items-center text-center justify-between">
             <div className="w-full flex justify-between items-center text-[10px] text-slate-500 mb-2">
               <span className="font-bold uppercase tracking-wider text-teal-800">Kepimpinan PGB</span>
-              <span className="font-mono text-amber-800 font-bold">{currentSchoolData?.code || 'MJAC011'}</span>
+              <span className="font-mono text-amber-800 font-bold">{isSecondaryMusleh ? 'JAIM/SAS(M)130' : (currentSchoolData?.code || 'MJAC011')}</span>
             </div>
 
             <div className="relative my-1">
@@ -571,13 +601,13 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
             <div className="mt-2 w-full">
               <strong className="text-xs font-extrabold text-slate-900 block truncate">
-                {currentSchoolData?.principal || currentUser?.fullName || 'Ustaz Abdul Qayyum bin Yaakop'}
+                {currentSchoolData?.principal || currentUser?.fullName || (isSecondaryMusleh ? 'Masitah Binti Seikh Omar (Pengetua)' : 'Ustaz Abdul Qayyum bin Yaakop')}
               </strong>
               <span className="text-[11px] font-semibold text-teal-800 block">
-                {currentUser?.position || 'Guru Besar'}
+                {currentUser?.position || (isSecondaryMusleh ? 'Pengetua' : 'Guru Besar')}
               </span>
               <span className="text-[10px] text-slate-500 block truncate">
-                {currentSchoolData?.email || 'abdulqayyumyaakop@imuslehmelaka.edu.my'}
+                {currentSchoolData?.email || (isSecondaryMusleh ? 'smimmelaka@gmail.com' : 'abdulqayyumyaakop@imuslehmelaka.edu.my')}
               </span>
             </div>
           </div>
@@ -587,7 +617,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Kod Sekolah</span>
               <strong className="text-sm font-black text-teal-900 font-mono mt-0.5 block">
-                {currentSchoolData?.code || 'MJAC011'}
+                {isSecondaryMusleh ? 'JAIM/SAS(M)130' : (currentSchoolData?.code || 'MJAC011')}
               </strong>
               <span className="text-[10px] text-slate-500">Pendaftaran Rasmi</span>
             </div>
@@ -611,7 +641,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">No. Keahlian Rasmi</span>
               <strong className="text-xs font-bold text-amber-700 font-mono mt-0.5 block truncate">
-                {currentUser?.membershipNo || (currentSchoolData?.code ? `MPGB-2026-${currentSchoolData.code}` : (isSecondaryMusleh ? 'MPGB-2026-MIA1009' : 'MPGB-2026-MJAC011'))}
+                {isSecondaryMusleh ? 'MPGB-2026-JAIM/SAS(M)130' : (currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || (currentSchoolData?.code ? `MPGB-2026-${currentSchoolData.code}` : 'MPGB-2026-MJAC011'))}
               </strong>
               <span className="text-[10px] text-emerald-600 font-semibold">Tahun: {currentSchoolData?.joinYear || (isSecondaryMusleh ? 2023 : 2026)}</span>
             </div>
@@ -648,7 +678,36 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
         </div>
       </div>
 
-      {/* 8 Quick Access Cards Grid */}
+      {/* Live Chat PGB Quick-Launch Banner */}
+      <div className="bg-slate-900 text-white rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-teal-800 border border-teal-600/50 text-amber-400 flex items-center justify-center shrink-0">
+            <MessageSquare className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>Rangkaian Interaksi Masa Nyata (Live Chat)</span>
+            </div>
+            <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
+              Ruang Sembang Langsung Semua PGB MPGBSIM
+            </h2>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Berinteraksi secara langsung bersama rakan Pengetua & Guru Besar seluruh Malaysia mengikut saluran topik atau mesej terus (1-ke-1).
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPortalTab('sembang-live')}
+          className="px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shrink-0 shadow-md transition cursor-pointer"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Masuk Ruang Sembang Live →</span>
+        </button>
+      </div>
+
+      {/* Quick Access Cards Grid */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -718,7 +777,13 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           {recentAnnouncements.map((ann) => (
             <div
               key={ann.id}
-              onClick={() => onOpenAnnouncementModal && onOpenAnnouncementModal(ann)}
+              onClick={() => {
+                if (onOpenAnnouncementModal) {
+                  onOpenAnnouncementModal(ann);
+                } else {
+                  setSelectedDashboardAnnouncement(ann);
+                }
+              }}
               className="p-5 rounded-2xl bg-slate-50 hover:bg-amber-50/40 border border-slate-200 hover:border-amber-300 transition-all cursor-pointer flex flex-col justify-between"
             >
               <div>
@@ -748,6 +813,27 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
                   {ann.title}
                 </h3>
                 <p className="text-xs text-slate-600 mt-2 line-clamp-3 leading-relaxed">{ann.summary}</p>
+
+                {(ann.attachmentName || ann.attachmentUrl) && (
+                  <div className="mt-3 p-2.5 rounded-xl bg-teal-50/80 border border-teal-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <FileText className="w-3.5 h-3.5 text-teal-800 shrink-0" />
+                      <span className="text-[11px] font-semibold text-teal-950 truncate">
+                        {ann.attachmentName || 'Dokumen Lampiran'}
+                      </span>
+                    </div>
+                    <a
+                      href={getAnnouncementDownloadUrl(ann)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="px-2.5 py-1 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-[10px] font-bold flex items-center gap-1 shrink-0 transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Muat Turun</span>
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
@@ -938,14 +1024,17 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      alert(`Memuat turun dokumen rasmi: ${docItem.title}`);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-teal-900 text-white text-[11px] font-semibold shrink-0"
+                  <a
+                    href={
+                      docItem.downloadUrl ||
+                      'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link'
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-teal-900 text-white text-[11px] font-semibold shrink-0 transition-colors"
                   >
                     Muat Turun
-                  </button>
+                  </a>
                 </div>
               ))}
             </div>
@@ -1004,6 +1093,88 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           </div>
         </div>
       </section>
+
+      {/* Dashboard Announcement Detail Modal */}
+      {selectedDashboardAnnouncement && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setSelectedDashboardAnnouncement(null)}
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-500"
+            >
+              ✕
+            </button>
+
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-900">
+                {selectedDashboardAnnouncement.category}
+              </span>
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
+              {selectedDashboardAnnouncement.title}
+            </h2>
+
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500 pb-4 border-b border-slate-100">
+              <span>
+                Dikeluarkan oleh:{' '}
+                <strong className="text-slate-800">{selectedDashboardAnnouncement.author}</strong>
+              </span>
+              <span>Tarikh: {selectedDashboardAnnouncement.date}</span>
+            </div>
+
+            {selectedDashboardAnnouncement.imageUrl && (
+              <div className="mt-4 rounded-2xl overflow-hidden border border-slate-200">
+                <img
+                  src={selectedDashboardAnnouncement.imageUrl}
+                  alt={selectedDashboardAnnouncement.title}
+                  className="w-full max-h-64 object-cover"
+                />
+              </div>
+            )}
+
+            <div className="mt-5 text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line space-y-4">
+              {selectedDashboardAnnouncement.content}
+            </div>
+
+            {(selectedDashboardAnnouncement.attachmentName ||
+              selectedDashboardAnnouncement.attachmentUrl) && (
+              <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <FileText className="w-6 h-6 text-teal-800 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="font-semibold text-xs text-slate-900 truncate">
+                      {selectedDashboardAnnouncement.attachmentName ||
+                        'Dokumen Lampiran Rasmi PDF'}
+                    </div>
+                    <span className="text-[10px] text-slate-500">
+                      Dokumen Lampiran Rasmi PDF (Google Drive)
+                    </span>
+                  </div>
+                </div>
+                <a
+                  href={getAnnouncementDownloadUrl(selectedDashboardAnnouncement)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Muat Turun</span>
+                </a>
+              </div>
+            )}
+
+            <div className="mt-8 pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setSelectedDashboardAnnouncement(null)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Digital Membership Card Modal */}
       <DigitalMembershipCardModal

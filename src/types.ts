@@ -546,3 +546,39 @@ export interface FeePaymentRecord {
   updatedAt?: string;
 }
 
+export interface PGBChatMessage {
+  id: string;
+  channelId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  senderSchool: string;
+  senderSchoolCode?: string;
+  senderState?: string;
+  senderAvatar?: string;
+  text: string;
+  imageUrl?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  replyToId?: string;
+  replyToSender?: string;
+  replyToText?: string;
+  pinned?: boolean;
+  reactions?: Record<string, string[]>; // emoji -> array of senderIds/schoolCodes
+  createdAt: string; // ISO timestamp
+}
+
+export interface PGBChatPresence {
+  id: string;
+  uid: string;
+  fullName: string;
+  position: string;
+  school: string;
+  schoolCode: string;
+  state: string;
+  avatarUrl?: string;
+  lastActiveAt: string; // ISO timestamp
+  statusText?: string;
+}
+
+

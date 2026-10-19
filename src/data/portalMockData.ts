@@ -60,8 +60,8 @@ export const DEMO_USERS: Record<string, UserProfile> = {
     logoUrl: '/mpgbsim-official-logo.png',
     expertise: ['Kepimpinan Kurikulum Menengah Agama', 'Tadbir Urus Sekolah Islam', 'Pendidikan Bersepadu'],
     interests: ['Inovasi Pendidikan Menengah', 'Kepimpinan Wanita Madani', 'Pembangunan Huffaz'],
-    membershipNo: 'MPGB-2026-MIA1009',
-    schoolCode: 'MIA1009',
+    membershipNo: 'MPGB-2026-JAIM/SAS(M)130',
+    schoolCode: 'JAIM/SAS(M)130',
     joinYear: 2023,
     serviceStartYear: 2023,
     pgbStartYear: 2023,
@@ -156,36 +156,52 @@ export const DEMO_USERS: Record<string, UserProfile> = {
 export const INITIAL_ANNOUNCEMENTS: AnnouncementItem[] = [
   {
     id: 'ann-1',
-    title: 'Mesyuarat Agung Tahunan (AGM) MPGBSIM Kali Ke-11 Sesi 2026',
+    title: 'JEMPUTAN MENYERTAI MESYUARAT MPGBSIM & KURSUS PROFESIONALISME GURU BESAR/PENGETUA',
     summary: 'Pemberitahuan rasmi mengenai tarikh, agenda pemilihan kepimpinan baharu dan pengesahan kehadiran PGB.',
-    content: `Assalamualaikum Wrt. Wbt.
-Kepada Semua Ahli Pengetua & Guru Besar yang dihormati,
+    content: `Guru Besar dan Pengetua
+Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)
 
-Sukacita dimaklumkan bahawa Mesyuarat Agung Tahunan (AGM) MPGBSIM Kali Ke-11 akan diadakan seperti ketetapan berikut:
+Assalamualaikum Warahmatullahi Wabarakatuh,
 
-Tarikh: 24 Oktober 2026 (Sabtu)
-Masa: 8:30 Pagi – 4:30 Petang
-Tempat: Dewan Persidangan Utama, Kompleks Pendidikan Islam Antarabangsa, Bangi
-Mod: Hibrid (Fizikal & Siaran Langsung Portal Ahli)
+Tuan/Puan,
+JEMPUTAN MENYERTAI MESYUARAT MPGBSIM & KURSUS PROFESIONALISME
+GURU BESAR/PENGETUA
 
-Agenda Utama:
-1. Ucapan Dasar Yang Dipertua MPGBSIM
-2. Pembentangan dan Pengesahan Minit Mesyuarat Kali Ke-10
-3. Laporan Aktiviti Tahunan 2025/2026
-4. Pembentangan Penyata Kewangan Beraudit
-5. Pembentangan Usul Transformasi Digital Sekolah Islam
-6. Hal-hal Lain
+Semoga tuan sentiasa di dalam lindungan Allah SWT setiap masa dan komited dalam
+menjalankan tugas.
 
-Sila sahkan kehadiran anda melalui butang Pengesahan Kehadiran di bawah tab Program selewat-lewatnya 15 Oktober 2026. Kehadiran Pengetua dan Guru Besar amat dihargai demi masa depan pendidikan Islam negara.`,
+2. Merujuk perkara diatas sukacita dimaklumkan bahawa Mesyuarat MPGBSIM &
+Kursus Profesionalisme Guru Besar/Pengetua akan diadakan seperti berikut:
+
+Tarikh : 27 - 28 Oktober 2026 (Selasa-Rabu)
+Tempat : The Scapes Hotel & IAB Genting Highlands
+Masa : 7.00 pagi – 2.00 petang
+Yuran PGB : RM200.00
+Yuran Pasangan/Keluarga : RM350.00
+
+3. Bayaran yuran penyertaan hendaklah dijelaskan melalui pautan
+https://app.herepay.org/mpgbsim/pf_0012 selewat-lewatnya 26 Oktober 2026.
+
+4. Semoga dengan sokongan tuan dapat melancarkan program dalam meneruskan
+perjuangan dalam arus perdana pendidikan. Segala kerjasama dan sokongan pihak tuan
+didahului dengan ucapan Jazakumullah Khairan Kathira.
+
+Sekian, terima kasih. Wassalam.
+
+Yang menjalankan amanah,
+
+MOHAMAD FAIZ BIN AZIZAN
+Pengerusi MPGBSIM
+Sesi 2026-2028`,
     category: 'Mesyuarat',
     author: 'Setiausaha Agung MPGBSIM',
     authorRole: 'Urus Setia Kebangsaan',
-    date: '2026-09-22',
+    date: '2026-09-30',
     status: 'published',
     pinned: true,
     imageUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
-    attachmentName: 'Surat_Panggilan_AGM_MPGBSIM_2026.pdf',
-    attachmentUrl: '#',
+    attachmentName: 'Surat jemputan menyertai mesyuarat mpgbsim & kursus profesionalisme guru besar/pengetua.pdf',
+    attachmentUrl: 'https://drive.google.com/file/d/1PIemR7HOk9-JC--T1gMLMmMx4pwxDZh9/view?usp=sharing',
   },
   {
     id: 'ann-2',
@@ -209,7 +225,7 @@ Dokumen lengkap boleh dimuat turun daripada Pusat Dokumen di dalam portal ini.`,
     pinned: true,
     imageUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80',
     attachmentName: 'Garis_Panduan_AI_Sekolah_Islam_MPGBSIM.pdf',
-    attachmentUrl: '#',
+    attachmentUrl: 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
   },
   {
     id: 'ann-3',

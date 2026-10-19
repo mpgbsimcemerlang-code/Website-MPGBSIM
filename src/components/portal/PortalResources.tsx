@@ -108,7 +108,7 @@ export const PortalResources: React.FC = () => {
             : 'artikel') as any,
           category: r.category || 'Panduan Rasmi',
           description: r.description || 'Dokumen rujukan rasmi yang dimuat naik melalui sistem CMS MPGBSIM.',
-          url: '#',
+          url: r.driveUrl || r.fileUrl || 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link',
           author: 'Sekretariat Utama MPGBSIM',
           date: r.publishedDate || '2026',
           fileSize: r.fileSize || '2.8 MB',
@@ -216,8 +216,14 @@ export const PortalResources: React.FC = () => {
 
             <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span className="text-[11px] truncate max-w-[120px]">Oleh: {res.author}</span>
-              <button
-                onClick={() => alert(`Membuka sumber: ${res.title}`)}
+              <a
+                href={
+                  res.url && res.url !== '#'
+                    ? res.url
+                    : 'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link'
+                }
+                target="_blank"
+                rel="noopener noreferrer"
                 className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center gap-1 shadow-xs"
               >
                 {res.type === 'video' || res.type === 'webinar' ? (
@@ -229,7 +235,7 @@ export const PortalResources: React.FC = () => {
                     <Download className="w-3.5 h-3.5" /> Akses
                   </>
                 )}
-              </button>
+              </a>
             </div>
           </div>
         ))}
