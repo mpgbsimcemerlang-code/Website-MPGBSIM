@@ -92,9 +92,9 @@ export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
     payerName: 'NOOR ASYIKIN BINTI AHMAT (Pengetua)',
     payerEmail: 'srialaminbangi@gmail.com',
     payerPhone: '019-3543665',
-    category: 'YURAN_TAHUNAN_MENENGAH',
-    categoryLabel: 'Yuran Tahunan Sekolah Menengah Sesi 2026/2027',
-    amount: 500.0,
+    category: 'YURAN_AHLI_ATAS_301',
+    categoryLabel: 'Yuran Ahli Biasa (> 3 Tahun • ≥ 301 Murid) — Fasal 6(1)',
+    amount: 600.0,
     paymentMethod: 'HerePay (FPX)',
     transactionRef: 'HP-MPGB-2026-98124',
     paymentDate: '2026-02-15',
@@ -102,9 +102,9 @@ export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
     academicSession: '2026/2027',
     gateway: 'HerePay',
     gatewayUrl: 'https://app.herepay.org/mpgbsim',
-    verifiedBy: 'Bendahari Kehormat MPGBSIM',
+    verifiedBy: 'Bendahari MPGBSIM',
     verifiedAt: '2026-02-15T10:30:00Z',
-    notes: 'Keahlian Sesi 2026/2027 diperbaharui dengan gerbang HerePay FPX.',
+    notes: 'Yuran Ahli Biasa Fasal 6(1) (> 3 tahun, enrolmen 301 murid ke atas) Sesi 2026/2027.',
     createdAt: '2026-02-15T10:28:00Z',
   },
   {
@@ -115,9 +115,9 @@ export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
     payerName: 'Ustaz Abdul Qayyum bin Yaakop (Guru Besar)',
     payerEmail: 'abdulqayyumyaakop@imuslehmelaka.edu.my',
     payerPhone: '+60 6-335 1290',
-    category: 'YURAN_TAHUNAN_RENDAH',
-    categoryLabel: 'Yuran Tahunan Sekolah Rendah Sesi 2026/2027',
-    amount: 300.0,
+    category: 'YURAN_AHLI_ATAS_301',
+    categoryLabel: 'Yuran Ahli Biasa (> 3 Tahun • ≥ 301 Murid) — Fasal 6(1)',
+    amount: 600.0,
     paymentMethod: 'HerePay (FPX)',
     transactionRef: 'HP-MPGB-2026-87112',
     paymentDate: '2026-01-20',
@@ -125,9 +125,9 @@ export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
     academicSession: '2026/2027',
     gateway: 'HerePay',
     gatewayUrl: 'https://app.herepay.org/mpgbsim',
-    verifiedBy: 'Bendahari Kehormat MPGBSIM',
+    verifiedBy: 'Bendahari MPGBSIM',
     verifiedAt: '2026-01-20T14:15:00Z',
-    notes: 'Yuran tahunan keahlian berdaftar MPGBSIM.',
+    notes: 'Yuran Ahli Biasa Fasal 6(1) (> 3 tahun, enrolmen 428 murid).',
     createdAt: '2026-01-20T14:10:00Z',
   },
   {
@@ -138,8 +138,8 @@ export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
     payerName: 'MOHD RAZMAN BIN RAMZAN (Guru Besar)',
     payerEmail: 'razman2015@gmail.com',
     payerPhone: '013-4365669',
-    category: 'YURAN_TAHUNAN_RENDAH',
-    categoryLabel: 'Yuran Tahunan Sekolah Rendah Sesi 2026/2027',
+    category: 'YURAN_AHLI_BAWAH_300',
+    categoryLabel: 'Yuran Ahli Biasa (> 3 Tahun • ≤ 300 Murid) — Fasal 6(1)',
     amount: 300.0,
     paymentMethod: 'HerePay (DuitNow QR)',
     transactionRef: 'HP-MPGB-2026-76431',
@@ -148,9 +148,9 @@ export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
     academicSession: '2026/2027',
     gateway: 'HerePay',
     gatewayUrl: 'https://app.herepay.org/mpgbsim',
-    verifiedBy: 'Bendahari Kehormat MPGBSIM',
+    verifiedBy: 'Bendahari MPGBSIM',
     verifiedAt: '2026-03-01T09:45:00Z',
-    notes: 'Keahlian aktif Sesi 2026/2027.',
+    notes: 'Yuran Ahli Biasa Fasal 6(1) (> 3 tahun, enrolmen 300 murid ke bawah).',
     createdAt: '2026-03-01T09:40:00Z',
   },
 ];
@@ -281,6 +281,7 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
               ? {
                   ...existing,
                   ...sch,
+                  icNumber: sch.icNumber || existing.icNumber,
                   schoolPhotoUrl: sch.schoolPhotoUrl || existing.schoolPhotoUrl,
                   logoUrl: sch.logoUrl || existing.logoUrl,
                   principalPhotoUrl: sch.principalPhotoUrl || existing.principalPhotoUrl,
@@ -318,6 +319,7 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
                   const merged: MemberSchool = {
                     ...existing,
                     ...sch,
+                    icNumber: sch.icNumber || existing.icNumber,
                     schoolPhotoUrl: sch.schoolPhotoUrl || existing.schoolPhotoUrl,
                     logoUrl: sch.logoUrl || existing.logoUrl,
                     principalPhotoUrl: sch.principalPhotoUrl || existing.principalPhotoUrl,
@@ -696,6 +698,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             ...(detail.updated.name ? { school: detail.updated.name } : {}),
             ...(detail.updated.state ? { state: detail.updated.state } : {}),
             ...(detail.updated.phone ? { phone: detail.updated.phone } : {}),
+            ...(detail.updated.icNumber ? { icNumber: detail.updated.icNumber } : {}),
             ...(detail.updated.principalPhotoUrl ? { photoURL: detail.updated.principalPhotoUrl } : {}),
             ...(detail.updated.schoolPhotoUrl ? { schoolPhotoUrl: detail.updated.schoolPhotoUrl } : {}),
             ...(detail.updated.logoUrl ? { logoUrl: detail.updated.logoUrl } : {}),
@@ -955,11 +958,59 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             }) : null);
 
         if (matched) {
+          const codeNorm = (matched.code || prev.schoolCode || '').trim().toLowerCase();
+          const nameNorm = (matched.name || prev.school || '').trim().toLowerCase();
+          const emailNorm = (matched.pgbEmail || matched.email || prev.pgbEmail || prev.email || '').trim().toLowerCase();
+          const principalNorm = (matched.principal || prev.fullName || '')
+            .replace(/\(.*?\)/g, '')
+            .trim()
+            .toLowerCase();
+
+          const matchedApp = (siteData.memberApplications || []).find((a) => {
+            const aCode = (a.schoolCode || '').trim().toLowerCase();
+            const aName = (a.schoolName || '').trim().toLowerCase();
+            const aEmail = (a.email || a.pgbEmail || '').trim().toLowerCase();
+            const aFullName = (a.fullName || '').trim().toLowerCase();
+            return (
+              (codeNorm && aCode && aCode === codeNorm) ||
+              (nameNorm && aName && aName === nameNorm) ||
+              (emailNorm && aEmail && aEmail === emailNorm) ||
+              (principalNorm && aFullName && (principalNorm.includes(aFullName) || aFullName.includes(principalNorm)))
+            );
+          });
+
+          let subIc = '';
+          for (const sub of siteData.submissions || []) {
+            const msg = sub.message || '';
+            const kpMatch = msg.match(/No\s*KP:\s*([0-9A-Za-z-]{6,20})/i);
+            if (!kpMatch || !kpMatch[1] || kpMatch[1] === '-') continue;
+            const msgLower = msg.toLowerCase();
+            const subEmail = (sub.email || '').trim().toLowerCase();
+            const subName = (sub.name || '').trim().toLowerCase();
+            if (
+              (codeNorm && msgLower.includes(`(${codeNorm})`)) ||
+              (nameNorm && msgLower.includes(nameNorm)) ||
+              (emailNorm && (subEmail === emailNorm || msgLower.includes(emailNorm))) ||
+              (principalNorm && subName && (principalNorm.includes(subName) || subName.includes(principalNorm)))
+            ) {
+              subIc = kpMatch[1].trim();
+              break;
+            }
+          }
+
+          const targetIc =
+            matched.icNumber ||
+            matchedApp?.icNumber ||
+            subIc ||
+            prev.icNumber ||
+            (isSecondaryMusleh ? '730627-01-5156' : isPrimaryMusleh ? '850312-04-5123' : '');
+
           const targetCode = isSecondaryMusleh ? 'JAIM/SAS(M)130' : (matched.code || prev.schoolCode);
           const targetMemNo = isSecondaryMusleh ? 'MPGB-2026-JAIM/SAS(M)130' : (prev.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || prev.membershipNo);
           const needsUpdate =
             (targetCode && targetCode !== prev.schoolCode) ||
             (targetMemNo && targetMemNo !== prev.membershipNo) ||
+            (targetIc && targetIc !== prev.icNumber) ||
             (matched.principal && matched.principal !== prev.fullName) ||
             (matched.name && matched.name !== prev.school) ||
             (matched.state && matched.state !== prev.state) ||
@@ -975,6 +1026,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             ...prev,
             ...(targetCode ? { schoolCode: targetCode } : {}),
             ...(targetMemNo ? { membershipNo: targetMemNo } : {}),
+            ...(targetIc ? { icNumber: targetIc } : {}),
             ...(matched.principal ? { fullName: matched.principal } : {}),
             ...(matched.name ? { school: matched.name } : {}),
             ...(matched.state ? { state: matched.state } : {}),
@@ -991,7 +1043,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         return prev;
       });
     }
-  }, [siteData.memberSchools]);
+  }, [siteData.memberSchools, siteData.memberApplications, siteData.submissions]);
 
   // On-demand Portal-only Firestore Listeners (only attached when user enters Portal mode and quota allows)
   useEffect(() => {
@@ -1257,6 +1309,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         fullName: defaultName,
         role,
         position: pos,
+        icNumber:
+          savedProfile?.icNumber ||
+          matchedSchool?.icNumber ||
+          (isSecondaryMusleh ? '730627-01-5156' : isPrimaryMusleh ? '850312-04-5123' : ''),
         school: defaultSchoolName,
         schoolCode: isSecondaryMusleh ? 'JAIM/SAS(M)130' : (matchedSchool?.code || savedProfile?.schoolCode || ''),
         schoolType: defaultSchoolType,
@@ -1530,21 +1586,49 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     // DIRECT FIRESTORE FETCH: Fetch school data directly from the same Firestore collection 'schools'
     // used by the Admin CMS to ensure any edits made in CMS are immediately reflected upon login.
-    let liveSchool = school;
+    let liveSchool: MemberSchool = { ...school };
     try {
       const schoolDoc = await getDoc(doc(db, 'schools', school.id));
       if (schoolDoc.exists()) {
-        liveSchool = { id: schoolDoc.id, ...(schoolDoc.data() as MemberSchool) };
+        const docData = schoolDoc.data() as MemberSchool;
+        liveSchool = {
+          ...school,
+          ...docData,
+          id: schoolDoc.id,
+          icNumber: docData.icNumber || school.icNumber,
+          schoolPhotoUrl: docData.schoolPhotoUrl || school.schoolPhotoUrl,
+          logoUrl: docData.logoUrl || school.logoUrl,
+          principalPhotoUrl: docData.principalPhotoUrl || school.principalPhotoUrl,
+        };
       } else if (school.code) {
         const q = query(collection(db, 'schools'), where('code', '==', school.code.toUpperCase()));
         const snap = await getDocs(q);
         if (!snap.empty) {
-          liveSchool = { id: snap.docs[0].id, ...(snap.docs[0].data() as MemberSchool) };
+          const docData = snap.docs[0].data() as MemberSchool;
+          liveSchool = {
+            ...school,
+            ...docData,
+            id: snap.docs[0].id,
+            icNumber: docData.icNumber || school.icNumber,
+            schoolPhotoUrl: docData.schoolPhotoUrl || school.schoolPhotoUrl,
+            logoUrl: docData.logoUrl || school.logoUrl,
+            principalPhotoUrl: docData.principalPhotoUrl || school.principalPhotoUrl,
+          };
         }
       }
     } catch (e) {
       console.warn('Direct Firestore school fetch on login notice:', e);
     }
+
+    // Also check saved user profile in 'users' collection if icNumber or custom fields were saved there
+    let savedUserIc = '';
+    try {
+      const userSnap = await getDoc(doc(db, 'users', `sch-user-${liveSchool.id}`));
+      if (userSnap.exists()) {
+        const uData = userSnap.data();
+        if (uData?.icNumber) savedUserIc = uData.icNumber;
+      }
+    } catch {}
 
     const isSecondaryMusleh =
       liveSchool.code === 'MIA1009' ||
@@ -1581,6 +1665,52 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         liveSchool.name?.toLowerCase().includes('rendah'));
     const pos = liveSchool.designation || (isPrimary ? 'Guru Besar' : 'Pengetua');
 
+    // Cross-match with memberApplications and submissions if icNumber is not yet on liveSchool
+    const codeNorm = cleanCode.trim().toLowerCase();
+    const nameNorm = schoolName.trim().toLowerCase();
+    const emailNorm = (liveSchool.pgbEmail || email || '').trim().toLowerCase();
+    const principalNorm = principalName.replace(/\(.*?\)/g, '').trim().toLowerCase();
+
+    const matchedApp = (siteData.memberApplications || []).find((a) => {
+      const aCode = (a.schoolCode || '').trim().toLowerCase();
+      const aName = (a.schoolName || '').trim().toLowerCase();
+      const aEmail = (a.email || a.pgbEmail || '').trim().toLowerCase();
+      const aFullName = (a.fullName || '').trim().toLowerCase();
+      return (
+        (codeNorm && aCode && aCode === codeNorm) ||
+        (nameNorm && aName && aName === nameNorm) ||
+        (emailNorm && aEmail && aEmail === emailNorm) ||
+        (principalNorm && aFullName && (principalNorm.includes(aFullName) || aFullName.includes(principalNorm)))
+      );
+    });
+
+    let subIc = '';
+    for (const sub of siteData.submissions || []) {
+      const msg = sub.message || '';
+      const kpMatch = msg.match(/No\s*KP:\s*([0-9A-Za-z-]{6,20})/i);
+      if (!kpMatch || !kpMatch[1] || kpMatch[1] === '-') continue;
+      const msgLower = msg.toLowerCase();
+      const subEmail = (sub.email || '').trim().toLowerCase();
+      const subName = (sub.name || '').trim().toLowerCase();
+      if (
+        (codeNorm && msgLower.includes(`(${codeNorm})`)) ||
+        (nameNorm && msgLower.includes(nameNorm)) ||
+        (emailNorm && (subEmail === emailNorm || msgLower.includes(emailNorm))) ||
+        (principalNorm && subName && (principalNorm.includes(subName) || subName.includes(principalNorm)))
+      ) {
+        subIc = kpMatch[1].trim();
+        break;
+      }
+    }
+
+    const resolvedIcNumber =
+      liveSchool.icNumber ||
+      school.icNumber ||
+      savedUserIc ||
+      matchedApp?.icNumber ||
+      subIc ||
+      (isSecondaryMusleh ? '730627-01-5156' : isPrimaryMusleh ? '850312-04-5123' : '');
+
     const profile: UserProfile = {
       uid: `sch-user-${liveSchool.id}`,
       schoolId: liveSchool.id,
@@ -1588,7 +1718,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       fullName: principalName || `${pos} ${schoolName}`,
       role: 'MEMBER',
       position: pos,
-      icNumber: (liveSchool as any).icNumber || '',
+      icNumber: resolvedIcNumber,
       school: schoolName,
       schoolCode: cleanCode,
       schoolType,
@@ -1625,7 +1755,12 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       hidePhone: true,
     };
 
+    if (currentUser && currentUser.schoolCode && currentUser.schoolCode !== profile.schoolCode) {
+      markPgbPresenceOffline(currentUser).catch(() => {});
+    }
+
     setCurrentUser(profile);
+    markPgbPresenceOnline(profile).catch(() => {});
     setViewMode('portal');
     setPortalTab('dashboard');
     recordAuditLog(
@@ -1634,14 +1769,136 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     );
   };
 
+  const getPresenceKeyForUser = (user: UserProfile | null) => {
+    if (!user) return { schoolCode: '', presenceKey: '' };
+    const schoolCode = (
+      user.schoolCode ||
+      user.membershipNo?.replace('MPGB-2026-', '') ||
+      user.uid ||
+      ''
+    ).trim();
+    const presenceKey = schoolCode.replace(/[^a-zA-Z0-9_-]/g, '_') || user.uid;
+    return { schoolCode, presenceKey };
+  };
+
+  const markPgbPresenceOnline = async (user: UserProfile) => {
+    const { schoolCode, presenceKey } = getPresenceKeyForUser(user);
+    if (!schoolCode || !presenceKey) return;
+
+    const payload = {
+      id: presenceKey,
+      uid: user.uid,
+      fullName: user.fullName || 'Ahli PGB MPGBSIM',
+      position: user.position || 'Pengetua / Guru Besar',
+      school: user.school || 'Sekolah Ahli MPGBSIM',
+      schoolCode,
+      state: user.state || 'Malaysia',
+      avatarUrl: user.photoURL || user.logoUrl || '',
+      lastActiveAt: new Date().toISOString(),
+      statusText: 'Dalam Talian' as const,
+    };
+
+    try {
+      const saved = safeLocalStorageGet('mpgbsim_pgb_chat_presence_v1');
+      const map = saved ? JSON.parse(saved) : {};
+      map[schoolCode] = payload;
+      safeLocalStorageSet('mpgbsim_pgb_chat_presence_v1', JSON.stringify(map));
+    } catch {}
+
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
+        bc.postMessage({ type: 'PRESENCE_ONLINE', schoolCode, presenceKey, presence: payload });
+        bc.close();
+      }
+    } catch {}
+
+    if (!isFirestoreQuotaExceeded()) {
+      try {
+        await setDoc(doc(db, 'pgbChatPresence', presenceKey), payload, { merge: true });
+      } catch {}
+    }
+  };
+
+  const markPgbPresenceOffline = async (user: UserProfile | null) => {
+    const { schoolCode, presenceKey } = getPresenceKeyForUser(user);
+    if (!schoolCode && !presenceKey) return;
+
+    try {
+      const saved = safeLocalStorageGet('mpgbsim_pgb_chat_presence_v1');
+      if (saved) {
+        const map = JSON.parse(saved);
+        delete map[schoolCode];
+        delete map[schoolCode.toUpperCase()];
+        Object.keys(map).forEach((k) => {
+          if (
+            k.trim().toUpperCase() === schoolCode.toUpperCase() ||
+            map[k]?.id === presenceKey
+          ) {
+            delete map[k];
+          }
+        });
+        safeLocalStorageSet('mpgbsim_pgb_chat_presence_v1', JSON.stringify(map));
+      }
+    } catch {}
+
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
+        bc.postMessage({ type: 'PRESENCE_OFFLINE', schoolCode, presenceKey });
+        bc.close();
+      }
+    } catch {}
+
+    if (!isFirestoreQuotaExceeded() && presenceKey) {
+      try {
+        await deleteDoc(doc(db, 'pgbChatPresence', presenceKey));
+      } catch {
+        try {
+          await setDoc(
+            doc(db, 'pgbChatPresence', presenceKey),
+            {
+              id: presenceKey,
+              schoolCode,
+              statusText: 'Luar Talian',
+              lastActiveAt: '1970-01-01T00:00:00.000Z',
+            },
+            { merge: true }
+          );
+        } catch {}
+      }
+    }
+  };
+
+  // Keep logged-in PGB presence active in real-time and clean up on tab close / logout
+  useEffect(() => {
+    if (!currentUser) return;
+    markPgbPresenceOnline(currentUser).catch(() => {});
+    const timer = window.setInterval(() => {
+      markPgbPresenceOnline(currentUser).catch(() => {});
+    }, 25000);
+
+    const handleBeforeUnload = () => {
+      markPgbPresenceOffline(currentUser).catch(() => {});
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentUser?.uid, currentUser?.schoolCode]);
+
   const logoutPortal = async () => {
+    const outgoingUser = currentUser;
+    setCurrentUser(null);
+    await markPgbPresenceOffline(outgoingUser);
     try {
       await signOut(auth);
     } catch (e) {
       // ignore
     }
-    recordAuditLog('Log Keluar Portal', `Pengguna ${currentUser?.fullName || 'Ahli'} telah log keluar.`);
-    setCurrentUser(null);
+    recordAuditLog('Log Keluar Portal', `Pengguna ${outgoingUser?.fullName || 'Ahli'} telah log keluar.`);
   };
 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
@@ -1737,9 +1994,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           updateDoc(doc(db, 'schools', d.id), {
             ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
             ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
+            ...(safeUpdates.icNumber !== undefined ? { icNumber: safeUpdates.icNumber } : {}),
             ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
             ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
             ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
+            ...(safeUpdates.membershipType ? { membershipType: safeUpdates.membershipType } : {}),
             ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
             ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
             ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
@@ -1800,9 +2059,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
                 ...s,
                 ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
                 ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
+                ...(safeUpdates.icNumber !== undefined ? { icNumber: safeUpdates.icNumber } : {}),
                 ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
                 ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
                 ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
+                ...(safeUpdates.membershipType ? { membershipType: safeUpdates.membershipType } : {}),
                 ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
                 ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
                 ...(safeUpdates.address ? { address: safeUpdates.address } : {}),

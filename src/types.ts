@@ -61,6 +61,8 @@ export interface AlumniRecord {
   updatedAt?: string;
 }
 
+export type MembershipCategory = 'Ahli Biasa' | 'Ahli Bersekutu';
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -72,6 +74,7 @@ export interface UserProfile {
   schoolId?: string;
   schoolCode?: string;
   schoolType?: string;
+  membershipType?: MembershipCategory;
   state?: string;
   district?: string;
   address?: string;
@@ -328,10 +331,12 @@ export interface MemberSchool {
   name: string;
   code: string;
   type: 'Sekolah Rendah' | 'Sekolah Menengah' | 'Maahad Tahfiz' | 'Rakan Musleh' | string;
+  membershipType?: MembershipCategory;
   state: string;
   district: string;
   principal: string;
   designation?: 'Pengetua' | 'Guru Besar' | string;
+  icNumber?: string;
   principalPhotoUrl?: string;
   studentCount: number;
   teacherCount?: number;
@@ -401,6 +406,7 @@ export interface MemberApplication {
   schoolName: string;
   schoolCode: string;
   schoolType: string;
+  membershipType?: MembershipCategory;
   state: string;
   district: string;
   website?: string;
@@ -512,6 +518,13 @@ export interface ExamCalendarItem {
 }
 
 export type FeeCategory =
+  | 'YURAN_AHLI_1_3_TAHUN'
+  | 'YURAN_AHLI_BAWAH_300'
+  | 'YURAN_AHLI_ATAS_301'
+  | 'YURAN_BERSEKUTU_1_3_TAHUN'
+  | 'YURAN_BERSEKUTU_BAWAH_300'
+  | 'YURAN_BERSEKUTU_ATAS_301'
+  | 'YURAN_MESYUARAT_PROGRAM'
   | 'YURAN_TAHUNAN_MENENGAH'
   | 'YURAN_TAHUNAN_RENDAH'
   | 'YURAN_PENDAFTARAN_BARU'

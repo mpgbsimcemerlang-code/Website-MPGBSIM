@@ -23,7 +23,7 @@ import {
   Radio,
   RotateCcw,
 } from 'lucide-react';
-import { SchoolNetworkCharts } from './SchoolNetworkCharts';
+import { SchoolNetworkCharts, resolveSchoolMembershipType } from './SchoolNetworkCharts';
 
 interface SchoolNetworkProps {
   stats: NetworkStats;
@@ -217,8 +217,20 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
       (a) => a.status === 'pending'
     ).length;
 
+    let ordinarySchoolsCount = 0;
+    let associateSchoolsCount = 0;
+    effectiveSchools.forEach((sch) => {
+      if (resolveSchoolMembershipType(sch) === 'Ahli Bersekutu') {
+        associateSchoolsCount += 1;
+      } else {
+        ordinarySchoolsCount += 1;
+      }
+    });
+
     return {
       totalSchools: effectiveSchools.length,
+      ordinarySchoolsCount,
+      associateSchoolsCount,
       principalsCount,
       headteachersCount,
       primaryStudentsCount,
@@ -248,6 +260,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState('Semua Negeri');
   const [selectedType, setSelectedType] = useState('Semua Jenis Sekolah');
+  const [selectedMembershipType, setSelectedMembershipType] = useState<'Semua Keahlian' | 'Ahli Biasa' | 'Ahli Bersekutu'>('Semua Keahlian');
   const [liveCardFilter, setLiveCardFilter] = useState<LiveCardFilter>('ALL');
 
   // Filter schools
@@ -268,6 +281,9 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
 
     const matchesState = selectedState === 'Semua Negeri' || school.state === selectedState;
     const matchesType = selectedType === 'Semua Jenis Sekolah' || normalizeCategory(school) === selectedType;
+    const memType = resolveSchoolMembershipType(school);
+    const matchesMembership =
+      selectedMembershipType === 'Semua Keahlian' || memType === selectedMembershipType;
 
     let matchesLiveCard = true;
     if (liveCardFilter === 'PENGETUA') {
@@ -280,7 +296,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
       matchesLiveCard = !isPrimarySchoolRecord(school);
     }
 
-    return matchesSearch && matchesState && matchesType && matchesLiveCard;
+    return matchesSearch && matchesState && matchesType && matchesMembership && matchesLiveCard;
   });
 
   const handleSelectLiveCard = (filter: LiveCardFilter) => {
@@ -380,7 +396,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100">
-              {liveMetrics.primarySchoolsCount} Rendah · {liveMetrics.secondarySchoolsCount} Menengah · {liveMetrics.statesCovered} Negeri
+              {liveMetrics.ordinarySchoolsCount} Ahli Biasa · {liveMetrics.associateSchoolsCount} Ahli Bersekutu
             </p>
           </button>
 
@@ -569,7 +585,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
           </div>
 
           {/* Search and Filters Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -608,6 +624,58 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
                 ))}
               </select>
             </div>
+
+            <div>
+              <select
+                value={selectedMembershipType}
+                onChange={(e) => setSelectedMembershipType(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-slate-50/50 font-semibold text-slate-800"
+              >
+                <option value="Semua Keahlian">Semua Kategori Keahlian ({effectiveSchools.length})</option>
+                <option value="Ahli Biasa">Ahli Biasa — Fasal 4(2) ({liveMetrics.ordinarySchoolsCount})</option>
+                <option value="Ahli Bersekutu">Ahli Bersekutu — Fasal 4(3) ({liveMetrics.associateSchoolsCount})</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Membership Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            <span className="text-xs font-bold text-slate-600 mr-1">Kategori Keahlian:</span>
+            <button
+              type="button"
+              onClick={() => setSelectedMembershipType('Semua Keahlian')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                selectedMembershipType === 'Semua Keahlian'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Semua Sekolah ({effectiveSchools.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedMembershipType('Ahli Biasa')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                selectedMembershipType === 'Ahli Biasa'
+                  ? 'bg-emerald-700 text-white shadow-2xs'
+                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Ahli Biasa ({liveMetrics.ordinarySchoolsCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedMembershipType('Ahli Bersekutu')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                selectedMembershipType === 'Ahli Bersekutu'
+                  ? 'bg-indigo-700 text-white shadow-2xs'
+                  : 'bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Ahli Bersekutu ({liveMetrics.associateSchoolsCount})</span>
+            </button>
           </div>
 
           {/* Interactive Hint */}
@@ -672,12 +740,23 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
                           <span className="font-semibold text-slate-800 block">
                             {isPrimary ? 'Sekolah Rendah' : 'Sekolah Menengah'}
                           </span>
-                          {sch.type &&
-                            sch.type.toLowerCase().trim() !== (isPrimary ? 'sekolah rendah' : 'sekolah menengah') && (
-                              <span className="inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60">
-                                {sch.type}
-                              </span>
-                            )}
+                          <div className="flex flex-wrap items-center gap-1 mt-1">
+                            <span
+                              className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${
+                                resolveSchoolMembershipType(sch) === 'Ahli Bersekutu'
+                                  ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              }`}
+                            >
+                              {resolveSchoolMembershipType(sch)}
+                            </span>
+                            {sch.type &&
+                              sch.type.toLowerCase().trim() !== (isPrimary ? 'sekolah rendah' : 'sekolah menengah') && (
+                                <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200/60">
+                                  {sch.type}
+                                </span>
+                              )}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-slate-600">
                           {sch.district ? `${sch.district}, ${sch.state}` : sch.state}
@@ -798,6 +877,15 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
 
                 <div className="min-w-0 pr-8">
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border ${
+                        resolveSchoolMembershipType(activeSchool) === 'Ahli Bersekutu'
+                          ? 'bg-indigo-500/30 border-indigo-400/50 text-indigo-200'
+                          : 'bg-emerald-500/30 border-emerald-400/50 text-emerald-200'
+                      }`}
+                    >
+                      {resolveSchoolMembershipType(activeSchool)}
+                    </span>
                     <span className="px-2.5 py-0.5 rounded-full bg-teal-500/30 border border-teal-400/40 text-teal-200 text-xs font-bold">
                       {activeSchool.type}
                     </span>

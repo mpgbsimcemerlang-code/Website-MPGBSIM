@@ -241,9 +241,29 @@ export const PortalLiveChat: React.FC = () => {
     } catch {}
   }, [messages]);
 
-  // Setup BroadcastChannel for instant multi-tab sync
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
   useEffect(() => {
-    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    const tickTimer = window.setInterval(() => {
+      setNowTick(Date.now());
+    }, 10000);
+    return () => window.clearInterval(tickTimer);
+  }, []);
+
+  // Setup BroadcastChannel & storage listener for instant multi-tab sync
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === PRESENCE_STORAGE_KEY && e.newValue) {
+        try {
+          setPresenceMap(JSON.parse(e.newValue));
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) {
+      return () => window.removeEventListener('storage', handleStorage);
+    }
     const bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
     broadcastRef.current = bc;
 
@@ -263,10 +283,32 @@ export const PortalLiveChat: React.FC = () => {
         });
       } else if (data.type === 'DELETE_MSG' && data.id) {
         setMessages((prev) => prev.filter((m) => m.id !== data.id));
+      } else if (data.type === 'PRESENCE_OFFLINE') {
+        const targetCode = (data.schoolCode || '').trim().toUpperCase();
+        const targetKey = data.presenceKey || '';
+        setPresenceMap((prev) => {
+          const next = { ...prev };
+          Object.keys(next).forEach((k) => {
+            if (
+              k.trim().toUpperCase() === targetCode ||
+              next[k]?.id === targetKey ||
+              (next[k]?.schoolCode || '').trim().toUpperCase() === targetCode
+            ) {
+              delete next[k];
+            }
+          });
+          return next;
+        });
+      } else if (data.type === 'PRESENCE_ONLINE' && data.presence) {
+        const p = data.presence as PGBChatPresence;
+        if (p.schoolCode) {
+          setPresenceMap((prev) => ({ ...prev, [p.schoolCode]: p }));
+        }
       }
     };
 
     return () => {
+      window.removeEventListener('storage', handleStorage);
       bc.close();
       broadcastRef.current = null;
     };
@@ -309,9 +351,13 @@ export const PortalLiveChat: React.FC = () => {
       collection(db, 'pgbChatPresence'),
       (snap) => {
         const map: Record<string, PGBChatPresence> = {};
+        const now = Date.now();
         snap.forEach((docSnap) => {
           const p = docSnap.data() as PGBChatPresence;
-          if (p && p.schoolCode) {
+          if (!p || !p.schoolCode) return;
+          if (p.statusText === 'Luar Talian') return;
+          const ageMs = p.lastActiveAt ? now - new Date(p.lastActiveAt).getTime() : 0;
+          if (ageMs < 90 * 1000) {
             map[p.schoolCode] = p;
           }
         });
@@ -329,7 +375,7 @@ export const PortalLiveChat: React.FC = () => {
     };
   }, []);
 
-  // Broadcast own presence heartbeat when entering Live Chat & every 45s
+  // Broadcast own presence heartbeat when entering Live Chat & every 25s
   useEffect(() => {
     if (!currentUser || isFirestoreQuotaExceeded()) return;
     const presenceKey = myIdentity.schoolCode.replace(/[^a-zA-Z0-9_-]/g, '_') || myIdentity.uid;
@@ -353,7 +399,7 @@ export const PortalLiveChat: React.FC = () => {
     };
 
     sendHeartbeat();
-    const timer = window.setInterval(sendHeartbeat, 45000);
+    const timer = window.setInterval(sendHeartbeat, 25000);
     return () => window.clearInterval(timer);
   }, [currentUser, myIdentity]);
 
@@ -362,7 +408,7 @@ export const PortalLiveChat: React.FC = () => {
     if (!code) return false;
     const normCode = code.trim().toUpperCase();
     const myNorm = (myIdentity.schoolCode || '').trim().toUpperCase();
-    if (normCode && myNorm && normCode === myNorm) return true;
+    if (Boolean(currentUser) && normCode && myNorm && normCode === myNorm) return true;
 
     const entry =
       presenceMap[code] ||
@@ -370,11 +416,11 @@ export const PortalLiveChat: React.FC = () => {
       Object.values(presenceMap).find(
         (p) => (p.schoolCode || '').trim().toUpperCase() === normCode
       );
-    if (!entry) return false;
-    if (!entry.lastActiveAt) return true;
-    const ageMs = Date.now() - new Date(entry.lastActiveAt).getTime();
-    // Consider online if active within the last 15 minutes
-    return ageMs < 15 * 60 * 1000;
+    if (!entry || entry.statusText === 'Luar Talian') return false;
+    if (!entry.lastActiveAt) return false;
+    const ageMs = nowTick - new Date(entry.lastActiveAt).getTime();
+    // Online only if active heartbeat within the last 90 seconds
+    return ageMs < 90 * 1000;
   };
 
   // Auto-scroll to bottom when messages change in active channel
@@ -425,7 +471,7 @@ export const PortalLiveChat: React.FC = () => {
       else offline += 1;
     });
     return { online, offline };
-  }, [memberSchools, presenceMap, myIdentity.schoolCode]);
+  }, [memberSchools, presenceMap, myIdentity.schoolCode, currentUser, nowTick]);
 
   // Filtered PGB peers for Direct Message or Directory (Online sorted first)
   const filteredPeers = useMemo(() => {
@@ -452,7 +498,7 @@ export const PortalLiveChat: React.FC = () => {
         if (aOnline !== bOnline) return bOnline - aOnline;
         return (a.name || '').localeCompare(b.name || '');
       });
-  }, [memberSchools, stateFilter, statusFilter, memberSearch, presenceMap, myIdentity.schoolCode]);
+  }, [memberSchools, stateFilter, statusFilter, memberSearch, presenceMap, myIdentity.schoolCode, currentUser, nowTick]);
 
   // Count messages per channel
   const channelCounts = useMemo(() => {

@@ -49,6 +49,7 @@ export interface MemberRegistrationForm {
   schoolName: string;
   schoolCode?: string;
   schoolType: string;
+  membershipType?: 'Ahli Biasa' | 'Ahli Bersekutu';
   state: string;
   district?: string;
   schoolEmail?: string; // Email Rasmi Sekolah
@@ -160,6 +161,7 @@ export const savePendingRegistration = async (
 
   const appData = sanitizeForFirestore({
     ...data,
+    membershipType: data.membershipType || 'Ahli Biasa',
     id: refId,
     refId,
     submittedAt: new Date().toISOString(),
@@ -170,9 +172,9 @@ export const savePendingRegistration = async (
     name: data.fullName || '',
     email: data.email || '',
     phone: data.phoneNumber || data.phone || '',
-    subject: `Permohonan Keahlian PGB: ${data.schoolName || ''} (${data.schoolType || ''})`,
+    subject: `Permohonan Keahlian PGB [${data.membershipType || 'Ahli Biasa'}]: ${data.schoolName || ''} (${data.schoolType || ''})`,
     category: 'Keahlian',
-    message: `Jawatan: ${data.designation || data.position || 'PGB'}, Tahun Menjadi PGB: ${data.serviceStartYear || data.pgbStartYear || year}, Tahun Menjadi Ahli MPGBSIM: ${data.joinYear || data.schoolJoinYear || year}, Sekolah: ${data.schoolName || ''} (${data.schoolCode || 'Tiada Kod'}), Jenis: ${data.schoolType || ''}, Negeri: ${data.state || ''}, Emel Sekolah: ${data.schoolEmail || '-'}, Tel Sekolah: ${data.schoolPhone || '-'}, Emel PGB: ${data.email || ''}, Tel PGB: ${data.phoneNumber || data.phone || '-'}, Murid: ${data.studentCount || 0}, Guru: ${data.teacherCount || 0}, No KP: ${data.icNumber || '-'}`,
+    message: `Kategori Keahlian: ${data.membershipType || 'Ahli Biasa'}, Jawatan: ${data.designation || data.position || 'PGB'}, Tahun Menjadi PGB: ${data.serviceStartYear || data.pgbStartYear || year}, Tahun Menjadi Ahli MPGBSIM: ${data.joinYear || data.schoolJoinYear || year}, Sekolah: ${data.schoolName || ''} (${data.schoolCode || 'Tiada Kod'}), Jenis: ${data.schoolType || ''}, Negeri: ${data.state || ''}, Emel Sekolah: ${data.schoolEmail || '-'}, Tel Sekolah: ${data.schoolPhone || '-'}, Emel PGB: ${data.email || ''}, Tel PGB: ${data.phoneNumber || data.phone || '-'}, Murid: ${data.studentCount || 0}, Guru: ${data.teacherCount || 0}, No KP: ${data.icNumber || '-'}`,
     status: 'unread',
     createdAt: new Date().toISOString(),
   });

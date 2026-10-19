@@ -347,6 +347,16 @@ export const AdminApplicationManagement: React.FC<AdminApplicationManagementProp
                           {app.fullName} ({app.designation})
                         </span>
                         <span>•</span>
+                        <span
+                          className={`px-2 py-0.5 rounded font-bold uppercase tracking-wider text-[10px] border ${
+                            (app.membershipType || (app.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')) ===
+                            'Ahli Bersekutu'
+                              ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          }`}
+                        >
+                          {app.membershipType || (app.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')}
+                        </span>
                         <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-800 font-semibold">
                           {app.schoolType}
                         </span>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Users,
   Building2,
@@ -17,10 +17,13 @@ import {
   Sparkles,
   School,
   GraduationCap,
+  ShieldCheck,
+  BarChart3,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool } from '../../types';
+import { SchoolNetworkCharts, resolveSchoolMembershipType } from '../SchoolNetworkCharts';
 
 export const PortalDirectory: React.FC = () => {
   const { portalSubTab, setPortalSubTab, currentUser, registeredSchools } = useMemberPortal();
@@ -34,10 +37,12 @@ export const PortalDirectory: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pgb' | 'sekolah'>(
     portalSubTab === 'sekolah' ? 'sekolah' : 'pgb'
   );
+  const [showAnalyticsChart, setShowAnalyticsChart] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('Semua');
   const [selectedType, setSelectedType] = useState('Semua');
+  const [selectedMembershipType, setSelectedMembershipType] = useState<'Semua' | 'Ahli Biasa' | 'Ahli Bersekutu'>('Semua');
   const [sortAlpha, setSortAlpha] = useState<'asc' | 'desc'>('asc');
 
   // Detail Modal States
@@ -77,6 +82,23 @@ export const PortalDirectory: React.FC = () => {
     return 'Sekolah Menengah';
   };
 
+  // Summary counts for Ahli Biasa & Ahli Bersekutu
+  const membershipStats = useMemo(() => {
+    let ordinaryCount = 0;
+    let associateCount = 0;
+    schools.forEach((sch) => {
+      if (resolveSchoolMembershipType(sch) === 'Ahli Bersekutu') {
+        associateCount += 1;
+      } else {
+        ordinaryCount += 1;
+      }
+    });
+    const total = schools.length;
+    const ordinaryPct = total > 0 ? Math.round((ordinaryCount / total) * 100) : 0;
+    const associatePct = total > 0 ? Math.round((associateCount / total) * 100) : 0;
+    return { ordinaryCount, associateCount, total, ordinaryPct, associatePct };
+  }, [schools]);
+
   // PGB items mapped from schools directory
   const pgbList = schools.map((sch) => ({
     id: `pgb-${sch.id}`,
@@ -87,6 +109,7 @@ export const PortalDirectory: React.FC = () => {
     state: sch.state,
     district: sch.district,
     schoolType: normalizeSchoolType(sch.type),
+    membershipType: resolveSchoolMembershipType(sch),
     expertise: [
       'Kepimpinan Pengurusan',
       sch.type.includes('Tahfiz') ? 'Kurikulum Al-Quran' : 'Kurikulum Bersepadu',
@@ -125,7 +148,9 @@ export const PortalDirectory: React.FC = () => {
         p.state.toLowerCase().includes(searchQuery.toLowerCase());
       const matchState = selectedState === 'Semua' || p.state === selectedState;
       const matchType = selectedType === 'Semua' || p.schoolType === selectedType;
-      return matchQuery && matchState && matchType;
+      const matchMembership =
+        selectedMembershipType === 'Semua' || p.membershipType === selectedMembershipType;
+      return matchQuery && matchState && matchType && matchMembership;
     })
     .sort((a, b) => {
       return sortAlpha === 'asc'
@@ -143,7 +168,10 @@ export const PortalDirectory: React.FC = () => {
         sch.principal.toLowerCase().includes(searchQuery.toLowerCase());
       const matchState = selectedState === 'Semua' || sch.state === selectedState;
       const matchType = selectedType === 'Semua' || normalizeSchoolType(sch.type) === selectedType;
-      return matchQuery && matchState && matchType;
+      const memType = resolveSchoolMembershipType(sch);
+      const matchMembership =
+        selectedMembershipType === 'Semua' || memType === selectedMembershipType;
+      return matchQuery && matchState && matchType && matchMembership;
     })
     .sort((a, b) => {
       return sortAlpha === 'asc'
@@ -162,46 +190,162 @@ export const PortalDirectory: React.FC = () => {
           </div>
           <h1 className="text-2xl font-black text-slate-900">Direktori Ahli & Sekolah MPGBSIM</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Pusat carian maklumat Pengetua, Guru Besar dan profil institusi pendidikan Islam ahli berdaftar.
+            Pusat carian maklumat Pengetua, Guru Besar dan profil institusi pendidikan Islam (<strong className="text-emerald-700">Ahli Biasa</strong> & <strong className="text-indigo-700">Ahli Bersekutu</strong>).
           </p>
         </div>
 
         {/* Directory Tab Switcher */}
-        <div className="p-1 rounded-2xl bg-slate-100 border border-slate-200 flex items-center shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
-            onClick={() => {
-              setActiveTab('pgb');
-              setPortalSubTab('pgb');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-              activeTab === 'pgb'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+            type="button"
+            onClick={() => setShowAnalyticsChart(!showAnalyticsChart)}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+              showAnalyticsChart
+                ? 'bg-teal-900 text-white border-teal-900 shadow-xs'
+                : 'bg-teal-50 text-teal-900 border-teal-200 hover:bg-teal-100'
             }`}
           >
-            <GraduationCap className="w-4 h-4 text-amber-400" />
-            Direktori PGB ({pgbList.length})
+            <BarChart3 className="w-4 h-4 text-teal-600" />
+            <span>{showAnalyticsChart ? 'Tutup Carta Analisis' : 'Analisis Taburan Sekolah'}</span>
           </button>
-          <button
-            onClick={() => {
-              setActiveTab('sekolah');
-              setPortalSubTab('sekolah');
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-              activeTab === 'sekolah'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Building2 className="w-4 h-4 text-amber-400" />
-            Direktori Sekolah ({schools.length})
-          </button>
+
+          <div className="p-1 rounded-2xl bg-slate-100 border border-slate-200 flex items-center">
+            <button
+              onClick={() => {
+                setActiveTab('pgb');
+                setPortalSubTab('pgb');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'pgb'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <GraduationCap className="w-4 h-4 text-amber-400" />
+              Direktori PGB ({pgbList.length})
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('sekolah');
+                setPortalSubTab('sekolah');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                activeTab === 'sekolah'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Building2 className="w-4 h-4 text-amber-400" />
+              Direktori Sekolah ({schools.length})
+            </button>
+          </div>
         </div>
       </div>
 
+      {/* Ringkasan Analisis Taburan Sekolah Ahli Biasa & Ahli Bersekutu */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button
+          type="button"
+          onClick={() => setSelectedMembershipType('Semua')}
+          className={`text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+            selectedMembershipType === 'Semua'
+              ? 'bg-slate-900 text-white border-slate-900 shadow-md'
+              : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div>
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wider block ${
+                selectedMembershipType === 'Semua' ? 'text-amber-300' : 'text-slate-500'
+              }`}
+            >
+              Jumlah Keseluruhan Rangkaian
+            </span>
+            <h3 className="text-lg font-black mt-0.5">Semua Sekolah Ahli</h3>
+            <p
+              className={`text-[11px] mt-0.5 ${
+                selectedMembershipType === 'Semua' ? 'text-slate-300' : 'text-slate-500'
+              }`}
+            >
+              {membershipStats.ordinaryCount} Ahli Biasa • {membershipStats.associateCount} Ahli Bersekutu
+            </p>
+          </div>
+          <div className="text-2xl font-black font-mono">{membershipStats.total}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedMembershipType(selectedMembershipType === 'Ahli Biasa' ? 'Semua' : 'Ahli Biasa')
+          }
+          className={`text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+            selectedMembershipType === 'Ahli Biasa'
+              ? 'bg-emerald-800 text-white border-emerald-800 shadow-md'
+              : 'bg-emerald-50/70 text-slate-900 border-emerald-200 hover:bg-emerald-50'
+          }`}
+        >
+          <div>
+            <span
+              className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                selectedMembershipType === 'Ahli Biasa' ? 'text-emerald-200' : 'text-emerald-800'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Fasal 4(2) Perlembagaan
+            </span>
+            <h3 className="text-lg font-black mt-0.5">Sekolah Ahli Biasa</h3>
+            <p
+              className={`text-[11px] mt-0.5 ${
+                selectedMembershipType === 'Ahli Biasa' ? 'text-emerald-100' : 'text-slate-600'
+              }`}
+            >
+              {membershipStats.ordinaryPct}% daripada keseluruhan sekolah
+            </p>
+          </div>
+          <div className="text-2xl font-black font-mono">{membershipStats.ordinaryCount}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedMembershipType(
+              selectedMembershipType === 'Ahli Bersekutu' ? 'Semua' : 'Ahli Bersekutu'
+            )
+          }
+          className={`text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+            selectedMembershipType === 'Ahli Bersekutu'
+              ? 'bg-indigo-800 text-white border-indigo-800 shadow-md'
+              : 'bg-indigo-50/70 text-slate-900 border-indigo-200 hover:bg-indigo-50'
+          }`}
+        >
+          <div>
+            <span
+              className={`text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                selectedMembershipType === 'Ahli Bersekutu' ? 'text-indigo-200' : 'text-indigo-800'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5" />
+              Fasal 4(3) Perlembagaan
+            </span>
+            <h3 className="text-lg font-black mt-0.5">Sekolah Ahli Bersekutu</h3>
+            <p
+              className={`text-[11px] mt-0.5 ${
+                selectedMembershipType === 'Ahli Bersekutu' ? 'text-indigo-100' : 'text-slate-600'
+              }`}
+            >
+              {membershipStats.associatePct}% daripada keseluruhan sekolah
+            </p>
+          </div>
+          <div className="text-2xl font-black font-mono">{membershipStats.associateCount}</div>
+        </button>
+      </div>
+
+      {/* Carta Analisis Taburan Sekolah Ahli Biasa & Ahli Bersekutu */}
+      {showAnalyticsChart && <SchoolNetworkCharts schools={schools} />}
+
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
           {/* Search Box */}
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -246,11 +390,24 @@ export const PortalDirectory: React.FC = () => {
             </select>
           </div>
 
+          {/* Membership Category Filter */}
+          <div>
+            <select
+              value={selectedMembershipType}
+              onChange={(e) => setSelectedMembershipType(e.target.value as any)}
+              className="w-full p-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white font-bold text-slate-800"
+            >
+              <option value="Semua">Semua Kategori Ahli ({membershipStats.total})</option>
+              <option value="Ahli Biasa">Ahli Biasa ({membershipStats.ordinaryCount})</option>
+              <option value="Ahli Bersekutu">Ahli Bersekutu ({membershipStats.associateCount})</option>
+            </select>
+          </div>
+
           {/* Sort Alpha */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSortAlpha(sortAlpha === 'asc' ? 'desc' : 'asc')}
-              className="w-full px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <ArrowUpDown className="w-3.5 h-3.5" />
               <span>Susun Abjad: {sortAlpha === 'asc' ? 'A → Z' : 'Z → A'}</span>
@@ -290,10 +447,21 @@ export const PortalDirectory: React.FC = () => {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">
-                      {pgb.position}
-                    </span>
-                    <h3 className="font-bold text-sm text-slate-900 truncate" title={pgb.name}>
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">
+                        {pgb.position}
+                      </span>
+                      <span
+                        className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${
+                          pgb.membershipType === 'Ahli Bersekutu'
+                            ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        }`}
+                      >
+                        {pgb.membershipType}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-900 truncate mt-0.5" title={pgb.name}>
                       {pgb.name}
                     </h3>
                     <p className="text-[11px] text-slate-500 truncate mt-0.5" title={pgb.school}>
@@ -307,9 +475,14 @@ export const PortalDirectory: React.FC = () => {
                     <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                     <span>{pgb.state} ({pgb.district})</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <School className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span className="truncate">{pgb.schoolType}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <School className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span className="truncate">{pgb.schoolType}</span>
+                    </div>
+                    <span className="font-mono text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded shrink-0">
+                      {pgb.schoolCode}
+                    </span>
                   </div>
                 </div>
 
@@ -327,12 +500,18 @@ export const PortalDirectory: React.FC = () => {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">
-                  Ahli Disahkan
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    pgb.membershipType === 'Ahli Bersekutu'
+                      ? 'text-indigo-800 bg-indigo-50 border-indigo-200'
+                      : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  }`}
+                >
+                  {pgb.membershipType} Disahkan
                 </span>
                 <button
                   onClick={() => setSelectedPGB(pgb)}
-                  className="text-xs font-bold text-indigo-800 hover:text-indigo-950 flex items-center gap-1"
+                  className="text-xs font-bold text-indigo-800 hover:text-indigo-950 flex items-center gap-1 cursor-pointer"
                 >
                   Profil Penuh <ChevronRight className="w-3 h-3" />
                 </button>
@@ -345,91 +524,116 @@ export const PortalDirectory: React.FC = () => {
       {/* Content: TAB 2 - Direktori Sekolah Ahli */}
       {activeTab === 'sekolah' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredSchools.map((sch) => (
-            <div
-              key={sch.id}
-              className="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
-            >
-              {/* Campus photo if available */}
-              {sch.schoolPhotoUrl && (
-                <div className="h-36 w-full overflow-hidden bg-slate-100 relative">
-                  <img
-                    src={sch.schoolPhotoUrl}
-                    alt={sch.name}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <span className="absolute bottom-2.5 left-3 text-[10px] font-bold text-white px-2 py-0.5 rounded bg-black/50 backdrop-blur-xs">
-                    {sch.type}
-                  </span>
-                </div>
-              )}
-
-              <div className="p-5 flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 font-mono">
-                      {sch.code}
-                    </span>
-                    <span className="text-xs text-slate-500 font-medium">{sch.state}</span>
-                  </div>
-
-                  <h3
-                    onClick={() => setSelectedSchool(sch)}
-                    className="font-black text-base text-slate-900 hover:text-teal-900 cursor-pointer line-clamp-2"
-                  >
-                    {sch.name}
-                  </h3>
-
-                  <div className="mt-3 space-y-1.5 text-xs text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <GraduationCap className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-                      <span className="truncate">Pengetua: <strong>{sch.principal}</strong></span>
-                    </div>
-                    {sch.email && (
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-3.5 h-3.5 text-teal-700 shrink-0" />
-                        <span className="truncate">{sch.email}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-center text-xs">
-                    <div className="p-2 rounded-xl bg-slate-50">
-                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Murid</span>
-                      <strong className="text-slate-800">{sch.studentCount || '500+'}</strong>
-                    </div>
-                    <div className="p-2 rounded-xl bg-slate-50">
-                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Guru</span>
-                      <strong className="text-slate-800">{sch.teacherCount || '45'}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  {sch.website ? (
-                    <a
-                      href={sch.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-teal-800 hover:underline flex items-center gap-1 font-semibold"
+          {filteredSchools.map((sch) => {
+            const memType = resolveSchoolMembershipType(sch);
+            return (
+              <div
+                key={sch.id}
+                className="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
+              >
+                {/* Campus photo if available */}
+                {sch.schoolPhotoUrl && (
+                  <div className="h-36 w-full overflow-hidden bg-slate-100 relative">
+                    <img
+                      src={sch.schoolPhotoUrl}
+                      alt={sch.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <span
+                      className={`absolute top-2.5 right-2.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border backdrop-blur-xs ${
+                        memType === 'Ahli Bersekutu'
+                          ? 'bg-indigo-950/85 text-indigo-200 border-indigo-400/50'
+                          : 'bg-emerald-950/85 text-emerald-200 border-emerald-400/50'
+                      }`}
                     >
-                      <Globe className="w-3.5 h-3.5" /> Laman Web
-                    </a>
-                  ) : (
-                    <span className="text-slate-400 text-[11px]">Tiada web rasmi</span>
-                  )}
+                      {memType}
+                    </span>
+                    <span className="absolute bottom-2.5 left-3 text-[10px] font-bold text-white px-2 py-0.5 rounded bg-black/50 backdrop-blur-xs">
+                      {sch.type}
+                    </span>
+                  </div>
+                )}
 
-                  <button
-                    onClick={() => setSelectedSchool(sch)}
-                    className="text-xs font-bold text-teal-900 hover:underline flex items-center gap-0.5"
-                  >
-                    Profil Lengkap →
-                  </button>
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 font-mono">
+                          {sch.code}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
+                            memType === 'Ahli Bersekutu'
+                              ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          }`}
+                        >
+                          {memType}
+                        </span>
+                      </div>
+                      <span className="text-xs text-slate-500 font-medium">{sch.state}</span>
+                    </div>
+
+                    <h3
+                      onClick={() => setSelectedSchool(sch)}
+                      className="font-black text-base text-slate-900 hover:text-teal-900 cursor-pointer line-clamp-2"
+                    >
+                      {sch.name}
+                    </h3>
+
+                    <div className="mt-3 space-y-1.5 text-xs text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                        <span className="truncate">
+                          PGB: <strong>{sch.principal}</strong>
+                        </span>
+                      </div>
+                      {sch.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                          <span className="truncate">{sch.email}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-center text-xs">
+                      <div className="p-2 rounded-xl bg-slate-50">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Murid</span>
+                        <strong className="text-slate-800">{sch.studentCount || '500+'}</strong>
+                      </div>
+                      <div className="p-2 rounded-xl bg-slate-50">
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Guru</span>
+                        <strong className="text-slate-800">{sch.teacherCount || '45'}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    {sch.website ? (
+                      <a
+                        href={sch.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-teal-800 hover:underline flex items-center gap-1 font-semibold"
+                      >
+                        <Globe className="w-3.5 h-3.5" /> Laman Web
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 text-[11px]">Tiada web rasmi</span>
+                    )}
+
+                    <button
+                      onClick={() => setSelectedSchool(sch)}
+                      className="text-xs font-bold text-teal-900 hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      Profil Lengkap →
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -454,15 +658,38 @@ export const PortalDirectory: React.FC = () => {
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200"
               />
               <div>
-                <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
-                  {activePGB.position}
-                </span>
-                <h2 className="text-lg font-black text-slate-900">{activePGB.name}</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">
+                    {activePGB.position}
+                  </span>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                      activePGB.membershipType === 'Ahli Bersekutu'
+                        ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    }`}
+                  >
+                    {activePGB.membershipType}
+                  </span>
+                </div>
+                <h2 className="text-lg font-black text-slate-900 mt-0.5">{activePGB.name}</h2>
                 <p className="text-xs text-slate-600">{activePGB.school}</p>
               </div>
             </div>
 
             <div className="space-y-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-4">
+              <div>
+                <span className="text-slate-400 font-semibold block">Kategori Keahlian Institusi (Perlembagaan):</span>
+                <span
+                  className={`inline-block mt-0.5 px-2.5 py-0.5 rounded font-bold text-xs border ${
+                    activePGB.membershipType === 'Ahli Bersekutu'
+                      ? 'bg-indigo-100 text-indigo-900 border-indigo-200'
+                      : 'bg-emerald-100 text-emerald-900 border-emerald-200'
+                  }`}
+                >
+                  {activePGB.membershipType} ({activePGB.membershipType === 'Ahli Bersekutu' ? 'Fasal 4(3)' : 'Fasal 4(2)'})
+                </span>
+              </div>
               <div>
                 <span className="text-slate-400 font-semibold block">Negeri & Daerah:</span>
                 <span className="text-slate-800 font-bold">{activePGB.state} ({activePGB.district})</span>
@@ -538,7 +765,16 @@ export const PortalDirectory: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span
+                className={`px-2.5 py-0.5 rounded text-xs font-black uppercase tracking-wider border ${
+                  resolveSchoolMembershipType(activeSchool) === 'Ahli Bersekutu'
+                    ? 'bg-indigo-100 text-indigo-900 border-indigo-200'
+                    : 'bg-emerald-100 text-emerald-900 border-emerald-200'
+                }`}
+              >
+                {resolveSchoolMembershipType(activeSchool)}
+              </span>
               <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-900 font-mono">
                 {activeSchool.code}
               </span>
@@ -551,9 +787,24 @@ export const PortalDirectory: React.FC = () => {
             <p className="text-xs text-slate-500 mt-0.5">{activeSchool.district}, {activeSchool.state}</p>
 
             <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs text-slate-700">
-              <div>
-                <span className="text-slate-400 block font-semibold">Pengetua / Guru Besar:</span>
-                <strong className="text-slate-900 text-sm">{activeSchool.principal}</strong>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <span className="text-slate-400 block font-semibold">Pengetua / Guru Besar:</span>
+                  <strong className="text-slate-900 text-sm">{activeSchool.principal}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 block font-semibold">Status Keahlian MPGBSIM:</span>
+                  <strong
+                    className={`text-sm ${
+                      resolveSchoolMembershipType(activeSchool) === 'Ahli Bersekutu'
+                        ? 'text-indigo-800'
+                        : 'text-emerald-800'
+                    }`}
+                  >
+                    {resolveSchoolMembershipType(activeSchool)} (
+                    {resolveSchoolMembershipType(activeSchool) === 'Ahli Bersekutu' ? 'Fasal 4(3)' : 'Fasal 4(2)'})
+                  </strong>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
@@ -608,3 +859,4 @@ export const PortalDirectory: React.FC = () => {
     </div>
   );
 };
+

@@ -111,6 +111,11 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
     matchedSchool?.type ||
     (isSecondaryMusleh ? 'Sekolah Menengah' : isPrimaryMusleh ? 'Sekolah Rendah' : 'Sekolah Menengah');
 
+  const membershipType: 'Ahli Biasa' | 'Ahli Bersekutu' =
+    currentUser?.membershipType ||
+    matchedSchool?.membershipType ||
+    (schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa');
+
   const state = currentUser?.state || matchedSchool?.state || 'Melaka';
   const rawCode = currentUser?.schoolCode || currentUser?.membershipNo?.replace(/^MPGB-\d{4}-/, '') || matchedSchool?.code || (isSecondaryMusleh ? 'JAIM/SAS(M)130' : 'MJAC011');
   const effectiveCode = isSecondaryMusleh ? 'JAIM/SAS(M)130' : isPrimaryMusleh ? 'MJAC011' : (rawCode === 'MIA1009' ? 'JAIM/SAS(M)130' : rawCode);
@@ -121,7 +126,20 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
     ? 'MPGB-2026-MJAC011'
     : currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || `MPGB-2026-${effectiveCode}`;
 
-  const icNumber = currentUser?.icNumber || (matchedSchool as any)?.icNumber || (isSecondaryMusleh ? '730627-01-5156' : '850312-04-5123');
+  const matchedApp = (siteData.memberApplications || []).find((a) => {
+    const codeNorm = (effectiveCode || '').trim().toLowerCase();
+    const nameNorm = (school || '').trim().toLowerCase();
+    return (
+      (codeNorm && (a.schoolCode || '').trim().toLowerCase() === codeNorm) ||
+      (nameNorm && (a.schoolName || '').trim().toLowerCase() === nameNorm)
+    );
+  });
+
+  const icNumber =
+    currentUser?.icNumber ||
+    matchedSchool?.icNumber ||
+    matchedApp?.icNumber ||
+    (isSecondaryMusleh ? '730627-01-5156' : isPrimaryMusleh ? '850312-04-5123' : '');
   const photoURL =
     currentUser?.photoURL ||
     matchedSchool?.principalPhotoUrl ||
@@ -154,6 +172,7 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
     name: fullName,
     position,
     school,
+    membershipType,
     state,
     status: 'AKTIF',
     validUntil: '31/12/2026',
@@ -323,9 +342,20 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                       </h5>
                     </div>
                   </div>
-                  <div className="px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-bold tracking-wider uppercase flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-amber-400" />
-                    <span>AHLI RASMI</span>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <div className="px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[9px] font-bold tracking-wider uppercase flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-amber-400" />
+                      <span>AHLI RASMI</span>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${
+                        membershipType === 'Ahli Bersekutu'
+                          ? 'bg-indigo-500/25 border-indigo-400/50 text-indigo-200'
+                          : 'bg-emerald-500/25 border-emerald-400/50 text-emerald-300'
+                      }`}
+                    >
+                      {membershipType === 'Ahli Bersekutu' ? 'AHLI BERSEKUTU' : 'AHLI BIASA'}
+                    </span>
                   </div>
                 </div>
 
@@ -354,6 +384,15 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                       {school}
                     </p>
                     <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span
+                        className={`text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider border ${
+                          membershipType === 'Ahli Bersekutu'
+                            ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/50'
+                            : 'bg-emerald-500/25 text-emerald-200 border-emerald-400/50'
+                        }`}
+                      >
+                        {membershipType}
+                      </span>
                       <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">
                         {state}
                       </span>
@@ -400,10 +439,20 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-[9px]">
+                    <div className="grid grid-cols-3 gap-2 text-[9px]">
                       <div>
                         <span className="text-slate-400 block text-[8px]">TAHUN AHLI:</span>
                         <span className="font-bold text-white">{joinYear}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[8px]">KATEGORI:</span>
+                        <span
+                          className={`font-black uppercase ${
+                            membershipType === 'Ahli Bersekutu' ? 'text-indigo-300' : 'text-amber-300'
+                          }`}
+                        >
+                          {membershipType}
+                        </span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[8px]">STATUS:</span>
@@ -483,7 +532,16 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
                       <h5 className="text-[10px] font-black text-white truncate leading-tight">
                         {school}
                       </h5>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-[8px] text-slate-300 font-mono">
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[8px] text-slate-300 font-mono">
+                        <span
+                          className={`px-1.5 py-0.2 rounded font-bold uppercase ${
+                            membershipType === 'Ahli Bersekutu'
+                              ? 'bg-indigo-500/25 text-indigo-200 border border-indigo-400/40'
+                              : 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
+                          }`}
+                        >
+                          {membershipType}
+                        </span>
                         <span className="text-amber-300 font-bold">Kod: {effectiveCode}</span>
                         <span>•</span>
                         <span>{state}</span>

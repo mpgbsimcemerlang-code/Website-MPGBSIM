@@ -94,6 +94,7 @@ export const PortalLoginView: React.FC = () => {
     schoolName: '',
     schoolCode: '',
     schoolType: 'Sekolah Menengah',
+    membershipType: 'Ahli Biasa',
     joinYear: new Date().getFullYear(),
     schoolJoinYear: new Date().getFullYear(),
     state: 'Selangor',
@@ -373,6 +374,7 @@ export const PortalLoginView: React.FC = () => {
           schoolName: regForm.schoolName,
           schoolCode: regForm.schoolCode || '',
           schoolType: regForm.schoolType,
+          membershipType: regForm.membershipType || (regForm.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa'),
           state: regForm.state,
           district: regForm.district || '',
           studentCount: Number(regForm.studentCount) || 0,
@@ -636,9 +638,20 @@ export const PortalLoginView: React.FC = () => {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-black/30" />
-                        <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/60 text-amber-300 backdrop-blur-xs border border-amber-400/30">
-                          {school.type}
-                        </span>
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider backdrop-blur-xs border ${
+                              (school.membershipType || (school.type === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')) === 'Ahli Bersekutu'
+                                ? 'bg-indigo-950/85 text-indigo-300 border-indigo-400/50'
+                                : 'bg-emerald-950/85 text-emerald-300 border-emerald-400/50'
+                            }`}
+                          >
+                            {school.membershipType || (school.type === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/60 text-amber-300 backdrop-blur-xs border border-amber-400/30">
+                            {school.type}
+                          </span>
+                        </div>
                         <span className="absolute bottom-2 left-3 text-[10px] font-mono text-white/90 bg-black/50 px-2 py-0.5 rounded">
                           {school.code}
                         </span>
@@ -648,9 +661,20 @@ export const PortalLoginView: React.FC = () => {
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
                           {school.code}
                         </span>
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                          {school.type}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                              (school.membershipType || (school.type === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')) === 'Ahli Bersekutu'
+                                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400/40'
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                            }`}
+                          >
+                            {school.membershipType || (school.type === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')}
+                          </span>
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                            {school.type}
+                          </span>
+                        </div>
                       </div>
                     )}
 
@@ -1264,7 +1288,14 @@ export const PortalLoginView: React.FC = () => {
                       <label className="block text-slate-300 mb-1 font-semibold">Kategori Sekolah *</label>
                       <select
                         value={regForm.schoolType}
-                        onChange={(e) => setRegForm({ ...regForm, schoolType: e.target.value })}
+                        onChange={(e) => {
+                          const newType = e.target.value;
+                          setRegForm({
+                            ...regForm,
+                            schoolType: newType,
+                            membershipType: newType === 'Rakan Musleh' ? 'Ahli Bersekutu' : regForm.membershipType || 'Ahli Biasa',
+                          });
+                        }}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-hidden focus:border-amber-400 transition"
                       >
                         {PORTAL_SCHOOL_TYPES.map((t) => (
@@ -1274,6 +1305,89 @@ export const PortalLoginView: React.FC = () => {
                         ))}
                       </select>
                     </div>
+                  </div>
+
+                  {/* Pilihan Status Keahlian Institusi: Ahli Biasa vs Ahli Bersekutu (Fasal 4 Perlembagaan MPGBSIM) */}
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-slate-200 font-bold text-xs flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Kategori Keahlian Institusi Sekolah (Fasal 4 Perlembagaan) *</span>
+                      </label>
+                      <span className="text-[10px] font-mono text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                        Wajib Pilih
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setRegForm({ ...regForm, membershipType: 'Ahli Biasa' })}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                          (regForm.membershipType || 'Ahli Biasa') === 'Ahli Biasa'
+                            ? 'bg-emerald-950/60 border-emerald-500/80 ring-1 ring-emerald-500/40 shadow-md'
+                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center mt-0.5 shrink-0 ${
+                            (regForm.membershipType || 'Ahli Biasa') === 'Ahli Biasa'
+                              ? 'border-emerald-400 bg-emerald-500 text-slate-950'
+                              : 'border-slate-600'
+                          }`}
+                        >
+                          {(regForm.membershipType || 'Ahli Biasa') === 'Ahli Biasa' && (
+                            <CheckCircle2 className="w-3 h-3" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-xs text-white">Ahli Biasa</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                              Fasal 4(2)
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                            Sekolah-Sekolah Islam Malaysia di bawah rangkaian penuh IKRAM MUSLEH (Sekolah Rendah, Sekolah Menengah & Maahad Tahfiz).
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRegForm({ ...regForm, membershipType: 'Ahli Bersekutu' })}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                          regForm.membershipType === 'Ahli Bersekutu'
+                            ? 'bg-indigo-950/60 border-indigo-500/80 ring-1 ring-indigo-500/40 shadow-md'
+                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full border flex items-center justify-center mt-0.5 shrink-0 ${
+                            regForm.membershipType === 'Ahli Bersekutu'
+                              ? 'border-indigo-400 bg-indigo-500 text-white'
+                              : 'border-slate-600'
+                          }`}
+                        >
+                          {regForm.membershipType === 'Ahli Bersekutu' && (
+                            <CheckCircle2 className="w-3 h-3" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-xs text-white">Ahli Bersekutu</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">
+                              Fasal 4(3)
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                            Sekolah Rakan Musleh / Institusi Pendidikan Islam bersekutu yang menyertai jaringan kerjasama strategik MPGBSIM.
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                       <label className="block text-slate-300 mb-1 font-semibold flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-amber-400" />

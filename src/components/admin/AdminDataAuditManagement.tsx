@@ -320,6 +320,7 @@ export const AdminDataAuditManagement: React.FC = () => {
           district: app.district,
           principal: `${app.fullName} (${app.designation})`,
           designation: app.designation,
+          icNumber: app.icNumber || '',
           principalPhotoUrl: app.pgbPhotoUrl || '',
           studentCount: Number(app.studentCount) || 0,
           teacherCount: Number(app.teacherCount) || 0,

@@ -82,6 +82,9 @@ export const PortalProfile: React.FC = () => {
   const [school, setSchool] = useState(currentUser?.school || '');
   const [schoolCode, setSchoolCode] = useState(currentUser?.schoolCode || '');
   const [schoolType, setSchoolType] = useState(normalizeSchoolCategory(currentUser?.schoolType));
+  const [membershipType, setMembershipType] = useState<'Ahli Biasa' | 'Ahli Bersekutu'>(
+    currentUser?.membershipType || (currentUser?.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')
+  );
   const [joinYear, setJoinYear] = useState<number | string>(
     currentUser?.joinYear || 2024
   );
@@ -190,9 +193,51 @@ export const PortalProfile: React.FC = () => {
       (isSecondaryMusleh ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80' : '') ||
       '';
 
+    const codeNorm = (currentUser?.schoolCode || matchedSchool?.code || '').trim().toLowerCase();
+    const nameNorm = (effectiveSchool || '').trim().toLowerCase();
+    const emailNorm = (currentUser?.pgbEmail || currentUser?.email || matchedSchool?.pgbEmail || matchedSchool?.email || '').trim().toLowerCase();
+    const principalNorm = (effectiveFullName || '')
+      .replace(/\(.*?\)/g, '')
+      .trim()
+      .toLowerCase();
+
+    const matchedApp = (siteData.memberApplications || []).find((a) => {
+      const aCode = (a.schoolCode || '').trim().toLowerCase();
+      const aName = (a.schoolName || '').trim().toLowerCase();
+      const aEmail = (a.email || a.pgbEmail || '').trim().toLowerCase();
+      const aFullName = (a.fullName || '').trim().toLowerCase();
+      return (
+        (codeNorm && aCode && aCode === codeNorm) ||
+        (nameNorm && aName && aName === nameNorm) ||
+        (emailNorm && aEmail && aEmail === emailNorm) ||
+        (principalNorm && aFullName && (principalNorm.includes(aFullName) || aFullName.includes(principalNorm)))
+      );
+    });
+
+    let subIc = '';
+    for (const sub of siteData.submissions || []) {
+      const msg = sub.message || '';
+      const kpMatch = msg.match(/No\s*KP:\s*([0-9A-Za-z-]{6,20})/i);
+      if (!kpMatch || !kpMatch[1] || kpMatch[1] === '-') continue;
+      const msgLower = msg.toLowerCase();
+      const subEmail = (sub.email || '').trim().toLowerCase();
+      const subName = (sub.name || '').trim().toLowerCase();
+      if (
+        (codeNorm && msgLower.includes(`(${codeNorm})`)) ||
+        (nameNorm && msgLower.includes(nameNorm)) ||
+        (emailNorm && (subEmail === emailNorm || msgLower.includes(emailNorm))) ||
+        (principalNorm && subName && (principalNorm.includes(subName) || subName.includes(principalNorm)))
+      ) {
+        subIc = kpMatch[1].trim();
+        break;
+      }
+    }
+
     const effectiveIcNumber =
       currentUser?.icNumber ||
-      (matchedSchool as any)?.icNumber ||
+      matchedSchool?.icNumber ||
+      matchedApp?.icNumber ||
+      subIc ||
       (isSecondaryMusleh ? '730627-01-5156' : isPrimaryMusleh ? '850312-04-5123' : '');
 
     const effectiveServiceStartYear =
@@ -225,6 +270,12 @@ export const PortalProfile: React.FC = () => {
       matchedSchool?.type ||
       (isSecondaryMusleh ? 'Sekolah Menengah' : isPrimaryMusleh ? 'Sekolah Rendah' : 'Sekolah Menengah')
     );
+
+    const effectiveMembershipType: 'Ahli Biasa' | 'Ahli Bersekutu' =
+      currentUser?.membershipType ||
+      matchedSchool?.membershipType ||
+      matchedApp?.membershipType ||
+      (effectiveSchoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa');
 
     const effectiveDistrict =
       currentUser?.district ||
@@ -293,6 +344,7 @@ export const PortalProfile: React.FC = () => {
       setPgbEmail(effectivePgbEmail);
       setSchoolCode(effectiveSchoolCode);
       setSchoolType(effectiveSchoolType);
+      setMembershipType(effectiveMembershipType);
       setDistrict(effectiveDistrict);
       setAddress(effectiveAddress);
       setSchoolEmail(effectiveSchoolEmail);
@@ -310,8 +362,10 @@ export const PortalProfile: React.FC = () => {
       if (currentUser?.interests && currentUser.interests.length > 0) {
         setInterestsStr(currentUser.interests.join(', '));
       }
+    } else if (!icNumber && effectiveIcNumber) {
+      setIcNumber(effectiveIcNumber);
     }
-  }, [currentUser, allSchools]);
+  }, [currentUser, allSchools, siteData.memberApplications, siteData.submissions]);
 
   const statesList = [
     'Selangor',
@@ -422,6 +476,7 @@ export const PortalProfile: React.FC = () => {
         school: school.trim(),
         schoolCode: schoolCode ? schoolCode.trim().toUpperCase() : undefined,
         schoolType: schoolType || 'Sekolah Menengah',
+        membershipType: membershipType || 'Ahli Biasa',
         state: state || 'Melaka',
         district: district ? district.trim() : undefined,
         address: address ? address.trim() : undefined,
@@ -473,7 +528,9 @@ export const PortalProfile: React.FC = () => {
           name: school.trim() || matchedSchool.name,
           code: schoolCode ? schoolCode.trim().toUpperCase() : matchedSchool.code,
           type: schoolType || matchedSchool.type,
+          membershipType: membershipType || matchedSchool.membershipType || 'Ahli Biasa',
           principal: fullName.trim() || matchedSchool.principal,
+          icNumber: icNumber ? icNumber.trim() : matchedSchool.icNumber,
           serviceStartYear: Number(serviceStartYear) || (matchedSchool as any).serviceStartYear,
           pgbStartYear: Number(serviceStartYear) || (matchedSchool as any).pgbStartYear,
           joinYear: Number(joinYear) || matchedSchool.joinYear,
@@ -650,8 +707,12 @@ export const PortalProfile: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  {currentUser?.role === 'ADMIN' ? 'ADMIN PENTADBIR' : 'AHLI RASMI PGB'}
+                <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                  membershipType === 'Ahli Bersekutu'
+                    ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  {currentUser?.role === 'ADMIN' ? 'ADMIN PENTADBIR' : membershipType.toUpperCase()}
                 </span>
               </div>
 
@@ -670,9 +731,18 @@ export const PortalProfile: React.FC = () => {
                   <h3 className="font-extrabold text-sm text-white truncate">{fullName || 'Ustaz Abdul Qayyum bin Yaakop'}</h3>
                   <p className="text-[11px] text-amber-300 font-semibold truncate">{position || 'Guru Besar'}</p>
                   <p className="text-[10px] text-slate-300 truncate">{school || 'Sekolah Rendah Islam I Musleh'}</p>
-                  <span className="inline-block mt-1 text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {state || 'Melaka'} • Kod: {effectiveCardCode}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1 mt-1">
+                    <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {state || 'Melaka'} • Kod: {effectiveCardCode}
+                    </span>
+                    <span className={`text-[9px] px-2 py-0.5 rounded font-bold border ${
+                      membershipType === 'Ahli Bersekutu'
+                        ? 'bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
+                        : 'bg-teal-500/25 text-teal-200 border-teal-400/40'
+                    }`}>
+                      {membershipType}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1053,6 +1123,76 @@ export const PortalProfile: React.FC = () => {
                   />
                 </div>
 
+                {/* Kategori Keahlian MPGBSIM (Fasal 4 Perlembagaan): Ahli Biasa vs Ahli Bersekutu */}
+                <div className="p-3.5 rounded-2xl bg-white border border-teal-200 space-y-2.5 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="font-bold text-teal-950 flex items-center gap-1.5 text-xs">
+                      <Shield className="w-4 h-4 text-teal-700" />
+                      <span>Status / Kategori Keahlian Sekolah (Fasal 4 Perlembagaan MPGBSIM) *</span>
+                    </label>
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                      Klasifikasi Rasmi Keahlian
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMembershipType('Ahli Biasa')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                        membershipType === 'Ahli Biasa'
+                          ? 'bg-teal-900 text-white border-teal-900 shadow-sm ring-2 ring-teal-500/20'
+                          : 'bg-slate-50 hover:bg-teal-50/50 text-slate-800 border-slate-200'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border ${
+                        membershipType === 'Ahli Biasa'
+                          ? 'bg-amber-400 border-amber-300 text-slate-950'
+                          : 'bg-white border-slate-300 text-transparent'
+                      }`}>
+                        <Check className="w-3 h-3" />
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-xs block">
+                          Ahli Biasa (Fasal 4(2))
+                        </span>
+                        <span className={`text-[10px] block mt-0.5 leading-snug ${
+                          membershipType === 'Ahli Biasa' ? 'text-teal-100' : 'text-slate-500'
+                        }`}>
+                          Sekolah-Sekolah Islam Malaysia di bawah IKRAM MUSLEH
+                        </span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMembershipType('Ahli Bersekutu')}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                        membershipType === 'Ahli Bersekutu'
+                          ? 'bg-indigo-900 text-white border-indigo-900 shadow-sm ring-2 ring-indigo-500/20'
+                          : 'bg-slate-50 hover:bg-indigo-50/50 text-slate-800 border-slate-200'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border ${
+                        membershipType === 'Ahli Bersekutu'
+                          ? 'bg-amber-400 border-amber-300 text-slate-950'
+                          : 'bg-white border-slate-300 text-transparent'
+                      }`}>
+                        <Check className="w-3 h-3" />
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-xs block">
+                          Ahli Bersekutu (Fasal 4(3))
+                        </span>
+                        <span className={`text-[10px] block mt-0.5 leading-snug ${
+                          membershipType === 'Ahli Bersekutu' ? 'text-indigo-100' : 'text-slate-500'
+                        }`}>
+                          Sekolah Rangkaian IKRAM MUSLEH (Bersekutu / Rakan Musleh)
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Kod Sekolah</label>
@@ -1070,7 +1210,13 @@ export const PortalProfile: React.FC = () => {
                     <label className="block font-bold text-slate-700 mb-1">Kategori Sekolah *</label>
                     <select
                       value={schoolType}
-                      onChange={(e) => setSchoolType(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSchoolType(val);
+                        if (val === 'Rakan Musleh') {
+                          setMembershipType('Ahli Bersekutu');
+                        }
+                      }}
                       className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-teal-700 focus:outline-none"
                     >
                       {schoolTypesList.map((st) => (
@@ -1724,7 +1870,13 @@ export const PortalProfile: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">Status Keahlian (Fasal 4):</span>
+                    <strong className={membershipType === 'Ahli Bersekutu' ? 'text-indigo-800' : 'text-teal-900'}>
+                      {membershipType}
+                    </strong>
+                  </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Kategori Sekolah:</span>
                     <strong className="text-slate-800">{schoolType || '-'}</strong>

@@ -108,6 +108,7 @@ export const AdminSchoolManagement: React.FC = () => {
     state: 'Selangor',
     district: '',
     type: 'Sekolah Menengah',
+    membershipType: 'Ahli Biasa',
     principal: '',
     designation: 'Pengetua',
     principalPhotoUrl: '',
@@ -579,7 +580,16 @@ export const AdminSchoolManagement: React.FC = () => {
                           : nextType === 'Sekolah Menengah' || nextType === 'Maahad Tahfiz'
                           ? 'Pengetua'
                           : formData.designation || 'Pengetua';
-                      setFormData({ ...formData, type: nextType, designation: autoDesig });
+                      const autoMem =
+                        nextType === 'Rakan Musleh'
+                          ? 'Ahli Bersekutu'
+                          : formData.membershipType || 'Ahli Biasa';
+                      setFormData({
+                        ...formData,
+                        type: nextType,
+                        designation: autoDesig,
+                        membershipType: autoMem,
+                      });
                     }}
                     className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
                   >
@@ -590,6 +600,25 @@ export const AdminSchoolManagement: React.FC = () => {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Kategori Keahlian Institusi (Fasal 4 Perlembagaan)
+                </label>
+                <select
+                  value={formData.membershipType || (formData.type === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      membershipType: e.target.value as 'Ahli Biasa' | 'Ahli Bersekutu',
+                    })
+                  }
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white font-bold text-slate-900"
+                >
+                  <option value="Ahli Biasa">Ahli Biasa — Fasal 4(2) (Rangkaian Penuh IKRAM MUSLEH)</option>
+                  <option value="Ahli Bersekutu">Ahli Bersekutu — Fasal 4(3) (Sekolah Rakan Musleh / Bersekutu)</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">

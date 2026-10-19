@@ -13,15 +13,16 @@ import {
   Info,
   CheckCircle2,
   Calendar,
-  Users,
   HeartHandshake,
   Receipt,
   FileCheck,
-  Lock,
-  Smartphone,
+  Scale,
+  Landmark,
 } from 'lucide-react';
 
 export const OFFICIAL_HEREPAY_URL = 'https://app.herepay.org/mpgbsim';
+const OFFICIAL_MAYBANK_ACC = '562188100141';
+const OFFICIAL_MAYBANK_NAME = 'PER MAJLIS GURU BESAR SEK-SEK ISLAM (M)';
 
 interface FeePaymentSectionProps {
   onOpenPortal?: () => void;
@@ -30,107 +31,175 @@ interface FeePaymentSectionProps {
 interface FeeCategoryOption {
   id: string;
   title: string;
-  type: 'rendah' | 'menengah' | 'daftar' | 'program' | 'infaq';
+  clause: string;
+  type: 'ahli_biasa' | 'ahli_bersekutu' | 'program' | 'infaq';
   amount: number;
   period: string;
   badge: string;
   badgeColor: string;
   suitableFor: string;
   features: string[];
-  recommended?: boolean;
 }
 
 const FEE_CATEGORIES: FeeCategoryOption[] = [
+  // FASAL 6(1): YURAN AHLI BIASA
   {
-    id: 'rendah',
-    title: 'Yuran Tahunan Sekolah Rendah',
-    type: 'rendah',
-    amount: 300,
-    period: 'Sesi Tahunan 2026/2027',
-    badge: 'Guru Besar / Institusi Rendah',
+    id: 'ahli_1_3_tahun',
+    title: 'Yuran Ahli Biasa (Penubuhan 1–3 Tahun)',
+    clause: 'Fasal 6(1) & Fasal 4(1)',
+    type: 'ahli_biasa',
+    amount: 100,
+    period: 'Setahun • Penubuhan 1–3 Tahun',
+    badge: 'Ahli Biasa • 1–3 Tahun',
     badgeColor: 'bg-teal-500/10 text-teal-300 border-teal-500/30',
-    suitableFor: 'Sekolah Rendah Islam (SRI), SRITI, SRAI, Rakan Musleh',
+    suitableFor: 'Institusi berdaftar IKRAM MUSLEH & KPM/JAI (Penubuhan sekolah 1 hingga 3 tahun)',
     features: [
-      'Pendaftaran keahlian sah Guru Besar & Majlis Pengurusan',
-      'Penyertaan Takwim Peperiksaan UPKK & Bengkel Kurikulum',
-      'Akses Penuh Portal Ahli PGB & Kad Digital',
-      'Penerbitan warta berita & profil sekolah di portal kebangsaan',
+      'Bayaran tahunan RM100 sahaja bagi sekolah berusia 1–3 tahun (Fasal 6(1))',
+      'Keahlian automatik bagi Guru Besar / Mudir / Pengetua (Fasal 4(2))',
+      'Hak penuh mengundi & perbincangan usul dalam Mesyuarat Agung MPGBSIM',
+      'Pengeluaran Sijil Keahlian Rasmi & akses penuh Portal Ahli PGB',
     ],
-    recommended: true,
   },
   {
-    id: 'menengah',
-    title: 'Yuran Tahunan Sekolah Menengah',
-    type: 'menengah',
-    amount: 500,
-    period: 'Sesi Tahunan 2026/2027',
-    badge: 'Pengetua / Institusi Menengah',
+    id: 'ahli_bawah_300',
+    title: 'Yuran Ahli Biasa (> 3 Tahun • ≤ 300 Murid)',
+    clause: 'Fasal 6(1) & Fasal 4(1)',
+    type: 'ahli_biasa',
+    amount: 300,
+    period: 'Setahun • Enrolmen ≤ 300 Murid',
+    badge: 'Ahli Biasa • ≤ 300 Murid',
+    badgeColor: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+    suitableFor: 'Institusi Ahli Biasa (> 3 tahun penubuhan) dengan bilangan murid 300 orang ke bawah',
+    features: [
+      'Mengikut kategori enrolmen murid 300 orang ke bawah (Fasal 6(1))',
+      'Hak mengundi & perbincangan usul dalam Mesyuarat Agung Tahunan',
+      'Program latihan ikhtisas & kompetensi kepimpinan ahli (Fasal 3(3))',
+      'Akses penuh Portal Ahli PGB, Kad Digital QR & Direktori Kebangsaan',
+    ],
+  },
+  {
+    id: 'ahli_atas_301',
+    title: 'Yuran Ahli Biasa (> 3 Tahun • ≥ 301 Murid)',
+    clause: 'Fasal 6(1) & Fasal 4(1)',
+    type: 'ahli_biasa',
+    amount: 600,
+    period: 'Setahun • Enrolmen ≥ 301 Murid',
+    badge: 'Ahli Biasa • ≥ 301 Murid',
     badgeColor: 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30',
-    suitableFor: 'Sekolah Menengah Islam (SMI), SMKA, SABK, Maahad Tahfiz',
+    suitableFor: 'Institusi Ahli Biasa (> 3 tahun penubuhan) dengan bilangan murid 301 orang ke atas',
     features: [
-      'Keahlian sah Pengetua & Pengurusan Sekolah Menengah',
-      'Modul kepimpinan Rabbani, takwim SPM & SPPIM',
-      'Akses direktori institusi & perkongsian modul kepimpinan SLT',
-      'Pentauliahan watikah keahlian berdaftar MPGBSIM',
+      'Mengikut kategori enrolmen murid 301 orang ke atas (Fasal 6(1))',
+      'Hak mengundi & perbincangan usul dalam Mesyuarat Agung Tahunan',
+      'Penyertaan program latihan ikhtisas, kurikulum & kokurikulum (Fasal 3)',
+      'Akses penuh Portal Ahli PGB, Kad Digital QR & Direktori Kebangsaan',
     ],
-    recommended: true,
   },
+
+  // FASAL 6(2): YURAN AHLI BERSEKUTU
   {
-    id: 'pendaftaran_baru',
-    title: 'Yuran Pendaftaran Institusi Baharu',
-    type: 'daftar',
+    id: 'bersekutu_1_3_tahun',
+    title: 'Yuran Ahli Bersekutu (Penubuhan 1–3 Tahun)',
+    clause: 'Fasal 6(2) & Fasal 4(7)',
+    type: 'ahli_bersekutu',
     amount: 200,
-    period: 'Sekali Sahaja (Permohonan Baru)',
-    badge: 'Keahlian Baharu',
+    period: 'Setahun • Penubuhan 1–3 Tahun',
+    badge: 'Ahli Bersekutu • 1–3 Tahun',
     badgeColor: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-    suitableFor: 'Sekolah atau institusi yang baru pertama kali mendaftar',
+    suitableFor: 'Institusi berdaftar KPM/Jabatan Agama (bukan IKRAM MUSLEH) berusia 1–3 tahun',
     features: [
-      'Audit pentauliahan & pengesahan kod rasmi institusi',
-      'Pakej pengenalan standard pentadbiran MPGBSIM',
-      'Akaun pentadbir portal dan sokongan onboarding',
+      'Bayaran tahunan RM200 sahaja bagi penubuhan 1 hingga 3 tahun (Fasal 6(2))',
+      'Terlibat dalam perbincangan mesyuarat berkala MPGBSIM (Fasal 4(7))',
+      'Hadir sebagai pemerhati rasmi dalam Mesyuarat Agung MPGBSIM',
+      'Akses jaringan kepimpinan PGB & program latihan profesional',
     ],
   },
   {
-    id: 'konvensyen',
-    title: 'Yuran Konvensyen Pemimpin (KPSI 2026)',
+    id: 'bersekutu_bawah_300',
+    title: 'Yuran Ahli Bersekutu (> 3 Tahun • ≤ 300 Murid)',
+    clause: 'Fasal 6(2) & Fasal 4(7)',
+    type: 'ahli_bersekutu',
+    amount: 400,
+    period: 'Setahun • Enrolmen ≤ 300 Murid',
+    badge: 'Ahli Bersekutu • ≤ 300 Murid',
+    badgeColor: 'bg-orange-500/10 text-orange-300 border-orange-500/30',
+    suitableFor: 'Institusi Ahli Bersekutu (> 3 tahun penubuhan) dengan bilangan murid 300 orang ke bawah',
+    features: [
+      'Mengikut kategori enrolmen murid 300 orang ke bawah (Fasal 6(2))',
+      'Penglibatan dalam mesyuarat berkala, seminar & kursus pendidikan Islam',
+      'Pemerhati rasmi dalam Mesyuarat Agung Tahunan MPGBSIM (Fasal 4(7))',
+      'Akses Portal Ahli PGB, sumber dokumen & direktori sekolah',
+    ],
+  },
+  {
+    id: 'bersekutu_atas_301',
+    title: 'Yuran Ahli Bersekutu (> 3 Tahun • ≥ 301 Murid)',
+    clause: 'Fasal 6(2) & Fasal 4(7)',
+    type: 'ahli_bersekutu',
+    amount: 700,
+    period: 'Setahun • Enrolmen ≥ 301 Murid',
+    badge: 'Ahli Bersekutu • ≥ 301 Murid',
+    badgeColor: 'bg-rose-500/10 text-rose-300 border-rose-500/30',
+    suitableFor: 'Institusi Ahli Bersekutu (> 3 tahun penubuhan) dengan bilangan murid 301 orang ke atas',
+    features: [
+      'Mengikut kategori enrolmen murid 301 orang ke atas (Fasal 6(2))',
+      'Penglibatan dalam mesyuarat berkala, seminar & kursus pendidikan Islam',
+      'Pemerhati rasmi dalam Mesyuarat Agung Tahunan MPGBSIM (Fasal 4(7))',
+      'Akses Portal Ahli PGB, sumber dokumen & direktori sekolah',
+    ],
+  },
+
+  // FASAL 6(4) & FASAL 3(5)-(6)
+  {
+    id: 'mesyuarat_program',
+    title: 'Yuran Mesyuarat / Program / Aktiviti',
+    clause: 'Fasal 6(4)',
     type: 'program',
     amount: 150,
-    period: 'Setiap Peserta',
-    badge: 'Program Kebangsaan',
+    period: 'Mengikut Kelulusan Pejabat Pengerusi',
+    badge: 'Fasal 6(4) • Program & Mesyuarat',
     badgeColor: 'bg-purple-500/10 text-purple-300 border-purple-500/30',
-    suitableFor: 'Pengetua, Guru Besar & Barisan Penolong Kanan',
+    suitableFor: 'Yuran Mesyuarat, yuran program atau aktiviti atas pertimbangan & kelulusan Pejabat Pengerusi MPGBSIM',
     features: [
-      'Kit persidangan digital, modul kepimpinan & AI sekolah',
-      'Jamuan apresiasi kepimpinan & sijil kebangsaan',
-      'Sesi ucaptama tokoh pendidikan tersohor',
+      'Tertakluk pada pertimbangan & kelulusan Pejabat Pengerusi MPGBSIM (Fasal 6(4))',
+      'Merangkumi Yuran Mesyuarat, Konvensyen (KPSI), seminar & kursus',
+      'Kit persidangan, modul latihan ikhtisas & sijil penyertaan rasmi',
     ],
   },
   {
     id: 'infaq_wakaf',
-    title: 'Infaq Dana Pendidikan & Kepimpinan',
+    title: 'Derma & Dana Kebajikan Ahli MPGBSIM',
+    clause: 'Fasal 3(5) & Fasal 3(6)',
     type: 'infaq',
     amount: 100,
-    period: 'Sumbangan Bebas',
-    badge: 'Infaq Jariah',
+    period: 'Sumbangan Kebajikan & Aktiviti',
+    badge: 'Fasal 3(5)-(6) • Dana Kebajikan',
     badgeColor: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-    suitableFor: 'Penyumbang korporat, alumni & individu budiman',
+    suitableFor: 'Derma, bantuan kewangan dan dana bagi tujuan kebajikan ahli-ahli & pelaksanaan aktiviti',
     features: [
-      'Pembangunan prasarana teknologi digital sekolah Islam',
-      'Tabung bantuan kebajikan kepimpinan guru & murid asnaf',
-      'Pahala jariah berterusan memperkasakan ummah',
+      'Mewujud dan mengumpulkan dana bagi tujuan kebajikan ahli-ahli (Fasal 3(6))',
+      'Memperkasa latihan ikhtisas, penerbitan & seminar pendidikan Islam',
+      'Dilaporkan dalam penyata kewangan tahunan Bendahari (Fasal 10(5))',
     ],
   },
 ];
 
 export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPortal }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('rendah');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ahli_bawah_300');
+  const [tierTab, setTierTab] = useState<'ALL' | 'ahli_biasa' | 'ahli_bersekutu' | 'program'>('ALL');
   const [schoolCode, setSchoolCode] = useState<string>('');
   const [schoolName, setSchoolName] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [copiedBank, setCopiedBank] = useState<boolean>(false);
   const [copiedRef, setCopiedRef] = useState<boolean>(false);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
 
-  const activeCategory = FEE_CATEGORIES.find((c) => c.id === selectedCategory) || FEE_CATEGORIES[0];
+  const activeCategory = FEE_CATEGORIES.find((c) => c.id === selectedCategory) || FEE_CATEGORIES[1];
+
+  const displayedCategories = FEE_CATEGORIES.filter((c) => {
+    if (tierTab === 'ALL') return true;
+    if (tierTab === 'program') return c.type === 'program' || c.type === 'infaq';
+    return c.type === tierTab;
+  });
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(OFFICIAL_HEREPAY_URL);
@@ -138,7 +207,15 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
-  const generatedPaymentNote = `MPGBSIM: ${activeCategory.title} | ${schoolCode ? `[${schoolCode.toUpperCase()}] ` : ''}${schoolName ? schoolName.toUpperCase() : 'NAMA SEKOLAH'}`;
+  const handleCopyBank = () => {
+    navigator.clipboard.writeText(OFFICIAL_MAYBANK_ACC);
+    setCopiedBank(true);
+    setTimeout(() => setCopiedBank(false), 2500);
+  };
+
+  const generatedPaymentNote = `MPGBSIM [${activeCategory.clause.split('&')[0].trim()}]: ${activeCategory.title} | ${
+    schoolCode ? `[${schoolCode.toUpperCase()}] ` : ''
+  }${schoolName ? schoolName.toUpperCase() : 'NAMA SEKOLAH'}`;
 
   const handleCopyNote = () => {
     navigator.clipboard.writeText(generatedPaymentNote);
@@ -146,7 +223,6 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
     setTimeout(() => setCopiedRef(false), 2500);
   };
 
-  // Direct QR Code using Google Charts API encoded with HerePay official URL
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
     OFFICIAL_HEREPAY_URL
   )}&color=0f172a&bgcolor=ffffff&margin=10`;
@@ -163,28 +239,45 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-14">
+        <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-950/80 border border-teal-500/40 text-teal-300 text-xs sm:text-sm font-semibold mb-4 backdrop-blur-xs shadow-md">
-            <CreditCard className="w-4 h-4 text-amber-400" />
-            <span>Gerbang Rasmi Pembayaran Yuran PGB</span>
+            <Scale className="w-4 h-4 text-amber-400" />
+            <span>Fasal 6 Perlembagaan MPGBSIM (PPM-002-10-23041996) • Sumber Kewangan</span>
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
-            Bayar Yuran Keahlian PGB & Institusi
+            Kategori & Kadar Yuran Perlembagaan MPGBSIM
           </h2>
 
           <p className="mt-4 text-base sm:text-lg text-slate-300 leading-relaxed">
-            Saluran rasmi dalam talian bagi Pengetua, Guru Besar dan Pihak Pengurusan Sekolah
-            menjelaskan yuran tahunan, pendaftaran baharu, atau program dengan pantas dan selamat
-            melalui gerbang rasmi <strong className="text-amber-400 font-semibold">HerePay</strong>.
+            Pembayaran yuran tahunan bagi <strong>Ahli Biasa (Fasal 6(1))</strong> dan{' '}
+            <strong>Ahli Bersekutu (Fasal 6(2))</strong> berdasarkan tempoh penubuhan sekolah serta
+            kategori enrolmen murid, dijelaskan selewatnya <strong className="text-amber-400">31 Mac setiap tahun</strong>.
           </p>
 
-          {/* Quick Official Link Bar */}
-          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 p-2 bg-slate-900/90 rounded-2xl border border-teal-500/30 shadow-lg">
-            <span className="text-xs text-slate-400 px-2 font-mono">
-              Pautan Rasmi: <strong className="text-teal-300">{OFFICIAL_HEREPAY_URL}</strong>
+          {/* Quick Official Link & Maybank Account Bar */}
+          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-3 p-2.5 bg-slate-900/90 rounded-2xl border border-teal-500/30 shadow-lg">
+            <span className="text-xs text-slate-300 px-2 font-mono">
+              Maybank Rasmi: <strong className="text-amber-300">{OFFICIAL_MAYBANK_ACC}</strong> ({OFFICIAL_MAYBANK_NAME})
             </span>
+            <button
+              type="button"
+              onClick={handleCopyBank}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer border border-slate-700"
+            >
+              {copiedBank ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400">No. Akaun Disalin!</span>
+                </>
+              ) : (
+                <>
+                  <Landmark className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Salin No. Akaun</span>
+                </>
+              )}
+            </button>
             <a
               href={OFFICIAL_HEREPAY_URL}
               target="_blank"
@@ -207,7 +300,7 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Salin Pautan</span>
+                  <span>Salin HerePay</span>
                 </>
               )}
             </button>
@@ -218,17 +311,55 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-16">
           {/* Left Column: Category Selection Tabs & Features */}
           <div className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-400" />
-                <span>Pilih Kategori Yuran Anda</span>
+                <span>Pilih Kategori Yuran Mengikut Fasal 6</span>
               </h3>
-              <span className="text-xs text-slate-400">Sesi Kalendar 2026/2027</span>
+
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTierTab('ALL')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                    tierTab === 'ALL' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Semua ({FEE_CATEGORIES.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTierTab('ahli_biasa')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                    tierTab === 'ahli_biasa' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Ahli Biasa • Fasal 6(1)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTierTab('ahli_bersekutu')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                    tierTab === 'ahli_bersekutu' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Ahli Bersekutu • Fasal 6(2)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTierTab('program')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
+                    tierTab === 'program' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Mesyuarat & Dana
+                </button>
+              </div>
             </div>
 
             {/* List of Category Cards */}
             <div className="space-y-3">
-              {FEE_CATEGORIES.map((cat) => {
+              {displayedCategories.map((cat) => {
                 const isSelected = selectedCategory === cat.id;
                 return (
                   <div
@@ -249,12 +380,10 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
                               : 'bg-slate-800 text-slate-400'
                           }`}
                         >
-                          {cat.type === 'rendah' ? (
+                          {cat.type === 'ahli_biasa' ? (
                             <GraduationCap className="w-5 h-5" />
-                          ) : cat.type === 'menengah' ? (
+                          ) : cat.type === 'ahli_bersekutu' ? (
                             <Building className="w-5 h-5" />
-                          ) : cat.type === 'daftar' ? (
-                            <FileCheck className="w-5 h-5" />
                           ) : cat.type === 'program' ? (
                             <Calendar className="w-5 h-5" />
                           ) : (
@@ -272,8 +401,9 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
                             >
                               {cat.badge}
                             </span>
+                            <span className="text-[10px] font-mono text-slate-400">{cat.clause}</span>
                           </div>
-                          <p className="text-xs text-slate-400 line-clamp-1">{cat.suitableFor}</p>
+                          <p className="text-xs text-slate-400">{cat.suitableFor}</p>
                         </div>
                       </div>
 
@@ -317,13 +447,13 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
                     <CreditCard className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-white">Ringkasan Bayaran PGB</h4>
-                    <p className="text-[11px] text-slate-400">Gerbang Rasmi HerePay MPGBSIM</p>
+                    <h4 className="text-sm font-bold text-white">Ringkasan Bayaran (Fasal 6)</h4>
+                    <p className="text-[11px] text-slate-400">HerePay & Akaun Maybank MPGBSIM</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-teal-400 bg-teal-950 px-2 py-0.5 rounded-full border border-teal-800">
-                    FPX & DuitNow
+                    {activeCategory.clause.split('&')[0].trim()}
                   </span>
                 </div>
               </div>
@@ -331,13 +461,37 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
               {/* Selected Plan Details */}
               <div className="py-5">
                 <span className="text-xs text-slate-400 block mb-1">Kategori Yang Dipilih:</span>
-                <div className="text-base font-bold text-white flex items-center justify-between">
+                <div className="text-base font-bold text-white flex items-center justify-between gap-2">
                   <span>{activeCategory.title}</span>
-                  <span className="text-2xl font-black text-amber-300">
+                  <span className="text-2xl font-black text-amber-300 shrink-0">
                     RM {activeCategory.amount}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 mt-1">{activeCategory.suitableFor}</p>
+              </div>
+
+              {/* Official Bank Account Box (Fasal 6(3)) */}
+              <div className="p-3.5 rounded-xl bg-slate-950/90 border border-amber-500/30 mb-4 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase text-amber-400">
+                    Akaun Bank Rasmi Pertubuhan (Fasal 6(3))
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyBank}
+                    className="text-[11px] font-bold text-teal-300 hover:text-teal-200 flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedBank ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedBank ? 'Disalin' : 'Salin'}</span>
+                  </button>
+                </div>
+                <div className="font-mono font-bold text-sm text-white">
+                  Maybank: <span className="text-amber-300">{OFFICIAL_MAYBANK_ACC}</span>
+                </div>
+                <div className="text-[11px] text-slate-300">{OFFICIAL_MAYBANK_NAME}</div>
+                <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">
+                  Tarikh akhir bayaran: <strong>Selewatnya hujung bulan Mac (31 Mac)</strong> setiap tahun.
+                </div>
               </div>
 
               {/* Helper: Input School Details for auto note generation */}
@@ -345,9 +499,9 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                     <Info className="w-3.5 h-3.5 text-amber-400" />
-                    Penjana Catatan Transaksi HerePay:
+                    Penjana Catatan Rujukan Transaksi:
                   </span>
-                  <span className="text-[10px] text-slate-500">Pilihan Mudah</span>
+                  <span className="text-[10px] text-slate-500">Fasal 6(3)</span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
@@ -387,10 +541,6 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
                     )}
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  💡 Tip: Salin catatan ini untuk diisi dalam borang HerePay bagi memudahkan
-                  pengesahan automatik oleh Bendahari Kehormat.
-                </p>
               </div>
 
               {/* Primary Action Button: Open HerePay */}
@@ -423,7 +573,7 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
                       className="py-2.5 px-3 rounded-xl bg-teal-950/80 hover:bg-teal-900 text-teal-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-teal-800/80 transition cursor-pointer"
                     >
                       <Receipt className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Semak Resit di Portal</span>
+                      <span>Serah Resit di Portal</span>
                     </button>
                   )}
                 </div>
@@ -433,17 +583,17 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
               <div className="mt-6 pt-5 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>Gerbang Rasmi Disahkan</span>
+                  <span>Bendahari MPGBSIM (Fasal 6(3))</span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-300">
                   <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
                     FPX
                   </span>
                   <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    DuitNow
+                    Maybank
                   </span>
                   <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    Visa / MC
+                    Cek
                   </span>
                 </div>
               </div>
@@ -454,9 +604,9 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
               <FileCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div className="text-xs text-slate-300">
                 <strong className="text-white block font-semibold mb-0.5">
-                  Sudah Selesai Membayar di HerePay?
+                  Serahan Bukti Pembayaran Kepada Bendahari (Fasal 6(3))
                 </strong>
-                Masukkan nombor rujukan transaksi anda ke dalam{' '}
+                Selepas membuat pembayaran melalui HerePay, <em>online banking</em> atau cek, log masuk ke{' '}
                 <button
                   type="button"
                   onClick={onOpenPortal}
@@ -464,64 +614,56 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
                 >
                   Portal Ahli PGB
                 </button>{' '}
-                untuk menjana Resit Digital Rasmi MPGBSIM dan mengaktifkan lencana keahlian digital
-                sekolah anda serta-merta.
+                untuk menyerahkan bukti pembayaran dan menjana Resit Pengesahan Rasmi MPGBSIM.
               </div>
             </div>
           </div>
         </div>
 
-        {/* 3-Step Guide for PGB */}
+        {/* Ringkasan Perlembagaan Fasal 6 */}
         <div className="mt-8 pt-12 border-t border-slate-800">
-          <div className="text-center max-w-xl mx-auto mb-10">
+          <div className="text-center max-w-2xl mx-auto mb-10">
             <span className="text-xs uppercase font-bold tracking-wider text-amber-400 block mb-1">
-              Panduan Mudah & Pantas
+              Perlembagaan Pertubuhan Induk MPGBSIM (PPM-002-10-23041996)
             </span>
             <h3 className="text-2xl font-bold text-white">
-              3 Langkah Mudah Pembayaran Yuran via HerePay
+              Ketetapan Rasmi Fasal 6: Sumber Kewangan
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 text-left relative">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center font-bold text-base mb-4">
-                1
+              <div className="inline-flex px-2.5 py-1 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold text-xs mb-3">
+                Fasal 6 (1) • Yuran Ahli Biasa
               </div>
-              <h4 className="text-base font-bold text-white mb-2">Pilih Kategori Yuran</h4>
+              <h4 className="text-base font-bold text-white mb-2">Institusi IKRAM MUSLEH & KPM/JAI</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Tentukan kadar yuran bagi institusi anda (Sekolah Rendah RM300 / Sekolah Menengah
-                RM500 / Ahli Baru RM200) dan sediakan Kod Sekolah anda.
+                Penubuhan sekolah 1 hingga 3 tahun: <strong className="text-white">RM100 setahun</strong>. Melebihi 3 tahun mengikut enrolmen murid:{' '}
+                <strong className="text-white">RM300 setahun</strong> (≤ 300 murid) dan{' '}
+                <strong className="text-white">RM600 setahun</strong> (≥ 301 murid).
               </p>
             </div>
 
             <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 text-left relative">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold text-base mb-4">
-                2
+              <div className="inline-flex px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-xs mb-3">
+                Fasal 6 (2) • Yuran Ahli Bersekutu
               </div>
-              <h4 className="text-base font-bold text-white mb-2">Buka HerePay & Buat Bayaran</h4>
+              <h4 className="text-base font-bold text-white mb-2">Institusi Bersekutu KPM/Jabatan Agama</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Klik pautan rasmi{' '}
-                <a
-                  href={OFFICIAL_HEREPAY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-teal-300 hover:underline font-mono"
-                >
-                  app.herepay.org/mpgbsim
-                </a>{' '}
-                dan jelaskan bayaran menggunakan perbankan internet (FPX), DuitNow QR atau Kad
-                Debit/Kredit.
+                Penubuhan sekolah 1 hingga 3 tahun: <strong className="text-white">RM200 setahun</strong>. Melebihi 3 tahun mengikut enrolmen murid:{' '}
+                <strong className="text-white">RM400 setahun</strong> (≤ 300 murid) dan{' '}
+                <strong className="text-white">RM700 setahun</strong> (≥ 301 murid).
               </p>
             </div>
 
             <div className="p-6 rounded-2xl bg-slate-900/70 border border-slate-800 text-left relative">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center justify-center font-bold text-base mb-4">
-                3
+              <div className="inline-flex px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs mb-3">
+                Fasal 6 (3), (5) & (6) • Tatacara & Tempoh
               </div>
-              <h4 className="text-base font-bold text-white mb-2">Simpan & Jana Resit</h4>
+              <h4 className="text-base font-bold text-white mb-2">Sebelum Hujung Bulan Mac</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Dapatkan rujukan transaksi daripada HerePay, log masuk ke Portal Ahli MPGBSIM untuk
-                merekod bayaran dan memuat turun Resit Pengesahan Keahlian.
+                Dijelaskan selewatnya hujung bulan Mac setiap tahun ke Akaun Maybank{' '}
+                <strong className="text-amber-300 font-mono">562188100141</strong> ({OFFICIAL_MAYBANK_NAME}). Tunggakan &gt; 2 tahun diberi notis peringatan; &gt; 3 tahun boleh dilucutkan keahlian.
               </p>
             </div>
           </div>
@@ -546,24 +688,16 @@ export const FeePaymentSection: React.FC<FeePaymentSectionProps> = ({ onOpenPort
               <span>Imbas Untuk Bayar (HerePay)</span>
             </div>
 
-            <h4 className="text-lg font-bold text-white mb-2">
-              Gerbang HerePay MPGBSIM
-            </h4>
+            <h4 className="text-lg font-bold text-white mb-2">Gerbang HerePay MPGBSIM</h4>
             <p className="text-xs text-slate-400 mb-6">
               Halakan kamera telefon pintar anda untuk membuka terus laman rasmi HerePay MPGBSIM.
             </p>
 
             <div className="p-4 bg-white rounded-2xl inline-block shadow-inner mx-auto mb-5">
-              <img
-                src={qrCodeUrl}
-                alt="QR Kod HerePay MPGBSIM"
-                className="w-48 h-48 mx-auto"
-              />
+              <img src={qrCodeUrl} alt="QR Kod HerePay MPGBSIM" className="w-48 h-48 mx-auto" />
             </div>
 
-            <div className="text-xs font-mono text-teal-300 mb-5 break-all">
-              {OFFICIAL_HEREPAY_URL}
-            </div>
+            <div className="text-xs font-mono text-teal-300 mb-5 break-all">{OFFICIAL_HEREPAY_URL}</div>
 
             <div className="space-y-2">
               <a

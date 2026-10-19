@@ -1151,10 +1151,41 @@ const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[]
  * Ensures schoolPhotoUrl, logoUrl, and principalPhotoUrl are never lost when merging from stripped caches
  * and cross-hydrates any missing media from existing state or approved memberApplications.
  */
+const extractIcFromSubmissions = (
+  submissions: ContactSubmission[] | undefined,
+  codeNorm: string,
+  nameNorm: string,
+  emailNorm: string,
+  principalNorm: string
+): string => {
+  if (!submissions || submissions.length === 0) return '';
+  for (const sub of submissions) {
+    const msg = sub.message || '';
+    const kpMatch = msg.match(/No\s*KP:\s*([0-9A-Za-z-]{6,20})/i);
+    if (!kpMatch || !kpMatch[1] || kpMatch[1] === '-') continue;
+    const msgLower = msg.toLowerCase();
+    const subEmailLower = (sub.email || '').trim().toLowerCase();
+    const subNameLower = (sub.name || '').trim().toLowerCase();
+    const subjLower = (sub.subject || '').toLowerCase();
+
+    const matchesSchool =
+      (codeNorm && msgLower.includes(`(${codeNorm})`)) ||
+      (nameNorm && (msgLower.includes(nameNorm) || subjLower.includes(nameNorm))) ||
+      (emailNorm && (subEmailLower === emailNorm || msgLower.includes(emailNorm))) ||
+      (principalNorm && subNameLower && (principalNorm.includes(subNameLower) || subNameLower.includes(principalNorm)));
+
+    if (matchesSchool) {
+      return kpMatch[1].trim();
+    }
+  }
+  return '';
+};
+
 const mergeSchoolsPreservingMedia = (
   incoming: MemberSchool[],
   fallbackSchools?: MemberSchool[],
-  applications?: MemberApplication[]
+  applications?: MemberApplication[],
+  submissions?: ContactSubmission[]
 ): MemberSchool[] => {
   if (!incoming || incoming.length === 0) return fallbackSchools || [];
   const fbList = fallbackSchools || [];
@@ -1164,6 +1195,10 @@ const mergeSchoolsPreservingMedia = (
     const codeNorm = (sch.code || '').trim().toLowerCase();
     const nameNorm = (sch.name || '').trim().toLowerCase();
     const pgbEmailNorm = (sch.pgbEmail || sch.email || '').trim().toLowerCase();
+    const principalNorm = (sch.principal || '')
+      .replace(/\(.*?\)/g, '')
+      .trim()
+      .toLowerCase();
 
     const prevMatch = fbList.find(
       (f) =>
@@ -1172,13 +1207,19 @@ const mergeSchoolsPreservingMedia = (
         (nameNorm && (f.name || '').trim().toLowerCase() === nameNorm)
     );
 
-    const appMatch = appList.find(
-      (a) =>
-        (codeNorm && (a.schoolCode || '').trim().toLowerCase() === codeNorm) ||
-        (nameNorm && (a.schoolName || '').trim().toLowerCase() === nameNorm) ||
-        (pgbEmailNorm && (a.email || a.pgbEmail || '').trim().toLowerCase() === pgbEmailNorm) ||
-        (nameNorm.includes('wilayah persekutuan') && (a.schoolName || '').toLowerCase().includes('wilayah persekutuan'))
-    );
+    const appMatch = appList.find((a) => {
+      const aCode = (a.schoolCode || '').trim().toLowerCase();
+      const aName = (a.schoolName || '').trim().toLowerCase();
+      const aEmail = (a.email || a.pgbEmail || '').trim().toLowerCase();
+      const aFullName = (a.fullName || '').trim().toLowerCase();
+      return (
+        (codeNorm && aCode && aCode === codeNorm) ||
+        (nameNorm && aName && aName === nameNorm) ||
+        (pgbEmailNorm && aEmail && aEmail === pgbEmailNorm) ||
+        (principalNorm && aFullName && (principalNorm.includes(aFullName) || aFullName.includes(principalNorm))) ||
+        (nameNorm.includes('wilayah persekutuan') && aName.includes('wilayah persekutuan'))
+      );
+    });
 
     const schoolPhotoUrl =
       sch.schoolPhotoUrl ||
@@ -1195,12 +1236,39 @@ const mergeSchoolsPreservingMedia = (
       prevMatch?.principalPhotoUrl ||
       appMatch?.pgbPhotoUrl ||
       '';
+    const icNumber =
+      sch.icNumber ||
+      prevMatch?.icNumber ||
+      appMatch?.icNumber ||
+      extractIcFromSubmissions(submissions, codeNorm, nameNorm, pgbEmailNorm, principalNorm) ||
+      '';
+    const pgbEmail =
+      sch.pgbEmail ||
+      prevMatch?.pgbEmail ||
+      appMatch?.pgbEmail ||
+      appMatch?.email ||
+      '';
+    const pgbPhone =
+      sch.pgbPhone ||
+      prevMatch?.pgbPhone ||
+      appMatch?.pgbPhone ||
+      appMatch?.phoneNumber ||
+      '';
+    const membershipType =
+      sch.membershipType ||
+      prevMatch?.membershipType ||
+      appMatch?.membershipType ||
+      (sch.type === 'Rakan Musleh' || (sch.type || '').toLowerCase().includes('rakan') ? 'Ahli Bersekutu' : 'Ahli Biasa');
 
     return {
       ...sch,
+      membershipType,
       ...(schoolPhotoUrl ? { schoolPhotoUrl } : {}),
       ...(logoUrl ? { logoUrl } : {}),
       ...(principalPhotoUrl ? { principalPhotoUrl } : {}),
+      ...(icNumber ? { icNumber } : {}),
+      ...(pgbEmail ? { pgbEmail } : {}),
+      ...(pgbPhone ? { pgbPhone } : {}),
     };
   });
 };
@@ -1230,6 +1298,7 @@ const getPendingRegistrationsFromStorage = (): MemberApplication[] => {
           schoolName: item.schoolName || '',
           schoolCode: item.schoolCode || '',
           schoolType: item.schoolType || 'Sekolah Menengah',
+          membershipType: item.membershipType || (item.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa'),
           state: item.state || 'Selangor',
           district: item.district || '',
           website: item.website || '',
@@ -2178,7 +2247,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               const enrichedSchools = mergeSchoolsPreservingMedia(
                 sanitizedSchools,
                 prev.memberSchools,
-                prev.memberApplications
+                prev.memberApplications,
+                prev.submissions
               );
               return { ...prev, memberSchools: enrichedSchools };
             }
@@ -2364,10 +2434,20 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           if (list.length > 0) {
             cacheFirestoreCollection('submissions', list);
           }
-          setSiteData((prev) => ({
-            ...prev,
-            submissions: list.length > 0 ? list : prev.submissions,
-          }));
+          setSiteData((prev) => {
+            const nextSubs = list.length > 0 ? list : prev.submissions;
+            const enrichedSchools = mergeSchoolsPreservingMedia(
+              prev.memberSchools,
+              prev.memberSchools,
+              prev.memberApplications,
+              nextSubs
+            );
+            return {
+              ...prev,
+              submissions: nextSubs,
+              memberSchools: enrichedSchools,
+            };
+          });
           setIsLoading(false);
         },
         (err) => handleListenerError('Submissions', err)
@@ -2437,8 +2517,16 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             const enrichedSchools = mergeSchoolsPreservingMedia(
               prev.memberSchools,
               prev.memberSchools,
-              nextApps
+              nextApps,
+              prev.submissions
             );
+            // Backfill missing icNumber into Firestore 'schools' documents if recovered from memberApplications
+            enrichedSchools.forEach((sch) => {
+              const prevSch = (prev.memberSchools || []).find((p) => p.id === sch.id);
+              if (sch.icNumber && (!prevSch || !prevSch.icNumber) && !isFirestoreQuotaExceeded()) {
+                setDoc(doc(db, 'schools', sch.id), { icNumber: sch.icNumber }, { merge: true }).catch(() => {});
+              }
+            });
             return {
               ...prev,
               memberApplications: nextApps,
@@ -3454,6 +3542,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             portalUser.serviceStartYear = updated.serviceStartYear;
             portalUser.pgbStartYear = updated.serviceStartYear;
           }
+          if (updated.icNumber) {
+            portalUser.icNumber = updated.icNumber;
+          }
+          if (updated.membershipType) {
+            portalUser.membershipType = updated.membershipType;
+          }
           portalUser.updatedAt = new Date().toISOString();
           safeLocalStorageSet('mpgbsim_portal_user_v1', JSON.stringify(portalUser));
 
@@ -3588,10 +3682,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       name: app.schoolName,
       code: app.schoolCode || `SCH-${Date.now().toString().slice(-4)}`,
       type: app.schoolType || 'Maahad Tahfiz',
+      membershipType: app.membershipType || (app.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa'),
       state: app.state,
       district: app.district,
       principal: `${app.fullName} (${app.designation})`,
       designation: app.designation,
+      icNumber: app.icNumber || '',
       principalPhotoUrl: app.pgbPhotoUrl || '',
       studentCount: Number(app.studentCount) || 0,
       teacherCount: Number(app.teacherCount) || 0,

@@ -362,6 +362,7 @@ export function repairSchoolIntegrity(
         name: sch.name || existing.name,
         principal: sch.principal || existing.principal,
         designation: sch.designation || existing.designation,
+        icNumber: sch.icNumber || existing.icNumber,
         principalPhotoUrl: sch.principalPhotoUrl || existing.principalPhotoUrl,
         schoolPhotoUrl: sch.schoolPhotoUrl || existing.schoolPhotoUrl,
         logoUrl: sch.logoUrl || existing.logoUrl,
@@ -414,6 +415,7 @@ export function repairSchoolIntegrity(
       district: 'Melaka Tengah',
       principal: 'Abdul Qayyum bin Yaakop',
       designation: 'Guru Besar',
+      icNumber: '850312-04-5123',
       email: 'abdulqayyumyaakop@imuslehmelaka.edu.my',
       phone: '+60 6-335 1290',
       studentCount: 428,
@@ -432,6 +434,8 @@ export function repairSchoolIntegrity(
     schoolsMap.set('sch-musleh-1', sriMusleh);
     schoolsMap.set('code:MJAC011', sriMusleh);
     actionsTaken.push('Memastikan entiti rasmi Sekolah Rendah Islam I Musleh (Kod: MJAC011) terpelihara');
+  } else if (!sriMusleh.icNumber) {
+    sriMusleh.icNumber = '850312-04-5123';
   }
 
   // 2. Ensure Sekolah Menengah Agama I-Musleh exists (JAIM/SAS(M)130)
@@ -453,6 +457,7 @@ export function repairSchoolIntegrity(
       district: 'Ayer Keroh',
       principal: 'Masitah Binti Seikh Omar (Pengetua)',
       designation: 'Pengetua',
+      icNumber: '730627-01-5156',
       email: 'smimmelaka@gmail.com',
       schoolEmail: 'smimmelaka@gmail.com',
       pgbEmail: 'smimmelaka@gmail.com',
@@ -477,6 +482,9 @@ export function repairSchoolIntegrity(
     actionsTaken.push('Memastikan entiti rasmi Sekolah Menengah Agama I-Musleh (Kod: JAIM/SAS(M)130) terpelihara');
   } else {
     smaMusleh.code = 'JAIM/SAS(M)130';
+    if (!smaMusleh.icNumber) {
+      smaMusleh.icNumber = '730627-01-5156';
+    }
   }
 
   // Deduplicate array
@@ -521,6 +529,9 @@ export function repairSchoolIntegrity(
       repairedUser.schoolType = smaMusleh.type;
       repairedUser.position = 'Pengetua';
       repairedUser.state = smaMusleh.state;
+      if (!repairedUser.icNumber && smaMusleh.icNumber) {
+        repairedUser.icNumber = smaMusleh.icNumber;
+      }
       if (smaMusleh.principal) {
         repairedUser.fullName = smaMusleh.principal;
       }
@@ -538,6 +549,9 @@ export function repairSchoolIntegrity(
       repairedUser.schoolType = sriMusleh.type;
       repairedUser.position = 'Guru Besar';
       repairedUser.state = sriMusleh.state;
+      if (!repairedUser.icNumber && sriMusleh.icNumber) {
+        repairedUser.icNumber = sriMusleh.icNumber;
+      }
       if (sriMusleh.principal) {
         repairedUser.fullName = sriMusleh.principal;
       }
@@ -569,6 +583,7 @@ export function repairSchoolIntegrity(
       if (matched) {
         if (matched.principal && !repairedUser.fullName) repairedUser.fullName = matched.principal;
         if (matched.name && !repairedUser.school) repairedUser.school = matched.name;
+        if (matched.icNumber && !repairedUser.icNumber) repairedUser.icNumber = matched.icNumber;
         actionsTaken.push(`Menyelaraskan profil pengguna portal dengan institusi "${matched.name}"`);
       }
     }
