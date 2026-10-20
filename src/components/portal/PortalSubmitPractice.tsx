@@ -155,7 +155,7 @@ export const PortalSubmitPractice: React.FC = () => {
     try {
       await submitMemberForm({
         submitter: currentUser?.fullName || 'Ahli PGB',
-        submitterEmail: currentUser?.email || 'ahli@mpgbsim.org.my',
+        submitterEmail: currentUser?.email || 'ahli@mpgbsim.org',
         school: currentUser?.school || 'Sekolah Ahli',
         type: genType,
         title: genTitle,

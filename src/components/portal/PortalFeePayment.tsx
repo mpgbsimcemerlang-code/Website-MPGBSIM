@@ -295,7 +295,8 @@ NO. TEL: ${currentUser?.phone || currentUser?.pgbPhone || '012-3456789'}
 INSTITUSI: ${currentUser?.school || 'Sekolah Ahli MPGBSIM'}
 KOD SEKOLAH: ${currentUser?.schoolCode || currentUser?.membershipNo || 'BLAD001'}
 ENROLMEN MURID: ${schoolStudentCount} orang
-KATEGORI YURAN (FASAL 6): ${recommendedPlan.name} (RM ${recommendedPlan.amount})`;
+KATEGORI YURAN (FASAL 6): ${recommendedPlan.name} (RM ${recommendedPlan.amount})
+LAMAN RASMI: https://www.mpgbsim.org/`;
 
   const handleCopyPayerDetails = () => {
     navigator.clipboard.writeText(payerDetailsText);
@@ -1338,6 +1339,9 @@ KATEGORI YURAN (FASAL 6): ${recommendedPlan.name} (RM ${recommendedPlan.amount})
                     <p className="text-[10px] text-slate-500">
                       9, Jalan Dagang SB 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor
                     </p>
+                    <p className="text-[10px] text-teal-800 font-medium mt-0.5">
+                      Tel: 03-4251 6157 / 03-4251 6167 • Emel: mpgbsim.cemerlang@gmail.com • Laman Rasmi: https://www.mpgbsim.org/
+                    </p>
                   </div>
                 </div>
 
@@ -1450,6 +1454,9 @@ KATEGORI YURAN (FASAL 6): ${recommendedPlan.name} (RM ${recommendedPlan.amount})
                   <span className="text-[10px] text-emerald-700 font-semibold block">
                     ✓ Bukti Pembayaran Diterima & Direkodkan dalam Sistem Kewangan MPGBSIM
                   </span>
+                  <span className="text-[10px] text-teal-800 font-mono block">
+                    Laman Web Rasmi: https://www.mpgbsim.org/ • mpgbsim.cemerlang@gmail.com
+                  </span>
                 </div>
 
                 <div className="text-center sm:text-right shrink-0">
@@ -1462,6 +1469,7 @@ KATEGORI YURAN (FASAL 6): ${recommendedPlan.name} (RM ${recommendedPlan.amount})
                           school: receiptToView.schoolCode,
                           amount: receiptToView.amount,
                           acc: OFFICIAL_MAYBANK_ACC,
+                          website: 'https://www.mpgbsim.org/',
                         })
                       )}`}
                       alt="QR Pengesahan Resit"

@@ -7,6 +7,7 @@ import {
   Calendar,
   ChevronRight,
   ShieldAlert,
+  Globe,
 } from 'lucide-react';
 import { AdminBar } from './AdminBar';
 
@@ -82,6 +83,15 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection }) => {
               <Mail className="w-3.5 h-3.5 text-amber-400" />
               mpgbsim.cemerlang@gmail.com
             </span>
+            <a
+              href="https://www.mpgbsim.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-amber-300 hover:underline font-mono"
+            >
+              <Globe className="w-3.5 h-3.5 text-teal-400" />
+              www.mpgbsim.org
+            </a>
           </div>
 
           <div className="flex items-center gap-4 text-[11px] text-slate-300">

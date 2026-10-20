@@ -696,7 +696,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
 
               <h4 className="font-bold text-slate-900 pt-2">4. Pertanyaan Privasi</h4>
               <p>
-                Untuk sebarang kemas kini atau pertanyaan berhubung dasar privasi, sila hubungi Urus Setia MPGBSIM di emel: <strong>mpgbsim.cemerlang@gmail.com</strong>.
+                Untuk sebarang kemas kini atau pertanyaan berhubung dasar privasi, sila hubungi Urus Setia MPGBSIM di emel: <strong>mpgbsim.cemerlang@gmail.com</strong> atau layari laman rasmi: <strong>https://www.mpgbsim.org/</strong>.
               </p>
             </div>
           </div>

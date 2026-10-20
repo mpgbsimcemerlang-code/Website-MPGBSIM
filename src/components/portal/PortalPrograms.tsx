@@ -122,7 +122,7 @@ export const PortalPrograms: React.FC = () => {
     try {
       const res = await registerForEvent(progId, {
         participantName: currentUser?.fullName || 'Ahli PGB MPGBSIM',
-        participantEmail: currentUser?.email || 'ahli@mpgbsim.org.my',
+        participantEmail: currentUser?.email || 'ahli@mpgbsim.org',
         participantPhone: currentUser?.phone || '',
         schoolName: currentUser?.school || 'Sekolah Ahli MPGBSIM',
         position: currentUser?.position || 'Pengetua / Guru Besar',

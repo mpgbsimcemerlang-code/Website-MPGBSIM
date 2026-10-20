@@ -381,7 +381,7 @@ export const AdminEventManagement: React.FC = () => {
     try {
       const res = await registerForEvent(manualForm.eventId, {
         participantName: manualForm.participantName.trim(),
-        participantEmail: manualForm.participantEmail.trim() || 'manual@mpgbsim.org.my',
+        participantEmail: manualForm.participantEmail.trim() || 'manual@mpgbsim.org',
         participantPhone: manualForm.participantPhone.trim(),
         schoolName: manualForm.schoolName.trim() || 'Sekolah Peserta',
         position: manualForm.position.trim(),

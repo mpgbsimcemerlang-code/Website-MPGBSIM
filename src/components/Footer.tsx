@@ -253,6 +253,18 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
                 <Phone className="w-4 h-4 text-teal-400 shrink-0" />
                 <span>{contactInfo.phone} {contactInfo.whatsapp ? `/ ${contactInfo.whatsapp}` : ''}</span>
               </div>
+
+              <div className="flex items-center gap-2.5">
+                <Globe className="w-4 h-4 text-amber-400 shrink-0" />
+                <a
+                  href="https://www.mpgbsim.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-teal-300 hover:underline font-mono"
+                >
+                  https://www.mpgbsim.org/
+                </a>
+              </div>
             </div>
 
             <div className="pt-2 text-[11px] text-slate-500 whitespace-pre-line">
@@ -267,7 +279,16 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
           <div className="text-center sm:text-left space-y-1">
             <p>
-              © {new Date().getFullYear()} {branding.orgName} ({branding.shortName}). Hak Cipta Terpelihara.
+              © {new Date().getFullYear()} {branding.orgName} ({branding.shortName}) •{' '}
+              <a
+                href="https://www.mpgbsim.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber-300 hover:underline font-mono"
+              >
+                https://www.mpgbsim.org/
+              </a>
+              . Hak Cipta Terpelihara.
             </p>
             <p className="text-slate-400">
               * Nota: Data statistik dan maklumat angka merupakan pemegang tempat (placeholder rasmi) yang sedang dimuktamadkan oleh Majlis.

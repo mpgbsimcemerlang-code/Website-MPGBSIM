@@ -136,7 +136,7 @@ export const PortalExamCalendar: React.FC = () => {
       lines.push('');
     });
 
-    lines.push('Disediakan melalui Portal Rasmi Kepimpinan MPGBSIM.');
+    lines.push('Disediakan melalui Portal Rasmi Kepimpinan MPGBSIM (https://www.mpgbsim.org/).');
 
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
       setCopiedSchedule(true);

@@ -1784,7 +1784,10 @@ export const PortalLoginView: React.FC = () => {
       <footer className="border-t border-slate-800/80 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
-            © {new Date().getFullYear()} Majlis Pengetua Guru Besar Sekolah Islam Malaysia (MPGBSIM).
+            © {new Date().getFullYear()} Majlis Pengetua Guru Besar Sekolah Islam Malaysia (MPGBSIM) •{' '}
+            <a href="https://www.mpgbsim.org/" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:underline font-mono">
+              https://www.mpgbsim.org/
+            </a>
           </span>
           <span className="text-[11px] text-slate-400">
             MPGBSIM Member Portal • Sistem Bersepadu Pengurusan Sekolah Islam

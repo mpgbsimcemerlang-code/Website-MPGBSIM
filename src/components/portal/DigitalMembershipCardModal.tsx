@@ -157,7 +157,7 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
   // Maklumat Rasmi Sekretariat Kebangsaan MPGBSIM Mengikut Arahan Rasmi
   const MPGBSIM_OFFICIAL_CONTACT = {
     email: 'mpgbsim.cemerlang@gmail.com',
-    website: 'https://website-mpgbsim.vercel.app/',
+    website: 'https://www.mpgbsim.org/',
     address: 'D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan 43300 Selangor',
     phones: '03-4251 6157, 03-4251 6167',
   };

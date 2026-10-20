@@ -34,9 +34,9 @@ export const AdminSiteSettings: React.FC = () => {
 
   const [contactForm, setContactForm] = useState<ContactInfoData>({
     email: siteData.contactInfo.email || 'mpgbsim.cemerlang@gmail.com',
-    phone: siteData.contactInfo.phone || '+60 3-8925 4567',
-    whatsapp: siteData.contactInfo.whatsapp || '+60 19-334 5678',
-    address: siteData.contactInfo.address || 'Aras 3, Kompleks Pendidikan Islam, Bandar Baru Bangi, 43650 Selangor',
+    phone: siteData.contactInfo.phone || '03-4251 6157, 03-4251 6167',
+    whatsapp: siteData.contactInfo.whatsapp || '03-4251 6157',
+    address: siteData.contactInfo.address || 'D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan 43300 Selangor',
     operatingHours: siteData.contactInfo.operatingHours || 'Isnin - Jumaat: 8:30 Pagi - 5:00 Petang',
     socialFacebook: siteData.contactInfo.socialFacebook || 'https://facebook.com/mpgbsim',
     socialYoutube: siteData.contactInfo.socialYoutube || 'https://youtube.com/@mpgbsim',

@@ -3710,7 +3710,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     // 2. Mark application as approved
     const approvedAt = new Date().toISOString();
-    const approvedBy = adminUser?.email || 'admin@mpgbsim.gov.my';
+    const approvedBy = adminUser?.email || 'admin@mpgbsim.org';
 
     setSiteData((prev) => ({
       ...prev,

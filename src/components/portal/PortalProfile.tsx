@@ -627,6 +627,7 @@ export const PortalProfile: React.FC = () => {
       school,
       state,
       status: 'AKTIF',
+      website: 'https://www.mpgbsim.org/',
     });
 
     QRCode.toDataURL(payload, { width: 150, margin: 1, color: { dark: '#064e3b', light: '#ffffff' } }, (err, url) => {
@@ -818,7 +819,7 @@ export const PortalProfile: React.FC = () => {
             {/* Card Preview Footer: Emel & Laman Web Rasmi */}
             <div className="mt-3 pt-2 border-t border-slate-800 text-[8px] text-slate-400 flex items-center justify-between">
               <span className="text-teal-300 font-medium">mpgbsim.cemerlang@gmail.com</span>
-              <span className="text-amber-300 font-mono text-[7.5px]">https://website-mpgbsim.vercel.app/</span>
+              <span className="text-amber-300 font-mono text-[7.5px]">https://www.mpgbsim.org/</span>
             </div>
           </div>
 
@@ -1750,7 +1751,7 @@ export const PortalProfile: React.FC = () => {
                   Pertubuhan Kebangsaan Kepimpinan Pentadbir Sekolah Islam Malaysia
                 </p>
                 <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
-                  D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Emel: mpgbsim.cemerlang@gmail.com • Laman Rasmi: https://website-mpgbsim.vercel.app/
+                  D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Emel: mpgbsim.cemerlang@gmail.com • Laman Rasmi: https://www.mpgbsim.org/
                 </p>
               </div>
               <div className="text-center sm:text-right shrink-0">
@@ -1999,7 +2000,7 @@ export const PortalProfile: React.FC = () => {
             {/* Official Footnote */}
             <div className="mt-4 pt-3 border-t border-slate-100 text-center">
               <p className="text-[9px] text-slate-400 leading-tight">
-                Dokumen ini merupakan salinan rekod profil rasmi yang dijana secara digital daripada Portal Ahli MPGBSIM pada {new Intl.DateTimeFormat('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}. Sebarang cetakan atau muat turun fail PDF ini diperakui sah sebagai bukti keahlian dan rekod institusi sekolah.
+                Dokumen ini merupakan salinan rekod profil rasmi yang dijana secara digital daripada Portal Ahli MPGBSIM (https://www.mpgbsim.org/) pada {new Intl.DateTimeFormat('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}. Sebarang cetakan atau muat turun fail PDF ini diperakui sah sebagai bukti keahlian dan rekod institusi sekolah.
               </p>
             </div>
           </div>

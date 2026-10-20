@@ -116,7 +116,10 @@ export const PortalMainLayout: React.FC = () => {
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
-            © {new Date().getFullYear()} Majlis Pengetua Guru Besar Sekolah Islam Malaysia (MPGBSIM). Hak Cipta Terpelihara.
+            © {new Date().getFullYear()} Majlis Pengetua Guru Besar Sekolah Islam Malaysia (MPGBSIM) •{' '}
+            <a href="https://www.mpgbsim.org/" target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline font-mono">
+              https://www.mpgbsim.org/
+            </a>
           </span>
           <span className="text-[11px] text-slate-400">
             Portal Ahli Rasmi Bersepadu • Versi 3.2.0 • Sesi 2026/2027

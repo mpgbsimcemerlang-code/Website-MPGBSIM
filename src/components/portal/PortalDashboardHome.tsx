@@ -1072,7 +1072,18 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-amber-400" />
-                <span>+60 3-8925 7890 / +60 19-345 6789</span>
+                <span>03-4251 6157, 03-4251 6167</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-amber-400" />
+                <a
+                  href="https://www.mpgbsim.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-300 hover:underline font-mono"
+                >
+                  https://www.mpgbsim.org/
+                </a>
               </div>
             </div>
           </div>

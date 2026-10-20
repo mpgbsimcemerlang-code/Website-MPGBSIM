@@ -9,7 +9,8 @@ import {
   AlertCircle,
   Building,
   ShieldAlert,
-  Edit3
+  Edit3,
+  Globe
 } from 'lucide-react';
 import { ContactInquiry, saveContactInquiry } from '../services/firebaseConfig';
 import { useAdminContent } from '../context/AdminContentContext';
@@ -103,6 +104,23 @@ export const ContactSection: React.FC = () => {
                       className="text-teal-700 hover:text-teal-900 font-semibold underline mt-1 block"
                     >
                       {contactInfo.email}
+                    </a>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="p-2.5 rounded-xl bg-teal-50 text-teal-700 shrink-0 mt-0.5 border border-teal-100">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <strong className="text-slate-900 block font-semibold">Laman Web Rasmi</strong>
+                    <a
+                      href="https://www.mpgbsim.org/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-teal-700 hover:text-teal-900 font-semibold font-mono underline mt-1 block"
+                    >
+                      https://www.mpgbsim.org/
                     </a>
                   </div>
                 </div>

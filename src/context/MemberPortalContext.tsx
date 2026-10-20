@@ -1181,7 +1181,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     const newLog: AuditLogItem = {
       id: `log-${Date.now()}`,
       user: currentUser?.fullName || 'Pengguna Awam',
-      email: currentUser?.email || 'tetamu@mpgbsim.org.my',
+      email: currentUser?.email || 'tetamu@mpgbsim.org',
       action,
       content,
       timestamp: new Date().toLocaleString('ms-MY', {
@@ -1652,7 +1652,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     const schoolName = liveSchool.name || (isSecondaryMusleh ? 'SEKOLAH MENENGAH AGAMA I-MUSLEH' : isPrimaryMusleh ? 'Sekolah Rendah Islam I Musleh' : '');
     const principalName = liveSchool.principal || (isSecondaryMusleh ? 'Masitah Binti Seikh Omar (Pengetua)' : isPrimaryMusleh ? 'Ustaz Abdul Qayyum bin Yaakop' : '');
-    const email = liveSchool.email || (isSecondaryMusleh ? 'smimmelaka@gmail.com' : isPrimaryMusleh ? 'abdulqayyumyaakop@imuslehmelaka.edu.my' : `${cleanCode.toLowerCase()}@mpgbsim.edu.my`);
+    const email = liveSchool.email || (isSecondaryMusleh ? 'smimmelaka@gmail.com' : isPrimaryMusleh ? 'abdulqayyumyaakop@imuslehmelaka.edu.my' : `${cleanCode.toLowerCase()}@mpgbsim.org`);
     const schoolType = liveSchool.type || (isSecondaryMusleh ? 'Sekolah Menengah' : isPrimaryMusleh ? 'Sekolah Rendah' : 'SMKA');
     const state = liveSchool.state || (isSecondaryMusleh || isPrimaryMusleh ? 'Melaka' : 'Wilayah Persekutuan');
     const phone = liveSchool.phone || (isSecondaryMusleh ? '06-2349405' : isPrimaryMusleh ? '+60 6-335 1290' : '03-8888 2026');
@@ -2529,7 +2529,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       await setDoc(doc(db, 'submissions', subId), {
         id: subId,
         submitter: authorName,
-        submitterEmail: currentUser?.email || 'pgb@mpgbsim.edu.my',
+        submitterEmail: currentUser?.email || 'pgb@mpgbsim.org',
         school: schoolName,
         type: 'Berita sekolah',
         title: newNewsItem.title,
