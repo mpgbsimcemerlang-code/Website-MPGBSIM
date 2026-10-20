@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap Rasmi MPGBSIM
+Sitemap: https://www.mpgbsim.org/sitemap.xml

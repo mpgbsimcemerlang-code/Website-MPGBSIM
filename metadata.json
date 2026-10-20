@@ -1,6 +1,6 @@
 {
   "name": "MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia",
-  "description": "Laman Web Rasmi Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM). Memperkasa Kepimpinan Pendidikan, Membina Generasi Rabbani.",
+  "description": "Laman Web & Portal Rasmi Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM). Direktori Sekolah Islam, Portal Ahli PGB, Takwim & Perkongsian Amalan Terbaik.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

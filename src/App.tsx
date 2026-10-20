@@ -90,6 +90,29 @@ function AppContent() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Dynamically update document title for SEO & browser tab clarity
+  useEffect(() => {
+    if (viewMode === 'portal') {
+      document.title = 'Portal Rasmi Ahli PGB | MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia';
+      return;
+    }
+    const sectionTitles: Record<string, string> = {
+      utama: 'MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
+      tentang: 'Pengenalan & Perlembagaan | MPGBSIM',
+      'fokus-strategik': 'Fokus Strategik Pendidikan Islam | MPGBSIM',
+      berita: 'Berita & Perkembangan Semasa | MPGBSIM',
+      'best-practice': 'Perkongsian Amalan Terbaik Sekolah Islam | MPGBSIM',
+      program: 'Takwim & Konvensyen Kebangsaan | MPGBSIM',
+      peperiksaan: 'Takwim Peperiksaan & Pentaksiran | MPGBSIM',
+      'bayar-yuran': 'Kadar Yuran Keahlian & Pembayaran | MPGBSIM',
+      'sekolah-ahli': 'Direktori Sekolah-Sekolah Islam Ahli Biasa & Bersekutu | MPGBSIM',
+      kepimpinan: 'Jawatankuasa Kepimpinan Pusat | MPGBSIM',
+      sumber: 'Pusat Sumber & Muat Turun Dokumen Rasmi | MPGBSIM',
+      hubungi: 'Hubungi Sekretariat Kebangsaan | MPGBSIM',
+    };
+    document.title = sectionTitles[activeSection] || 'MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia';
+  }, [viewMode, activeSection]);
+
   // If viewMode is 'portal', render the dedicated MPGBSIM Member Portal interface
   if (viewMode === 'portal') {
     return <PortalMainLayout />;
