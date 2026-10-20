@@ -41,6 +41,7 @@ import {
 } from '../../utils/dateUtils';
 import { useRateLimiter } from '../../utils/rateLimiter';
 import { RateLimitNotice } from './RateLimitNotice';
+import { copyNewsShareLink } from '../../utils/shareUtils';
 
 // Preset HD Images for quick selection by PGB
 const PRESET_NEWS_IMAGES = [
@@ -124,6 +125,15 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
   // In-App Delete Confirmation State
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [copiedNewsId, setCopiedNewsId] = useState<string | null>(null);
+
+  const handleCopyLink = async (id: string) => {
+    await copyNewsShareLink(id);
+    setCopiedNewsId(id);
+    setTimeout(() => {
+      setCopiedNewsId((prev) => (prev === id ? null : prev));
+    }, 2500);
+  };
 
   // Combine news from live website context and portal context to accurately identify this school's items
   const allAvailableNews = React.useMemo(() => {
@@ -460,7 +470,28 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => handleCopyLink(successInfo.id)}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
+                copiedNewsId === successInfo.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-400'
+              }`}
+            >
+              {copiedNewsId === successInfo.id ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>Pautan Disalin!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4 text-emerald-700" />
+                  <span>Salin Pautan Berita</span>
+                </>
+              )}
+            </button>
             <button
               onClick={() => {
                 setViewMode('public');
@@ -1214,7 +1245,30 @@ export const PortalSchoolNewsSubmit: React.FC = () => {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink(news.id)}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                          copiedNewsId === news.id
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border-amber-200'
+                        }`}
+                        title="Salin pautan terus ke berita ini"
+                      >
+                        {copiedNewsId === news.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Disalin!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Salin Pautan</span>
+                          </>
+                        )}
+                      </button>
+
                       <button
                         onClick={() => {
                           setViewMode('public');

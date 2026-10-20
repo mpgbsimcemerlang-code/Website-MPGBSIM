@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { NewsItem } from '../types';
 import { sortNewsByPublishedDate } from '../utils/dateUtils';
+import { copyNewsShareLink } from '../utils/shareUtils';
 import {
   Newspaper,
   Calendar,
@@ -17,7 +18,9 @@ import {
   ChevronDown,
   ChevronUp,
   X,
-  Filter
+  Filter,
+  Share2,
+  Check
 } from 'lucide-react';
 
 interface LatestNewsProps {
@@ -34,6 +37,16 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
   const [selectedFilter, setSelectedFilter] = useState<string>('semua');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isViewAll, setIsViewAll] = useState<boolean>(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleQuickShare = async (e: React.MouseEvent, newsId: string) => {
+    e.stopPropagation();
+    await copyNewsShareLink(newsId);
+    setCopiedId(newsId);
+    setTimeout(() => {
+      setCopiedId((prev) => (prev === newsId ? null : prev));
+    }, 2500);
+  };
 
   // Filter and sort items strictly according to published date (latest first)
   const filteredList = useMemo(() => {
@@ -343,13 +356,37 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
 
                   {/* Footer Action */}
                   <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 truncate max-w-[170px]">
+                    <span className="text-slate-500 truncate max-w-[140px]">
                       {news.author || 'Urus Setia'}
                     </span>
-                    <span className="inline-flex items-center gap-1 font-bold text-teal-800 group-hover:translate-x-1 transition-transform">
-                      <span>Baca Berita</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => handleQuickShare(e, news.id)}
+                        title="Salin pautan terus berita ini"
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          copiedId === news.id
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-white hover:bg-teal-50 text-slate-600 hover:text-teal-800 border border-slate-200'
+                        }`}
+                      >
+                        {copiedId === news.id ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            <span>Disalin!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-3 h-3" />
+                            <span>Kongsi</span>
+                          </>
+                        )}
+                      </button>
+                      <span className="inline-flex items-center gap-1 font-bold text-teal-800 group-hover:translate-x-1 transition-transform">
+                        <span>Baca</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
                   </div>
                 </article>
               ))}
@@ -453,13 +490,38 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                     <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs text-slate-400">
                         <UserCheck className="w-3.5 h-3.5 text-teal-400" />
-                        <span className="truncate max-w-[240px]">{featuredItem.author}</span>
+                        <span className="truncate max-w-[180px]">{featuredItem.author}</span>
                       </div>
 
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-300 group-hover:translate-x-1 transition-transform">
-                        <span>Baca Penuh</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </span>
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={(e) => handleQuickShare(e, featuredItem.id)}
+                          title="Salin pautan terus berita ini"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            copiedId === featuredItem.id
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                          }`}
+                        >
+                          {copiedId === featuredItem.id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Pautan Disalin!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Share2 className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Salin Pautan</span>
+                            </>
+                          )}
+                        </button>
+
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-300 group-hover:translate-x-1 transition-transform">
+                          <span>Baca Penuh</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -534,11 +596,35 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                       </div>
 
                       <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                        <span className="truncate max-w-[180px]">{news.author}</span>
-                        <span className="font-bold text-teal-800 inline-flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                          <span>Baca Berita</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
+                        <span className="truncate max-w-[140px]">{news.author}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => handleQuickShare(e, news.id)}
+                            title="Salin pautan terus berita ini"
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              copiedId === news.id
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white hover:bg-teal-100 text-slate-600 hover:text-teal-900 border border-slate-200'
+                            }`}
+                          >
+                            {copiedId === news.id ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>Disalin!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Share2 className="w-3 h-3 text-teal-700" />
+                                <span>Kongsi</span>
+                              </>
+                            )}
+                          </button>
+                          <span className="font-bold text-teal-800 inline-flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                            <span>Baca Berita</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

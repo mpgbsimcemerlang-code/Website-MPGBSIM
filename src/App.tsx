@@ -54,6 +54,35 @@ function AppContent() {
   const [detailModalContent, setDetailModalContent] = useState<ModalContentType>(null);
   const [activeSection, setActiveSection] = useState('utama');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const handledDeepLinkNewsIdRef = React.useRef<string | null>(null);
+
+  // Detect shared news link (?berita=<id> or ?news=<id>) and automatically open the news article modal
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetNewsId = params.get('berita') || params.get('news');
+    if (!targetNewsId) return;
+
+    if (handledDeepLinkNewsIdRef.current === targetNewsId) return;
+
+    const allNews = siteData.news || [];
+    const matchedNews = allNews.find(
+      (n) => String(n.id) === String(targetNewsId)
+    );
+
+    if (matchedNews) {
+      handledDeepLinkNewsIdRef.current = targetNewsId;
+      if (viewMode !== 'public') {
+        setViewMode('public');
+      }
+      setDetailModalContent({ type: 'news', data: matchedNews });
+      setTimeout(() => {
+        const el = document.getElementById('berita');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 200);
+    }
+  }, [siteData.news, viewMode, setViewMode]);
 
   // Track active section for navigation highlight and scroll button visibility
   useEffect(() => {
@@ -96,6 +125,10 @@ function AppContent() {
       document.title = 'Portal Rasmi Ahli PGB | MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia';
       return;
     }
+    if (detailModalContent?.type === 'news' && detailModalContent.data?.title) {
+      document.title = `${detailModalContent.data.title} | Berita MPGBSIM`;
+      return;
+    }
     const sectionTitles: Record<string, string> = {
       utama: 'MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
       tentang: 'Pengenalan & Perlembagaan | MPGBSIM',
@@ -111,7 +144,7 @@ function AppContent() {
       hubungi: 'Hubungi Sekretariat Kebangsaan | MPGBSIM',
     };
     document.title = sectionTitles[activeSection] || 'MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia';
-  }, [viewMode, activeSection]);
+  }, [viewMode, activeSection, detailModalContent]);
 
   // If viewMode is 'portal', render the dedicated MPGBSIM Member Portal interface
   if (viewMode === 'portal') {
@@ -120,6 +153,36 @@ function AppContent() {
 
   const handleOpenPortal = () => {
     setViewMode('portal');
+  };
+
+  const handleSelectNews = (news: NewsItem) => {
+    setDetailModalContent({ type: 'news', data: news });
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('berita', String(news.id));
+      window.history.replaceState(null, '', `${url.pathname}?${url.searchParams.toString()}`);
+    } catch {
+      // Ignore history API errors in restricted environments
+    }
+  };
+
+  const handleCloseDetailModal = () => {
+    setDetailModalContent(null);
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('berita') || url.searchParams.has('news')) {
+        url.searchParams.delete('berita');
+        url.searchParams.delete('news');
+        const queryStr = url.searchParams.toString();
+        window.history.replaceState(
+          null,
+          '',
+          `${url.pathname}${queryStr ? `?${queryStr}` : ''}${url.hash}`
+        );
+      }
+    } catch {
+      // Ignore history API errors
+    }
   };
 
   const handleScrollTo = (elementId: string) => {
@@ -166,9 +229,7 @@ function AppContent() {
         {/* 4. LATEST NEWS (Managed via CMS & Member Portal PGB Live Submissions) */}
         <LatestNewsSection
           newsList={siteData.news || []}
-          onSelectNews={(news: NewsItem) =>
-            setDetailModalContent({ type: 'news', data: news })
-          }
+          onSelectNews={handleSelectNews}
           onOpenPortal={handleOpenPortal}
         />
 
@@ -233,7 +294,7 @@ function AppContent() {
       {/* General Detail / Reader Modal */}
       <DetailModal
         content={detailModalContent}
-        onClose={() => setDetailModalContent(null)}
+        onClose={handleCloseDetailModal}
       />
 
       {/* Floating Scroll-to-Top Button */}

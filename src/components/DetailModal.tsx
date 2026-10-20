@@ -29,6 +29,7 @@ import { db, doc, setDoc } from '../firebase';
 import { useAdminContent } from '../context/AdminContentContext';
 import { useMemberPortal } from '../context/MemberPortalContext';
 import { checkAndRecordRateLimit } from '../utils/rateLimiter';
+import { getNewsShareUrl, getNewsShareMessage, copyNewsShareLink } from '../utils/shareUtils';
 
 export type ModalContentType =
   | { type: 'news'; data: NewsItem }
@@ -65,6 +66,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
     registeredAt: string;
   } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedNewsLink, setCopiedNewsLink] = useState(false);
 
   // Share best practice mini-form state
   const [shareTitle, setShareTitle] = useState('');
@@ -92,6 +94,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
 
   // Reset form when content opens/changes
   React.useEffect(() => {
+    setCopiedNewsLink(false);
     if (content?.type === 'program') {
       setProgRegistered(false);
       setRegReceipt(null);
@@ -273,41 +276,138 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pb-4 mb-6 border-b border-slate-100">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-teal-600" />
-                  {content.data.date}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  {content.data.readTime}
-                </span>
-                <span className="flex items-center gap-1">
-                  <UserCheck className="w-3.5 h-3.5 text-teal-600" />
-                  {content.data.author}
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500 pb-4 mb-6 border-b border-slate-100">
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                    {content.data.date}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    {content.data.readTime}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <UserCheck className="w-3.5 h-3.5 text-teal-600" />
+                    {content.data.author}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await copyNewsShareLink(content.data.id);
+                    setCopiedNewsLink(true);
+                    setTimeout(() => setCopiedNewsLink(false), 3000);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    copiedNewsLink
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200'
+                  }`}
+                >
+                  {copiedNewsLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Pautan Disalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Salin Pautan Berita</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               <div className="prose max-w-none text-slate-700 text-sm sm:text-base leading-relaxed space-y-4 whitespace-pre-line font-sans">
                 {content.data.content}
               </div>
 
-              <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              {/* Direct News Link & Social Sharing Panel */}
+              <div className="mt-8 p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                      <Share2 className="w-4 h-4 text-teal-700" />
+                      <span>Kongsi Pautan Terus Berita Ini</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Apabila pautan ini diklik, pembaca akan dibawa terus ke paparan penuh berita ini.
+                    </p>
+                  </div>
+
+                  {/* Quick Social Share Links */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(getNewsShareMessage(content.data))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                    >
+                      <span>WhatsApp</span>
+                    </a>
+                    <a
+                      href={`https://t.me/share/url?url=${encodeURIComponent(getNewsShareUrl(content.data.id))}&text=${encodeURIComponent(`📰 ${content.data.title}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                    >
+                      <span>Telegram</span>
+                    </a>
+                    <a
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getNewsShareUrl(content.data.id))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                    >
+                      <span>Facebook</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Direct URL Input + Copy Button */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={getNewsShareUrl(content.data.id)}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-mono text-slate-700 focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await copyNewsShareLink(content.data.id);
+                      setCopiedNewsLink(true);
+                      setTimeout(() => setCopiedNewsLink(false), 3000);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                      copiedNewsLink
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-slate-900 hover:bg-teal-800 text-white shadow-xs'
+                    }`}
+                  >
+                    {copiedNewsLink ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Disalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Salin Pautan</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>
                   {content.data.schoolName
                     ? `Diterbitkan secara langsung melalui Portal Ahli MPGBSIM (${content.data.schoolName})`
                     : 'Diterbitkan oleh Urus Setia MPGBSIM'}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(window.location.href);
-                  }}
-                  className="inline-flex items-center gap-1 text-teal-700 font-semibold hover:underline"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Salin Pautan</span>
-                </button>
               </div>
             </div>
           </div>
