@@ -2575,26 +2575,27 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const updateSchoolNews = async (id: string, updates: Partial<NewsItem>): Promise<void> => {
-    await ensureFirebaseAuth();
+    const updatedPayload = {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    setSchoolNews((prev) =>
+      sortNewsByPublishedDate(
+        prev.map((n) => (n.id === id ? { ...n, ...updatedPayload } : n))
+      )
+    );
+    window.dispatchEvent(
+      new CustomEvent('mpgbsim_content_updated', {
+        detail: { id, updates: updatedPayload },
+      })
+    );
+
     try {
-      await updateDoc(doc(db, 'news', id), {
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      });
-      setSchoolNews((prev) =>
-        sortNewsByPublishedDate(
-          prev.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: new Date().toISOString() } : n))
-        )
-      );
+      await ensureFirebaseAuth();
+      await setDoc(doc(db, 'news', id), updatedPayload, { merge: true });
       recordAuditLog('Kemas Kini Berita Kejayaan', `Berita #${id} telah dikemas kini.`);
-      window.dispatchEvent(new CustomEvent('mpgbsim_content_updated', { detail: { id, updates } }));
     } catch (err) {
       console.warn('Update news error:', err);
-      setSchoolNews((prev) =>
-        sortNewsByPublishedDate(
-          prev.map((n) => (n.id === id ? { ...n, ...updates, updatedAt: new Date().toISOString() } : n))
-        )
-      );
     }
   };
 

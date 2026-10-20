@@ -32,6 +32,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminFloatingControl } from './components/AdminFloatingControl';
 
 import { StrategicFocus, NewsItem, BestPracticeItem, ProgramEvent } from './types';
+import { db, doc, getDoc } from './firebase';
 
 import { MemberPortalProvider, useMemberPortal } from './context/MemberPortalContext';
 import { PortalMainLayout } from './components/portal/PortalMainLayout';
@@ -55,14 +56,13 @@ function AppContent() {
   const [activeSection, setActiveSection] = useState('utama');
   const [showScrollTop, setShowScrollTop] = useState(false);
   const handledDeepLinkNewsIdRef = React.useRef<string | null>(null);
+  const fetchedDeepLinkDocIdRef = React.useRef<string | null>(null);
 
-  // Detect shared news link (?berita=<id> or ?news=<id>) and automatically open the news article modal
+  // Detect shared news link (?berita=<id> or ?news=<id>) and automatically open & keep the news article modal synced
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const targetNewsId = params.get('berita') || params.get('news');
     if (!targetNewsId) return;
-
-    if (handledDeepLinkNewsIdRef.current === targetNewsId) return;
 
     const allNews = siteData.news || [];
     const matchedNews = allNews.find(
@@ -70,17 +70,73 @@ function AppContent() {
     );
 
     if (matchedNews) {
-      handledDeepLinkNewsIdRef.current = targetNewsId;
-      if (viewMode !== 'public') {
-        setViewMode('public');
-      }
-      setDetailModalContent({ type: 'news', data: matchedNews });
-      setTimeout(() => {
-        const el = document.getElementById('berita');
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth' });
+      if (handledDeepLinkNewsIdRef.current !== targetNewsId) {
+        handledDeepLinkNewsIdRef.current = targetNewsId;
+        if (viewMode !== 'public') {
+          setViewMode('public');
         }
-      }, 200);
+        setDetailModalContent({ type: 'news', data: matchedNews });
+        setTimeout(() => {
+          const el = document.getElementById('berita');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 200);
+      } else {
+        // Keep the open modal synchronized when Firestore / IndexedDB finishes hydrating the real imageUrl
+        setDetailModalContent((prev) => {
+          if (prev?.type === 'news' && String(prev.data.id) === String(targetNewsId)) {
+            const bestImageUrl =
+              matchedNews.imageUrl && matchedNews.imageUrl.trim() !== ''
+                ? matchedNews.imageUrl
+                : prev.data.imageUrl || '';
+            if (
+              prev.data.imageUrl !== bestImageUrl ||
+              prev.data.title !== matchedNews.title ||
+              prev.data.content !== matchedNews.content
+            ) {
+              return {
+                type: 'news',
+                data: { ...prev.data, ...matchedNews, imageUrl: bestImageUrl },
+              };
+            }
+          }
+          return prev;
+        });
+      }
+    }
+
+    // If matchedNews is not yet in siteData.news or its imageUrl was stripped in local cache, fetch directly from Firestore
+    if (
+      (!matchedNews || !matchedNews.imageUrl || matchedNews.imageUrl.trim() === '') &&
+      fetchedDeepLinkDocIdRef.current !== targetNewsId
+    ) {
+      fetchedDeepLinkDocIdRef.current = targetNewsId;
+      getDoc(doc(db, 'news', targetNewsId))
+        .then((docSnap) => {
+          if (docSnap.exists()) {
+            const firestoreNews = {
+              id: docSnap.id,
+              ...(docSnap.data() as any),
+            } as NewsItem;
+            handledDeepLinkNewsIdRef.current = targetNewsId;
+            if (viewMode !== 'public') {
+              setViewMode('public');
+            }
+            setDetailModalContent((prev) => {
+              const fallbackImg = prev?.type === 'news' ? prev.data.imageUrl : '';
+              return {
+                type: 'news',
+                data: {
+                  ...(matchedNews || {}),
+                  ...firestoreNews,
+                  imageUrl: firestoreNews.imageUrl || fallbackImg || '',
+                },
+              };
+            });
+          }
+        })
+        .catch(() => {});
     }
   }, [siteData.news, viewMode, setViewMode]);
 

@@ -25,7 +25,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { NewsItem, StrategicFocus, BestPracticeItem, ProgramEvent } from '../types';
-import { db, doc, setDoc } from '../firebase';
+import { db, doc, getDoc, setDoc } from '../firebase';
 import { useAdminContent } from '../context/AdminContentContext';
 import { useMemberPortal } from '../context/MemberPortalContext';
 import { checkAndRecordRateLimit } from '../utils/rateLimiter';
@@ -67,6 +67,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
   } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedNewsLink, setCopiedNewsLink] = useState(false);
+  const [fetchedNewsItem, setFetchedNewsItem] = useState<NewsItem | null>(null);
 
   // Share best practice mini-form state
   const [shareTitle, setShareTitle] = useState('');
@@ -92,7 +93,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
     };
   }, [content, onClose]);
 
-  // Reset form when content opens/changes
+  // Reset form when content opens/changes and ensure live Firestore news image is fetched if needed
   React.useEffect(() => {
     setCopiedNewsLink(false);
     if (content?.type === 'program') {
@@ -101,9 +102,48 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
       setProgError(null);
       setCopiedCode(false);
     }
-  }, [content]);
+    if (content?.type === 'news' && content.data?.id) {
+      const targetId = content.data.id;
+      const inSiteData = siteData.news?.find((n) => String(n.id) === String(targetId));
+      const existingImg = inSiteData?.imageUrl || content.data.imageUrl;
+      if (!existingImg || existingImg.trim() === '') {
+        getDoc(doc(db, 'news', targetId))
+          .then((snap) => {
+            if (snap.exists()) {
+              setFetchedNewsItem({ id: snap.id, ...(snap.data() as any) } as NewsItem);
+            }
+          })
+          .catch(() => {});
+      }
+    } else {
+      setFetchedNewsItem(null);
+    }
+  }, [content, siteData.news]);
 
   if (!content) return null;
+
+  // Retrieve current live news item from siteData / Firestore so imageUrl is always identical to the card
+  const liveNews: NewsItem | null =
+    content.type === 'news' && content.data
+      ? (() => {
+          const fromSite = siteData.news?.find((n) => String(n.id) === String(content.data.id));
+          const fromFetched =
+            fetchedNewsItem && String(fetchedNewsItem.id) === String(content.data.id)
+              ? fetchedNewsItem
+              : null;
+          const resolvedImageUrl =
+            (fromFetched?.imageUrl && fromFetched.imageUrl.trim() !== '' ? fromFetched.imageUrl : '') ||
+            (fromSite?.imageUrl && fromSite.imageUrl.trim() !== '' ? fromSite.imageUrl : '') ||
+            (content.data.imageUrl && content.data.imageUrl.trim() !== '' ? content.data.imageUrl : '') ||
+            'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=800';
+          return {
+            ...content.data,
+            ...(fromSite || {}),
+            ...(fromFetched || {}),
+            imageUrl: resolvedImageUrl,
+          };
+        })()
+      : null;
 
   // Retrieve current live event from siteData to ensure live capacity is always accurate
   const liveProgram: ProgramEvent | null =
@@ -223,36 +263,50 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
         </button>
 
         {/* Content Type: NEWS */}
-        {content.type === 'news' && (
+        {content.type === 'news' && liveNews && (
           <div>
-            <div className="relative h-64 sm:h-80 w-full overflow-hidden bg-slate-900">
+            {/* Full Unobstructed News Image Container with Ambient Backdrop */}
+            <div className="relative w-full h-64 sm:h-96 overflow-hidden bg-slate-950 flex items-center justify-center">
+              {/* Subtle blurred background fill so portrait/poster photos look framed without cropping */}
               <img
-                src={content.data.imageUrl || 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=800'}
-                alt={content.data.title}
-                className="w-full h-full object-cover"
+                src={liveNews.imageUrl}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover blur-xl opacity-40 scale-110 pointer-events-none"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6 text-white">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="px-2.5 py-1 rounded text-xs font-bold bg-amber-500 text-slate-950 shadow-md inline-block">
-                    {content.data.category}
+              {/* Main exact news image */}
+              <img
+                src={liveNews.imageUrl}
+                alt={liveNews.title}
+                className="relative z-10 w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=800';
+                }}
+              />
+            </div>
+
+            <div className="p-6 sm:p-8 max-h-[62vh] overflow-y-auto">
+              {/* Category & Title Header */}
+              <div className="mb-5">
+                <div className="flex flex-wrap items-center gap-2 mb-2.5">
+                  <span className="px-2.5 py-1 rounded text-xs font-bold bg-amber-500 text-slate-950 shadow-2xs inline-block">
+                    {liveNews.category}
                   </span>
-                  {content.data.achievementLevel && (
-                    <span className="px-2.5 py-1 rounded text-xs font-bold bg-teal-800 text-teal-100 border border-teal-600/50 shadow-md inline-block">
-                      Peringkat {content.data.achievementLevel}
+                  {liveNews.achievementLevel && (
+                    <span className="px-2.5 py-1 rounded text-xs font-bold bg-teal-800 text-teal-100 border border-teal-600/50 shadow-2xs inline-block">
+                      Peringkat {liveNews.achievementLevel}
                     </span>
                   )}
                 </div>
 
-                <h3 className="text-xl sm:text-2xl font-extrabold text-white leading-tight">
-                  {content.data.title}
+                <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">
+                  {liveNews.title}
                 </h3>
               </div>
-            </div>
 
-            <div className="p-6 sm:p-8 max-h-[60vh] overflow-y-auto">
               {/* School Achievement Spotlight if present */}
-              {(content.data.schoolName || content.data.isSchoolAchievement) && (
+              {(liveNews.schoolName || liveNews.isSchoolAchievement) && (
                 <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="p-2 rounded-lg bg-amber-500 text-slate-950 shrink-0">
@@ -263,14 +317,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                         Kejayaan Sekolah Ahli MPGBSIM
                       </div>
                       <div className="text-sm font-bold text-slate-900">
-                        {content.data.schoolName || 'Sekolah Ahli Berdaftar'}
+                        {liveNews.schoolName || 'Sekolah Ahli Berdaftar'}
                       </div>
                     </div>
                   </div>
 
-                  {content.data.state && (
+                  {liveNews.state && (
                     <div className="px-3 py-1 rounded-lg bg-white border border-amber-200 text-xs font-bold text-amber-900 shrink-0 self-start sm:self-auto">
-                      Negeri: {content.data.state}
+                      Negeri: {liveNews.state}
                     </div>
                   )}
                 </div>
@@ -280,22 +334,22 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                 <div className="flex flex-wrap items-center gap-4">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-teal-600" />
-                    {content.data.date}
+                    {liveNews.date}
                   </span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    {content.data.readTime}
+                    {liveNews.readTime}
                   </span>
                   <span className="flex items-center gap-1">
                     <UserCheck className="w-3.5 h-3.5 text-teal-600" />
-                    {content.data.author}
+                    {liveNews.author}
                   </span>
                 </div>
 
                 <button
                   type="button"
                   onClick={async () => {
-                    await copyNewsShareLink(content.data.id);
+                    await copyNewsShareLink(liveNews.id);
                     setCopiedNewsLink(true);
                     setTimeout(() => setCopiedNewsLink(false), 3000);
                   }}
@@ -320,7 +374,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
               </div>
 
               <div className="prose max-w-none text-slate-700 text-sm sm:text-base leading-relaxed space-y-4 whitespace-pre-line font-sans">
-                {content.data.content}
+                {liveNews.content}
               </div>
 
               {/* Direct News Link & Social Sharing Panel */}
@@ -339,7 +393,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                   {/* Quick Social Share Links */}
                   <div className="flex items-center gap-2 shrink-0">
                     <a
-                      href={`https://wa.me/?text=${encodeURIComponent(getNewsShareMessage(content.data))}`}
+                      href={`https://wa.me/?text=${encodeURIComponent(getNewsShareMessage(liveNews))}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
@@ -347,7 +401,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                       <span>WhatsApp</span>
                     </a>
                     <a
-                      href={`https://t.me/share/url?url=${encodeURIComponent(getNewsShareUrl(content.data.id))}&text=${encodeURIComponent(`📰 ${content.data.title}`)}`}
+                      href={`https://t.me/share/url?url=${encodeURIComponent(getNewsShareUrl(liveNews.id))}&text=${encodeURIComponent(`📰 ${liveNews.title}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
@@ -355,7 +409,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                       <span>Telegram</span>
                     </a>
                     <a
-                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getNewsShareUrl(content.data.id))}`}
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getNewsShareUrl(liveNews.id))}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
@@ -370,14 +424,14 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                   <input
                     type="text"
                     readOnly
-                    value={getNewsShareUrl(content.data.id)}
+                    value={getNewsShareUrl(liveNews.id)}
                     onClick={(e) => (e.target as HTMLInputElement).select()}
                     className="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-mono text-slate-700 focus:outline-hidden"
                   />
                   <button
                     type="button"
                     onClick={async () => {
-                      await copyNewsShareLink(content.data.id);
+                      await copyNewsShareLink(liveNews.id);
                       setCopiedNewsLink(true);
                       setTimeout(() => setCopiedNewsLink(false), 3000);
                     }}
@@ -404,8 +458,8 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>
-                  {content.data.schoolName
-                    ? `Diterbitkan secara langsung melalui Portal Ahli MPGBSIM (${content.data.schoolName})`
+                  {liveNews.schoolName
+                    ? `Diterbitkan secara langsung melalui Portal Ahli MPGBSIM (${liveNews.schoolName})`
                     : 'Diterbitkan oleh Urus Setia MPGBSIM'}
                 </span>
               </div>

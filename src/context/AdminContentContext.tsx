@@ -1477,6 +1477,52 @@ function getCachedFirestoreCollection<T>(collectionKey: string): T | null {
   }
 }
 
+function mergeNewsPreservingMedia(
+  primaryList?: NewsItem[] | null,
+  ...fallbackLists: (NewsItem[] | undefined | null)[]
+): NewsItem[] {
+  const base = Array.isArray(primaryList) ? primaryList : [];
+  if (base.length === 0) return [];
+
+  const fallbackMap = new Map<string, NewsItem>();
+  for (const list of fallbackLists) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      if (!item || !item.id) continue;
+      const existing = fallbackMap.get(item.id);
+      if (!existing) {
+        fallbackMap.set(item.id, item);
+      } else {
+        const bestImg =
+          existing.imageUrl && existing.imageUrl.trim() !== ''
+            ? existing.imageUrl
+            : item.imageUrl && item.imageUrl.trim() !== ''
+            ? item.imageUrl
+            : '';
+        fallbackMap.set(item.id, { ...item, ...existing, imageUrl: bestImg });
+      }
+    }
+  }
+
+  return base.map((item) => {
+    const fb = fallbackMap.get(item.id);
+    if (!fb) return item;
+    const hasPrimaryImage = Boolean(item.imageUrl && item.imageUrl.trim() !== '');
+    const hasFallbackImage = Boolean(fb.imageUrl && fb.imageUrl.trim() !== '');
+    const resolvedImageUrl = hasPrimaryImage
+      ? item.imageUrl
+      : hasFallbackImage
+      ? fb.imageUrl
+      : item.imageUrl || '';
+
+    return {
+      ...fb,
+      ...item,
+      imageUrl: resolvedImageUrl,
+    };
+  });
+}
+
 const AdminContentContext = createContext<AdminContentContextType | undefined>(undefined);
 
 const sanitizeBranding = (b?: Partial<BrandingData> | null): BrandingData => {
@@ -1554,10 +1600,14 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       (initialSync?.memberSchools?.length ? initialSync.memberSchools : null) ||
       (prev?.memberSchools?.length ? prev.memberSchools : DEFAULT_MEMBER_SCHOOLS);
 
-    const rawNews =
+    const rawNews = mergeNewsPreservingMedia(
       (cachedNews && cachedNews.length > 0 ? cachedNews : null) ||
-      (initialSync?.news?.length ? initialSync.news : null) ||
-      (prev?.news?.length ? prev.news : DEFAULT_NEWS);
+        (initialSync?.news?.length ? initialSync.news : null) ||
+        (prev?.news?.length ? prev.news : DEFAULT_NEWS),
+      initialSync?.news,
+      prev?.news,
+      DEFAULT_NEWS
+    );
 
     const rawPrograms =
       (cachedEvents && cachedEvents.length > 0 ? cachedEvents : null) ||
@@ -1762,10 +1812,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  const hasHydratedIndexedDBRef = React.useRef(false);
+
   // Hydrate full state from IndexedDB on initial mount (only if live Firestore listeners haven't already populated more complete data)
   useEffect(() => {
     getFullSiteContentAsync()
       .then((cached) => {
+        hasHydratedIndexedDBRef.current = true;
         if (cached) {
           setSiteData((prev) => {
             const prevHasRealLeaders =
@@ -1794,6 +1847,17 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                 ? cached.resources
                 : prev.resources;
 
+            const resolvedNews =
+              prev.news && prev.news.length > 0
+                ? mergeNewsPreservingMedia(
+                    prev.news,
+                    Array.isArray(cached.news) ? cached.news : [],
+                    DEFAULT_NEWS
+                  )
+                : Array.isArray(cached.news) && cached.news.length > 0
+                ? mergeNewsPreservingMedia(cached.news, prev.news, DEFAULT_NEWS)
+                : prev.news;
+
             return {
               ...prev,
               branding: cached.branding || prev.branding,
@@ -1815,7 +1879,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                       Array.isArray(cached.memberApplications) ? cached.memberApplications : prev.memberApplications
                     )
                   : prev.memberSchools,
-              news: Array.isArray(cached.news) ? sortNewsByPublishedDate(cached.news) : prev.news,
+              news: sortNewsByPublishedDate(resolvedNews),
               programs: Array.isArray(cached.programs) ? cached.programs : prev.programs,
               practices: Array.isArray(cached.practices) ? cached.practices : prev.practices,
               leadership: resolvedLeadership,
@@ -1843,29 +1907,53 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
       })
       .catch((e) => {
+        hasHydratedIndexedDBRef.current = true;
         console.warn('Hydration notice:', e);
       });
   }, []);
 
   // Listen for portal profile updates or external storage synchronization
   useEffect(() => {
-    const handleContentUpdated = () => {
+    const handleContentUpdated = (evt?: Event) => {
       try {
+        const customDetail = (evt as CustomEvent)?.detail;
         const saved = safeLocalStorageGet(STORAGE_KEYS.SITE_CONTENT);
         const parsed = saved ? JSON.parse(saved) : {};
-        setSiteData((prev) => ({
-          ...prev,
-          memberSchools: parsed.memberSchools && parsed.memberSchools.length > 0
-            ? mergeSchoolsPreservingMedia(
-                sanitizeMemberSchoolsList(parsed.memberSchools),
-                prev.memberSchools,
-                prev.memberApplications
+        setSiteData((prev) => {
+          let nextNews = prev.news;
+          if (customDetail?.type === 'news' && customDetail?.newsItem) {
+            const incoming: NewsItem = customDetail.newsItem;
+            nextNews = sortNewsByPublishedDate([
+              incoming,
+              ...prev.news.filter((n) => n.id !== incoming.id),
+            ]);
+          } else if (customDetail?.id && customDetail?.updates) {
+            nextNews = sortNewsByPublishedDate(
+              prev.news.map((n) =>
+                n.id === customDetail.id ? { ...n, ...customDetail.updates } : n
               )
-            : prev.memberSchools,
-          memberApplications: sanitizeMemberApplicationsList(
-            parsed.memberApplications?.length ? parsed.memberApplications : prev.memberApplications
-          ),
-        }));
+            );
+          } else if (Array.isArray(parsed.news) && parsed.news.length > 0) {
+            nextNews = sortNewsByPublishedDate(
+              mergeNewsPreservingMedia(prev.news, parsed.news, DEFAULT_NEWS)
+            );
+          }
+
+          return {
+            ...prev,
+            news: nextNews,
+            memberSchools: parsed.memberSchools && parsed.memberSchools.length > 0
+              ? mergeSchoolsPreservingMedia(
+                  sanitizeMemberSchoolsList(parsed.memberSchools),
+                  prev.memberSchools,
+                  prev.memberApplications
+                )
+              : prev.memberSchools,
+            memberApplications: sanitizeMemberApplicationsList(
+              parsed.memberApplications?.length ? parsed.memberApplications : prev.memberApplications
+            ),
+          };
+        });
       } catch (e) {
         console.warn('Error handling content update event:', e);
       }
@@ -1897,8 +1985,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [isLogoModalOpen, setIsLogoModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  // Sync to IndexedDB + safe localStorage whenever siteData changes
+  // Sync to IndexedDB + safe localStorage whenever siteData changes (after initial IndexedDB hydration)
   useEffect(() => {
+    if (!hasHydratedIndexedDBRef.current) return;
     persistSiteContent(siteData).catch((err) => {
       console.warn('Ralat latar belakang ketika menyimpan tapak:', err);
     });
@@ -2110,12 +2199,13 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
             });
           }
           const sortedNews = list.length > 0 ? sortNewsByPublishedDate(list) : [];
-          if (sortedNews.length > 0) {
-            cacheFirestoreCollection('news', sortedNews);
-          }
           setSiteData((prev) => {
             if (sortedNews.length > 0) {
-              return { ...prev, news: sortedNews };
+              const enrichedNews = sortNewsByPublishedDate(
+                mergeNewsPreservingMedia(sortedNews, prev.news, DEFAULT_NEWS)
+              );
+              cacheFirestoreCollection('news', enrichedNews);
+              return { ...prev, news: enrichedNews };
             }
             if (isMockCleared) {
               return { ...prev, news: [] };
@@ -2763,17 +2853,17 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         count++;
       }
 
-      // 2. Sync News
+      // 2. Sync News (never overwrite Firestore imageUrl with empty string from stripped cache)
       for (const item of siteData.news) {
-        await setDoc(
-          doc(db, 'news', item.id),
-          {
-            ...item,
-            status: item.status || 'published',
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        );
+        const safeNewsPayload: Record<string, any> = {
+          ...item,
+          status: item.status || 'published',
+          updatedAt: new Date().toISOString(),
+        };
+        if (!safeNewsPayload.imageUrl) {
+          delete safeNewsPayload.imageUrl;
+        }
+        await setDoc(doc(db, 'news', item.id), safeNewsPayload, { merge: true });
         count++;
       }
 
@@ -2993,32 +3083,55 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   // 1. News CRUD
   const addNews = async (item: NewsItem) => {
-    setSiteData((prev) => ({
-      ...prev,
-      news: sortNewsByPublishedDate([item, ...prev.news]),
-    }));
+    setSiteData((prev) => {
+      const nextNews = sortNewsByPublishedDate([item, ...prev.news.filter((n) => n.id !== item.id)]);
+      const nextState = { ...prev, news: nextNews };
+      cacheFirestoreCollection('news', nextNews);
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
     try {
-      await setDoc(doc(db, 'news', item.id), {
-        ...item,
-        status: item.status || 'published',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      await setDoc(
+        doc(db, 'news', item.id),
+        {
+          ...item,
+          status: item.status || 'published',
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     } catch (e) {
       console.warn('Firestore write news notice:', e);
     }
   };
 
   const updateNews = async (id: string, updated: Partial<NewsItem>) => {
-    setSiteData((prev) => ({
-      ...prev,
-      news: sortNewsByPublishedDate(prev.news.map((item) => (item.id === id ? { ...item, ...updated } : item))),
-    }));
+    let fullMergedItem: NewsItem | null = null;
+    setSiteData((prev) => {
+      const nextNews = sortNewsByPublishedDate(
+        prev.news.map((item) => {
+          if (item.id === id) {
+            fullMergedItem = { ...item, ...updated };
+            return fullMergedItem;
+          }
+          return item;
+        })
+      );
+      const nextState = { ...prev, news: nextNews };
+      cacheFirestoreCollection('news', nextNews);
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
     try {
-      await updateDoc(doc(db, 'news', id), {
-        ...updated,
-        updatedAt: new Date().toISOString(),
-      });
+      await setDoc(
+        doc(db, 'news', id),
+        {
+          ...(fullMergedItem || updated),
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     } catch (e) {
       console.warn('Firestore update news notice:', e);
     }
