@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
-import { AI_PROMPTS_LIBRARY } from '../../data/portalMockData';
+import { AI_PROMPTS_LIBRARY, AI_TOOLS_LIST } from '../../data/portalMockData';
 
 export const PortalGlobalSearchModal: React.FC = () => {
   const {
@@ -92,6 +92,14 @@ export const PortalGlobalSearchModal: React.FC = () => {
     (pr) => pr.title.toLowerCase().includes(q) || pr.prompt.toLowerCase().includes(q)
   );
 
+  const matchingAITools = AI_TOOLS_LIST.filter(
+    (tool) =>
+      tool.name.toLowerCase().includes(q) ||
+      tool.category.toLowerCase().includes(q) ||
+      tool.description.toLowerCase().includes(q) ||
+      tool.bestFor.toLowerCase().includes(q)
+  );
+
   const matchingNews = (siteData.news || []).filter(
     (n) =>
       n.title.toLowerCase().includes(q) ||
@@ -117,6 +125,7 @@ export const PortalGlobalSearchModal: React.FC = () => {
     matchingDocuments.length +
     matchingPractices.length +
     matchingPrompts.length +
+    matchingAITools.length +
     matchingNews.length;
 
   const handleNavigate = (tab: PortalTab, subTab?: string) => {
@@ -358,6 +367,33 @@ export const PortalGlobalSearchModal: React.FC = () => {
                           <div className="truncate">
                             <span className="font-semibold text-slate-900 truncate block">{n.title}</span>
                             <span className="text-[10px] text-slate-400">{n.schoolName || n.category} • {n.date}</span>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Tools */}
+              {matchingAITools.length > 0 && (
+                <div>
+                  <span className="text-[10px] font-bold text-teal-900 uppercase tracking-wider block mb-2 px-1">
+                    Alatan & Platform AI ({matchingAITools.length})
+                  </span>
+                  <div className="space-y-1">
+                    {matchingAITools.slice(0, 4).map((tool) => (
+                      <div
+                        key={tool.id}
+                        onClick={() => handleNavigate('ai-hub')}
+                        className="p-2.5 rounded-xl hover:bg-teal-50 cursor-pointer flex items-center justify-between transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 truncate">
+                          <Cpu className="w-4 h-4 text-teal-600 shrink-0" />
+                          <div className="truncate">
+                            <span className="font-semibold text-slate-900 truncate block">{tool.name}</span>
+                            <span className="text-[10px] text-slate-400">{tool.category} • {tool.badge}</span>
                           </div>
                         </div>
                         <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />

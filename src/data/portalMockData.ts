@@ -553,134 +553,408 @@ export const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
 ];
 
 export const AI_PROMPTS_LIBRARY: AIPromptItem[] = [
+  // 1. AI UNTUK KEPIMPINAN
   {
-    id: 'pr-1',
-    title: 'Penulisan Ucapan Perhimpunan Rasmi Berunsur Tazkirah Kepimpinan',
+    id: 'pr-kep-1',
+    title: 'Draf Pelan Strategik Berasaskan Aspirasi KPM & Dini',
     category: 'Kepimpinan',
-    description: 'Menjana teks ucapan Pengetua yang padat, membina motivasi murid dan menyuntik nilai integriti berteraskan ayat Al-Quran.',
-    prompt: `Anda adalah penasihat kepimpinan pendidikan Islam berpengalaman. 
-Tuliskan draf teks ucapan perhimpunan rasmi selama 7 minit untuk seorang Pengetua Sekolah Islam.
-Topik: [Masukkan Topik: cth. Disiplin Solat dan Ketepatan Waktu Menjelang Peperiksaan].
-Sasaran: Murid sekolah menengah berumur 13-17 tahun.
-Struktur:
-1. Mukadimah ringkas dengan selawat dan doa kesyukuran.
-2. Petikan sepotong ayat Al-Quran atau Hadis sahih yang relevan berserta terjemahan hikmah.
-3. Tiga nasihat praktikal yang boleh diamalkan murid dalam rutin harian asrama/kelas.
-4. Kata-kata perangsang kepimpinan yang membakar semangat.
-5. Penutup doa ringkas.
-Gunakan nada bahasa Melayu tinggi yang mendidik, mesra tetapi berwibawa.`,
-    usageInstructions: 'Gantikan kurungan [Topik] dengan fokus semasa sekolah anda, kemudian tampal ke Google Gemini atau ChatGPT.',
-    tags: ['Ucapan', 'Tazkirah', 'Perhimpunan', 'Nilai'],
-  },
-  {
-    id: 'pr-2',
-    title: 'Pelan Intervensi Akademik Berdasarkan Analisis Jurang Markah Percubaan',
-    category: 'Kurikulum',
-    description: 'Menstrukturkan tindakan pemulihan pantas bagi subjek kritikal berasaskan peratusan murid lulus dan gagal.',
-    prompt: `Bertindak sebagai Pakar Analisis Kurikulum Sekolah Menengah.
-Berdasarkan data keputusan peperiksaan percubaan berikut:
-- Subjek: [Nama Subjek, cth. Matematik Tambahan / Pendidikan Islam]
-- Bilangan calon: [Jumlah Murid, cth. 85 orang]
-- Peratus lulus: [cth. 64%]
-- Kelemahan utama yang dikenal pasti: [cth. Kertas 2 bahagian Kemahiran Berfikir Aras Tinggi (KBAT) dan hafazan ayat hukum]
+    description: 'Merangka pelan strategik sekolah 5 tahun yang mengharmonikan Pelan Pembangunan Pendidikan Malaysia (PPPM) KPM dengan teras Kurikulum Bersepadu Dini/Tahfiz.',
+    prompt: `Anda ialah Pakar Perancangan Strategik Pendidikan Islam dan Penasihat Kepimpinan Pengetua/Guru Besar (PGB).
+Bina satu Draf Pelan Strategik Sekolah 5 Tahun (2026–2030) untuk:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Kategori Sekolah: [SABK / SMKA / SRI / SMI / Maahad Tahfiz Sains]
+- Fokus Utama: [cth. Kecemerlangan Akademik SPM, Kelestarian Hafazan Al-Quran, & Sahsiah Rabbani]
 
-Sila rangka Pelan Intervensi 6 Minggu (Rapid Intervention Plan) yang mengandungi:
-1. Objektif sasaran peningkatan Gred Purata Mata Pelajaran (GPMP).
-2. Pembahagian murid kepada 3 kumpulan: Cemerlang, Sederhana, dan Harapan Lulus.
-3. Modul aktiviti mingguan berfokus dengan pendekatan rakan sebaya (peer coaching).
-4. Mekanisme pemantauan mingguan oleh Guru Kanan Mata Pelajaran.
-5. Templat borang komitmen murid yang berkesan.`,
-    usageInstructions: 'Sesuai digunakan oleh Guru Kanan Pentadbiran dan Guru Panitia untuk mesyuarat kurikulum.',
-    tags: ['Akademik', 'SPM', 'Intervensi', 'Analisis Data'],
+Sila hasilkan dokumen lengkap mengikut struktur rasmi berikut:
+1. Pernyataan Visi, Misi & Motto Sekolah Rabbani.
+2. Analisis SWOT (Kekuatan, Kelemahan, Peluang, Ancaman) semasa.
+3. 5 Teras Strategik Utama (Selaras Aspirasi Murid KPM & Pendidikan Dini).
+4. Jadual Matriks Sasaran KPI 5 Tahun (Baseline 2026 hingga Sasaran 2030).
+5. Pelan Tindakan Tahunan & Agihan Tanggungjawab (PGB, PK Pentadbiran, PK HEM, PK Kokurikulum).
+6. Mekanisme Pemantauan & Semakan Berkala (Mid-Term Review).`,
+    usageInstructions: 'Klik "Buka Studio & Guna Modul" untuk menjana pelan strategik sekolah anda secara automatik atau salin prompt ini ke Gemini AI / ChatGPT.',
+    tags: ['Pelan Strategik', 'KPM', 'Kurikulum Dini', 'Kepimpinan PGB'],
   },
   {
-    id: 'pr-3',
-    title: 'Rangka Kertas Kerja Memohon Dana Wakaf / Penajaan Korporat',
-    category: 'Pentadbiran',
-    description: 'Menghasilkan draf kertas kerja permohonan dana sumbangan yang profesional mengikut format institusi.',
-    prompt: `Anda adalah Pengurus Pembangunan Dana institusi pendidikan Islam.
-Bina satu draf Kertas Kerja Rasmi bagi memohon tajaan/dana wakaf daripada agensi korporat atau alumni.
-Nama Projek: [cth. Pembangunan Makmal Komputer AI & Pusat Digital Huffaz]
-Institusi: [Nama Sekolah Anda]
-Jumlah Dana Dipohon: [cth. RM45,000]
-Objektif: [cth. Menyediakan 30 unit komputer riba dan sambungan jalur lebar pantas untuk murid asrama]
+    id: 'pr-kep-2',
+    title: 'Penulisan Teks Ucapan Tazkirah Perhimpunan',
+    category: 'Kepimpinan',
+    description: 'Menjana teks ucapan Pengetua/Guru Besar yang padat, membina motivasi murid dan menyuntik nilai adab serta integriti berteraskan Al-Quran & Sunnah.',
+    prompt: `Anda adalah penasihat kepimpinan pendidikan Islam berpengalaman.
+Tuliskan draf teks ucapan perhimpunan rasmi selama 7 minit untuk seorang Pengetua / Guru Besar Sekolah Islam.
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Topik Fokus: [Masukkan Topik: cth. Adab Menuntut Ilmu, Disiplin Solat Berjemaah & Persediaan Peperiksaan]
+- Sasaran: [Murid Sekolah Menengah / Sekolah Rendah & Guru]
 
-Sila susun kertas kerja mengikut format standard:
-1. Ringkasan Eksekutif (Executive Summary).
-2. Latar Belakang Sekolah & Pencapaian Semasa.
-3. Penyataan Masalah & Keperluan Mendesak.
-4. Butiran Projek & Jadual Pelaksanaan.
-5. Anggaran Pecahan Belanjawan Terperinci.
-6. Pulangan Nilai Sosial (Social ROI) kepada Pihak Penaja (termasuk potongan cukai jika berkenaan dan liputan publisiti portal MPGBSIM).
-7. Kesimpulan & Maklumat Hubungan Rasmi.`,
-    usageInstructions: 'Lengkapkan anggaran belanjawan sebelum menyerahkan kepada syarikat berkaitan.',
-    tags: ['Kertas Kerja', 'Dana', 'Wakaf', 'Sumbangan'],
+Struktur Teks Ucapan:
+1. Mukadimah ringkas dengan salam, selawat dan penghargaan kepada guru bertugas.
+2. Petikan sepotong ayat Al-Quran atau Hadis sahih yang relevan berserta terjemahan dan pengajaran hikmah.
+3. Tiga amanat/nasihat praktikal yang boleh diamalkan murid dalam rutin harian kelas dan asrama.
+4. Kata-kata perangsang kepimpinan yang membakar semangat kecemerlangan duniawi dan ukhrawi.
+5. Penutup berserta doa ringkas keberkatan ilmu.
+Gunakan nada bahasa Melayu tinggi yang mendidik, empati tetapi berwibawa.`,
+    usageInstructions: 'Gunakan Studio Interaktif untuk memasukkan topik perhimpunan minggu ini atau salin terus ke Gemini / ChatGPT.',
+    tags: ['Ucapan', 'Tazkirah', 'Perhimpunan', 'Amanat PGB'],
   },
   {
-    id: 'pr-4',
-    title: 'Pelan Pengurusan Krisis Disiplin & Media Sosial Sekolah',
-    category: 'HEM',
-    description: 'Panduan merangka SOP komunikasi pantas dan tindakan pemulihan adab sekiranya berlaku isu tular.',
-    prompt: `Sebagai Perunding Komunikasi Krisis Pendidikan, rangka Pelan Tindak Balas Pantas (Rapid Response SOP) untuk Pengetua Sekolah Islam sekiranya berlaku isu disiplin atau aduan tular di media sosial.
-Senario: [Masukkan Ringkasan Senario: cth. Isu ketidakpuasan hati makanan dewan makan asrama dimuat naik di TikTok]
-
-Hasilkan panduan 4 fasa:
-1. Fasa Pengesahan Fakta (Jam 0 - 2): Langkah siasatan dalaman dan perlindungan privasi murid.
-2. Fasa Kenyataan Media & Mesej WhatsApp Rasmi (Jam 2 - 4): Contoh templat mesej penenang kepada ibu bapa yang empati dan bertanggungjawab tanpa menuding jari.
-3. Fasa Tindakan Pembetulan (Hari 1 - 3): Sesi dialog bersama wakil ibu bapa dan pihak pembekal.
-4. Fasa Pemulihan Tarbiah & Reputasi Sekolah (Minggu 1 - 2): Pengajaran hikmah kepada murid dan penambahbaikan SOP.`,
-    usageInstructions: 'Gunakan sebagai panduan asas perbincangan bersama warden dan kaunselor sekolah.',
-    tags: ['HEM', 'Krisis', 'Media Sosial', 'Disiplin'],
-  },
-  {
-    id: 'pr-5',
-    title: 'Prompt Analisis Sentimen & Maklum Balas Soal Selidik Ibu Bapa (PIBG)',
-    category: 'Data & Analisis',
-    description: 'Menganalisis puluhan jawapan teks terbuka daripada borang Google Form secara pantas dan tepat.',
-    prompt: `Berikut adalah senarai 20 maklum balas terbuka daripada borang soal selidik ibu bapa berkaitan sesi persekolahan:
-[Tampal teks maklum balas di sini]
-
-Sila jalankan analisis:
-1. Rumusan Sentimen Keseluruhan: Peratusan Positif, Neutral dan Perlu Perhatian Segera.
-2. Tiga Kekuatan Utama sekolah yang paling kerap dipuji oleh ibu bapa.
-3. Tiga Titik Kesakitan (Pain Points) atau rungutan yang paling banyak dibangkitkan (cth: kebersihan tandas, kualiti makanan, komunikasi guru).
-4. Cadangan Tindakan Segera (Quick Wins) yang boleh diselesaikan dalam tempoh 14 hari tanpa kos tinggi.
-5. Draf ucapan terima kasih Pengetua dalam kumpulan WhatsApp PIBG yang meredakan kebimbangan ibu bapa.`,
-    usageInstructions: 'Eksport maklum balas Google Form ke bentuk teks dan tampal ke prompt ini.',
-    tags: ['Analisis', 'Ibu Bapa', 'PIBG', 'Maklum Balas'],
-  },
-  {
-    id: 'pr-6',
-    title: 'Rangka Modul Kem Kepimpinan Murid Rabbani (3 Hari 2 Malam)',
-    category: 'Tarbiah & Sahsiah',
-    description: 'Menyusun tentatif, objektif slot dan aktiviti LDK yang menyatukan sahsiah kepimpinan dengan amalan sunnah.',
-    prompt: `Rangka satu kertas konsep dan jadual program Kem Kepimpinan Pemimpin Murid Sekolah Islam (Pengawas, Ketua Asrama, Naqib) bertema "Pemimpin Rabbani: Mewarisi Integriti Sahabat".
-Tempoh: 3 Hari 2 Malam di Pusat Latihan / Kem Asrama.
-Jumlah Peserta: 60 orang murid tingkatan 3 dan 4.
+    id: 'pr-kep-3',
+    title: 'Penilaian Prestasi & Maklum Balas Membina Guru',
+    category: 'Kepimpinan',
+    description: 'Membantu PGB menyusun ulasan penilaian prestasi tahunan (PBPPP) dan skrip sesi bimbingan (coaching & mentoring) guru secara empati dan profesional.',
+    prompt: `Bertindak sebagai Pengetua / Guru Besar Cemerlang yang mahir dalam bimbingan instruksional (Instructional Coaching).
+Saya perlu menyediakan ulasan penilaian prestasi dan skrip maklum balas membina untuk seorang guru:
+- Nama / Kategori Guru: [cth. Guru Akademik / Guru Dini / Guru Baharu]
+- Kekuatan Utama: [cth. Komited dalam kelas tambahan dan disenangi murid]
+- Aspek Perlu Penambahbaikan: [cth. Pengurusan masa PdP, penggunaan bahan digital/AI dan ketepatan penghantaran rekod RPH]
 
 Sila sediakan:
-1. Objektif Khusus Kemenjadian Murid.
-2. Jadual Tentatif Lengkap dari Solat Subuh berjemaah, Qiamullail, slot Latihan Dalam Kumpulan (LDK) hingga aktiviti riadhah sunnah.
-3. Modul 4 Slot Utama:
-   - Slot 1: Karisma Umar Al-Khattab (Ketegasan & Keadilan).
-   - Slot 2: Seni Berunding & Komunikasi Empati Musab bin Umair.
-   - Slot 3: Simulasi Pengurusan Konflik Rakan Sebaya di Sekolah.
-   - Slot 4: Ikrar Amanah & Resolusi Tindakan.
-4. Rubrik penilaian kemenjadian peserta pra dan pasca kem.`,
-    usageInstructions: 'Gunakan untuk merangka kertas kerja program kepimpinan pengawas sekolah.',
-    tags: ['Tarbiah', 'Kepimpinan Murid', 'Kem', 'Sahsiah'],
+1. Ulasan Rasmi Penilai Pertama/Kedua (Format PBPPP) yang profesional dan membina.
+2. Skrip Dialog Bimbingan (Pendekatan GROW Model: Goal, Reality, Options, Will) berunsur hikmah dan empati.
+3. 3 Cadangan Pembangunan Profesionalisme Berterusan (CPD) yang sesuai untuk guru tersebut bagi suku tahun akan datang.
+4. Kata-kata penghargaan dan motivasi berteraskan konsep kerja sebagai ibadah.`,
+    usageInstructions: 'Sesuai untuk sesi semakan prestasi pertengahan/akhir tahun dan bimbingan pencerapan PdP guru.',
+    tags: ['PBPPP', 'Prestasi Guru', 'Coaching', 'Maklum Balas'],
+  },
+
+  // 2. AI UNTUK PENTADBIRAN
+  {
+    id: 'pr-pen-1',
+    title: 'Kertas Kerja Memohon Dana Sumbangan & CSR',
+    category: 'Pentadbiran',
+    description: 'Menghasilkan draf kertas kerja permohonan dana wakaf, infaq pembangunan dan penajaan korporat (CSR) yang lengkap serta meyakinkan.',
+    prompt: `Anda adalah Pengurus Pembangunan Dana & Wakaf institusi pendidikan Islam.
+Bina satu draf Kertas Kerja Rasmi bagi memohon tajaan CSR korporat atau dana wakaf pendidikan:
+- Nama Projek: [cth. Naik Taraf Makmal Komputer AI & Pusat Sumber Digital Huffaz]
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Jumlah Dana Dipohon: [cth. RM50,000]
+- Objektif Utama: [cth. Menyediakan 30 buah komputer dan fasiliti pembelajaran digital untuk 450 orang murid]
+
+Sila susun kertas kerja mengikut format rasmi institusi:
+1. Ringkasan Eksekutif (Executive Summary).
+2. Latar Belakang Sekolah & Pencapaian Semasa.
+3. Penyataan Masalah & Justifikasi Keperluan Mendesak.
+4. Objektif, Sasaran & Impak Jangka Panjang Projek.
+5. Anggaran Pecahan Belanjawan Terperinci (Jadual Kos).
+6. Nilai Tambah & Manfaat kepada Pihak Penaja (Pelepasan cukai, Sijil Penghargaan, Publisiti Rasmi).
+7. Penutup & Maklumat Akaun Rasmi Sekolah.`,
+    usageInstructions: 'Isi jumlah dana dan nama projek di Studio Interaktif untuk menjana kertas kerja siap cetak.',
+    tags: ['Kertas Kerja', 'Dana Wakaf', 'CSR', 'Pentadbiran'],
+  },
+  {
+    id: 'pr-pen-2',
+    title: 'Format Minit Mesyuarat Tindakan Segera',
+    category: 'Pentadbiran',
+    description: 'Meringkaskan nota perbincangan mesyuarat pengurusan sekolah kepada format minit mesyuarat rasmi beserta jadual maklum balas tindakan segera.',
+    prompt: `Bertindak sebagai Setiausaha Pengurusan Sekolah yang cekap.
+Tukarkan nota ringkas perbincangan mesyuarat berikut kepada Format Minit Mesyuarat Pengurusan Rasmi:
+- Nama Mesyuarat: [cth. Mesyuarat Pengurusan Tertinggi Sekolah Bil. 3/2026]
+- Tarikh & Masa: [Masukkan Tarikh & Masa]
+- Pengerusi: [Nama Pengetua / Guru Besar]
+- Isi Perbincangan / Nota Mentah: [Masukkan isi-isi penting perbincangan di sini]
+
+Sila hasilkan:
+1. Minit Mesyuarat Rasmi mengikut format Pekeliling Kemajuan Pentadbiran Awam (Perutusan Pengerusi, Pengesahan Minit Lalu, Perkara Berbangkit, Perbincangan Kertas Kerja/Isu Utama, Hal-hal Lain, Penutup).
+2. Jadual Ringkasan Tindakan Segera (Action Matrix): Bil | Perkara/Keputusan | Pegawai Bertanggungjawab (PIC) | Tarikh Akhir (Deadline) | Status Semasa.
+3. Draf Mesej Peringatan WhatsApp Rasmi kepada ahli mesyuarat berkaitan tindakan yang perlu diselesaikan dalam tempoh 7 hari.`,
+    usageInstructions: 'Tampal nota kasar mesyuarat untuk ditukarkan kepada minit rasmi dalam beberapa saat.',
+    tags: ['Minit Mesyuarat', 'Pentadbiran', 'Tindakan Segera', 'Surat Rasmi'],
+  },
+  {
+    id: 'pr-pen-3',
+    title: 'SOP Pengurusan Premis & Keselamatan Asrama',
+    category: 'Pentadbiran',
+    description: 'Merangka Prosedur Operasi Standard (SOP) penyelenggaraan fasiliti, pencegahan kebakaran, kawalan pelawat dan keselamatan murid asrama.',
+    prompt: `Anda ialah Pakar Pengurusan Keselamatan Fasiliti dan Asrama Sekolah (3K: Kebersihan, Kesihatan, Keselamatan).
+Bina satu dokumen Prosedur Operasi Standard (SOP) Pengurusan Premis & Keselamatan Asrama yang komprehensif bagi:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Fokus Kawasan: [cth. Blok Asrama Putera/Puteri, Dewan Makan, Makmal & Kawalan Pintu Utama]
+- Kapasiti Penghuni: [cth. 350 orang murid asrama]
+
+Sila sediakan SOP lengkap merangkumi:
+1. Objektif & Skop Keselamatan Premis.
+2. SOP Rondaan Berkala Warden & Pengawal Keselamatan (Siang & Malam).
+3. SOP Pencegahan Kebakaran, Laluan Kecemasan & Pengurusan Pendawaian Elektrik.
+4. SOP Kawalan Keluar Masuk Pelawat / Ibu Bapa & Prosedur Murid Sakit Cemas (Kecemasan Malam).
+5. Senarai Semak Audit Keselamatan Mingguan (Checklist) untuk ditandatangani oleh PK HEM dan Warden.`,
+    usageInstructions: 'Gunakan untuk mengemas kini buku panduan keselamatan asrama dan fail audit 3K sekolah.',
+    tags: ['SOP', 'Keselamatan Asrama', 'Premis 3K', 'Warden'],
+  },
+
+  // 3. AI UNTUK KURIKULUM
+  {
+    id: 'pr-kur-1',
+    title: 'Pelan Intervensi Murid Percubaan SPM',
+    category: 'Kurikulum',
+    description: 'Menstrukturkan tindakan pemulihan berfokus dan pecutan akhir akademik bagi subjek kritikal berdasarkan analisis keputusan peperiksaan percubaan.',
+    prompt: `Bertindak sebagai Pakar Analisis Kurikulum & Kecemerlangan Akademik SPM.
+Berdasarkan data keputusan peperiksaan percubaan berikut:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Subjek Fokus: [cth. Matematik, Bahasa Inggeris, Bahasa Arab Tinggi, Syariah Islamiah]
+- Bilangan Calon & Peratus Lulus Semasa: [cth. 90 calon, Lulus 68%, GPMP 5.42]
+- Isu / Kelemahan Utama: [cth. Lemah menjawab soalan KBAT Kertas 2 dan penguasaan kosa kata Bahasa Arab]
+
+Sila rangka Pelan Intervensi Pecutan Akhir SPM (8 Minggu) yang mengandungi:
+1. Sasaran Peningkatan GPMP & Peratus Layak Sijil (LMS).
+2. Strategi Pengupayaan Mengikut 3 Kelompok Murid:
+   - Kumpulan Elit / Straight A (Pengayaan KBAT)
+   - Kumpulan Sederhana / Near-Miss A/B (Klinik Teknik Menjawab)
+   - Kumpulan Harapan Lulus / GALUS (Modul Lulus Pasti & Bimbingan Berfokus)
+3. Jadual Pelaksanaan Mingguan & Program Guru Muda (Peer Coaching).
+4. Mekanisme Pemantauan Panitia & Pelibatan Ibu Bapa.`,
+    usageInstructions: 'Sesuai digunakan oleh PK Pentadbiran, GKMP dan Ketua Panitia selepas analisis post-mortem peperiksaan.',
+    tags: ['Intervensi SPM', 'Kurikulum', 'Akademik', 'GPMP'],
+  },
+  {
+    id: 'pr-kur-2',
+    title: 'Jadual Waktu Murajaah & Tahfiz Terbeza',
+    category: 'Kurikulum',
+    description: 'Menyusun jadual pengulangan hafazan (murajaah) Al-Quran secara pedagogi terbeza mengikut tahap keupayaan murid tanpa menjejaskan subjek akademik/STEM.',
+    prompt: `Anda ialah Pakar Kurikulum Tahfiz Bersepadu (Ulul Albab / Tahfiz Sains & Dini).
+Rangka satu Sistem & Jadual Waktu Murajaah (Pengulangan Hafazan) & Tahfiz Terbeza untuk:
+- Nama Institusi: [Masukkan Nama Sekolah / Maahad]
+- Peringkat Murid: [cth. Tingkatan 1 hingga Tingkatan 5]
+- Sasaran Juzuk: [cth. 6 Juzuk setahun / 30 Juzuk dalam 5 tahun beserta subjek Akademik/STEM]
+
+Sila sediakan:
+1. Pembahagian Pedagogi Terbeza kepada 3 Tahap Keupayaan Murid (Lancar/Cepat, Sederhana, Perlu Bimbingan Talaqqi Intensif).
+2. Jadual Waktu Harian Bersepadu (Halaqah Subuh, Slot Qailulah/Zohor, Murajaah Mandiri Maghrib, & Integrasi Hujung Minggu).
+3. Kaedah "Sabak" (Hafazan Baharu), "Para Sabak" (Hafazan Semasa) dan "Amokhtar" (Murajaah Lama) yang sistematik.
+4. Teknik Integrasi Tadabbur Ayat Al-Quran dengan Konsep Sains/STEM di dalam bilik darjah.
+5. Templat Buku Rekod Prestasi Tasmi' & Murajaah Mingguan.`,
+    usageInstructions: 'Sangat berguna untuk Penyelaras Tahfiz dan PK Kurikulum menyusun jadual waktu tahunan.',
+    tags: ['Tahfiz', 'Murajaah', 'Pedagogi Terbeza', 'Ulul Albab'],
+  },
+  {
+    id: 'pr-kur-3',
+    title: 'Rubrik Penilaian Kurikulum Dini & Azhari',
+    category: 'Kurikulum',
+    description: 'Membina rubrik pentaksiran holistik (lisan, bertulis dan amali) bagi subjek Usuluddin, Syariah, Al-Lughah Al-Arabiah dan kurikulum Azhari/STAM.',
+    prompt: `Bertindak sebagai Pakar Pentaksiran Kurikulum Bersepadu Dini (KBD) dan Kurikulum Azhari.
+Bina satu Rubrik Penilaian Holistik (Pentaksiran Bilik Darjah & Amali) bagi:
+- Mata Pelajaran: [cth. Al-Syariah / Usuluddin / Al-Lughah Al-Arabiah Al-Mu'asirah / Mutalaah & Insya']
+- Tingkatan / Tahap: [cth. Tingkatan 4 / Calon Sijil Menengah Agama (SMA) / STAM]
+- Fokus Kemahiran: [cth. Kefahaman Nas, Istinbat Hukum, Kemahiran Bertutur Bahasa Arab & Aplikasi Akhlak]
+
+Sila sediakan:
+1. Jadual Rubrik Penilaian 6 Tahap Penguasaan (TP1 hingga TP6) yang jelas dan boleh diukur.
+2. Kriteria Penilaian Lisan (Syafawi), Penulisan (Tahriri) dan Penghayatan Amali.
+3. 5 Contoh Soalan Kemahiran Berfikir Aras Tinggi (KBAT) Dwibahasa (Bahasa Melayu & Bahasa Arab) berserta skema jawapan ringkas.
+4. Panduan intervensi bagi murid yang masih berada di tahap penguasaan TP1–TP3.`,
+    usageInstructions: 'Gunakan untuk menyelaraskan standard pemarkahan panitia Dini dan persediaan peperiksaan SMA/STAM/SPM.',
+    tags: ['Rubrik Dini', 'Azhari', 'Bahasa Arab', 'Pentaksiran'],
+  },
+
+  // 4. AI UNTUK HEM & SAHSIAH
+  {
+    id: 'pr-hem-1',
+    title: 'SOP Komunikasi Krisis & Isu Tular Media',
+    category: 'HEM',
+    description: 'Panduan tindak balas pantas (Golden Hour) merangka kenyataan rasmi, komunikasi ibu bapa dan pengurusan krisis sekiranya berlaku isu tular media sosial.',
+    prompt: `Sebagai Perunding Komunikasi Krisis Pendidikan, rangka Pelan Tindak Balas Pantas (Rapid Response SOP) untuk Pengetua/Guru Besar sekiranya berlaku isu disiplin, kebajikan atau aduan tular di media sosial:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Ringkasan Senario Krisis: [cth. Aduan berkaitan fasiliti/makanan asrama atau salah faham tindakan disiplin dimuat naik ke media sosial]
+
+Hasilkan panduan lengkap 4 fasa:
+1. Fasa 1: Pengesahan Fakta & Kawalan Dalaman (Jam 0 – 2): Langkah siasatan pantas, perlindungan privasi murid/guru dan laporan awal kepada PPD/JPN/Lembaga Pengelola.
+2. Fasa 2: Kenyataan Rasmi & Mesej WhatsApp Ibu Bapa (Jam 2 – 4): Draf kenyataan rasmi yang tenang, empati, berfakta dan bertanggungjawab tanpa mengeruhkan keadaan.
+3. Fasa 3: Sesi Libat Urus & Penyelesaian (Hari 1 – 3): Protokol pertemuan harmoni bersama ibu bapa dan pihak terlibat.
+4. Fasa 4: PemulihanKepercayaan & Tarbiah (Minggu 1 – 2): Langkah penambahbaikan SOP dan pemulihan imej institusi.`,
+    usageInstructions: 'Sediakan dalam fail pengurusan krisis PGB dan PK HEM sebagai rujukan kecemasan.',
+    tags: ['SOP Krisis', 'Isu Tular', 'Komunikasi Ibu Bapa', 'HEM'],
+  },
+  {
+    id: 'pr-hem-2',
+    title: 'Modul Tarbiah & Biah Solehah Asrama',
+    category: 'HEM',
+    description: 'Merangka modul pembangunan sahsiah penghuni asrama, budaya usrah kepemimpinan pengawas/naqib, dan kempen Biah Solehah sepanjang tahun.',
+    prompt: `Anda ialah Pakar Pembangunan Sahsiah & Tarbiah Sekolah Islam Berasrama.
+Bina satu Modul Tahunan "Tarbiah & Biah Solehah Asrama" serta Kepimpinan Naqib/Pengawas untuk:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Sasaran: [Penghuni Asrama Putera & Puteri / Barisan Kepimpinan Murid]
+- Fokus Sahsiah: [cth. Budaya Hormat-Menghormati, Sifar Buli, Cinta Masjid, & Adab Sesama Rakan]
+
+Sila sediakan:
+1. Kerangka Konsep "Biah Solehah" (Persekitaran Kondusif Berteraskan Iman & Ukhuwah).
+2. Takwim Aktiviti Tarbiah Bulanan & Mingguan (Usrah Nuqaba', Kuliah Maghrib Berfokus, Qiamullail Perdana, Kempen Sahsiah Mulia).
+3. Modul Pengesanan Awal Emosi & Sokongan Rakan Sebaya (Sistem Buddy/Mentor Asrama bagi mengelakkan tekanan emosi dan buli).
+4. Piagam Adab Penghuni Asrama & Sistem Pengiktirafan Dorm Terbaik / Tokoh Sahsiah Terpuji.`,
+    usageInstructions: 'Gunakan bersama Badan Dakwah & Rohani (BADAR), Lembaga Pengawas, Warden dan Unit Bimbingan Kaunseling.',
+    tags: ['Biah Solehah', 'Tarbiah Asrama', 'Sahsiah', 'Naqib'],
+  },
+  {
+    id: 'pr-hem-3',
+    title: 'Analisis Kehadiran & Amaran Awal Ponteng',
+    category: 'HEM',
+    description: 'Menganalisis corak ketidakhadiran murid, mengenal pasti punca risiko keciciran awal, dan menjana surat/mesej intervensi kaunseling berhemah.',
+    prompt: `Bertindak sebagai Pakar Pengurusan Hal Ehwal Murid (HEM) & Bimbingan Kaunseling.
+Bantu saya merangka sistem Analisis Kehadiran & Intervensi Amaran Awal Ponteng bagi:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Peratus Kehadiran Semasa: [cth. 91.5% berbanding sasaran 96.0%]
+- Pola Ketidakhadiran Dikesan: [cth. Kerap tidak hadir pada hari Isnin/Jumaat atau selepas cuti penggal bagi murid tingkatan menengah atas]
+
+Sila hasilkan:
+1. Matriks Pengesanan Awal Risiko (Early Warning System): Kategori Hijau, Kuning (3 hari berturut/berkala), Jingga, dan Merah.
+2. Pelan Intervensi Bersepadu (Cakna Kehadiran): Kerjasama Guru Kelas, Guru Kaunseling, PK HEM dan PIBG.
+3. Draf Mesej / Surat Prihatin kepada Ibu Bapa (Nada empati dan ingin membantu, bukan sekadar menghukum).
+4. Borang Temu Bual Kaunseling Punca Ketidakhadiran (Masalah emosi, kewangan, pengangkutan, atau motivasi akademik) beserta cadangan penyelesaian.`,
+    usageInstructions: 'Gunakan setiap hujung bulan selepas semakan data kehadiran APDM/SSDM untuk tindakan proaktif HEM.',
+    tags: ['Kehadiran Murid', 'Intervensi Ponteng', 'HEM', 'Kaunseling'],
+  },
+
+  // 5. AI UNTUK DATA & ANALITIK
+  {
+    id: 'pr-dat-1',
+    title: 'Analisis Sentimen Kaji Selidik Ibu Bapa PIBG',
+    category: 'Data & Analisis',
+    description: 'Menganalisis maklum balas terbuka Google Form ibu bapa (PIBG) secara pantas untuk mengenal pasti tahap kepuasan, kekuatan sekolah dan isu utama.',
+    prompt: `Bertindak sebagai Penganalisis Data Pendidikan & Perhubungan Komuniti PIBG.
+Berikut adalah ringkasan / maklum balas daripada borang kaji selidik ibu bapa (Google Form PIBG):
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Fokus Kaji Selidik: [cth. Maklum Balas Pengurusan Sekolah, Kurikulum, Kebajikan Asrama & Program PIBG]
+- Data / Maklum Balas Ibu Bapa: [Tampal senarai respons Google Form atau ringkasan isu di sini]
+
+Sila jalankan analisis komprehensif:
+1. Rumusan Sentimen Keseluruhan: Anggaran pecahan Positif, Neutral, dan Perlu Perhatian Segera.
+2. 3 Kekuatan Utama sekolah yang paling dihargai oleh ibu bapa.
+3. 3 Isu Utama (Pain Points) yang paling kerap dibangkitkan berserta punca masalah.
+4. Pelan Tindakan Segera (Quick Wins - 14 Hari) dan Pelan Jangka Sederhana untuk dibentangkan dalam Mesyuarat AJK PIBG.
+5. Draf Maklum Balas Rasmi Pengetua/Guru Besar kepada ibu bapa yang telus, profesional dan meyakinkan.`,
+    usageInstructions: 'Eksport jawapan Google Form ibu bapa atau masukkan isu utama di Studio Interaktif untuk menjana laporan PIBG.',
+    tags: ['Analisis Sentimen', 'PIBG', 'Google Form', 'Data Sekolah'],
+  },
+  {
+    id: 'pr-dat-2',
+    title: 'Sintesis Laporan Tahunan Sekolah Ahli',
+    category: 'Data & Analisis',
+    description: 'Merumus pencapaian akademik, kokurikulum, sahsiah dan kewangan sepanjang tahun kepada Laporan Tahunan Eksekutif yang kemas untuk Lembaga Pengelola & MPGBSIM.',
+    prompt: `Anda ialah Ketua Editor Laporan Eksekutif Pendidikan.
+Sintesis dan susun satu Laporan Tahunan Eksekutif Sekolah bagi sesi persekolahan semasa:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Sorotan Pencapaian Akademik & Tahfiz: [cth. GPS SPM meningkat kepada 2.45, 18 murid khatam 30 juzuk]
+- Sorotan Kokurikulum & Kemenjadian Murid: [cth. Johan Bahas Bahasa Arab Kebangsaan, 98% kehadiran tahunan]
+- Cabaran & Perancangan Tahun Hadapan: [cth. Menaik taraf fasiliti digital dan latihan AI untuk semua guru]
+
+Sila hasilkan dokumen Laporan Tahunan Eksekutif merangkumi:
+1. Perutusan Eksekutif Pengetua / Guru Besar.
+2. Papan Pemuka Pencapaian Utama (Key Highlights & KPI Dashboard dalam bentuk jadual ringkas).
+3. Analisis Pencapaian Mengikut 4 Bidang: Kurikulum & Tahfiz, Hal Ehwal Murid, Kokurikulum, dan Pentadbiran/Kewangan.
+4. Rumusan Beban Tugas Guru & Inisiatif Kebajikan Staf.
+5. Hala Tuju & Sasaran Strategik Tahun Hadapan.`,
+    usageInstructions: 'Sesuai untuk pembentangan Mesyuarat Agung PIBG, Lembaga Pengelola Sekolah (LPS) dan pelaporan MPGBSIM.',
+    tags: ['Laporan Tahunan', 'Sintesis Data', 'KPI Sekolah', 'Eksekutif'],
+  },
+  {
+    id: 'pr-dat-3',
+    title: 'Unjuran Enrolmen & Kapasiti Bilik Darjah',
+    category: 'Data & Analisis',
+    description: 'Menganalisis trend kemasukan murid, unjuran kapasiti kelas/asrama, dan pengagihan nisbah guru-murid secara optimum bagi sesi persekolahan baharu.',
+    prompt: `Bertindak sebagai Pakar Perancangan Data Enrolmen & Sumber Manusia Sekolah.
+Berdasarkan data semasa sekolah berikut:
+- Nama Sekolah: [Masukkan Nama Sekolah]
+- Enrolmen Semasa & Bilangan Kelas: [cth. 620 orang murid, 20 buah bilik darjah, 48 orang guru]
+- Trend Permohonan Kemasukan Baharu: [cth. 280 permohonan untuk 120 kekosongan Tingkatan 1 / Tahun 1]
+- Kekangan Semasa: [cth. Kapasiti bilik darjah maksimum 32 orang/kelas dan keperluan guru subjek Dini/Sains]
+
+Sila sediakan Laporan Unjuran Enrolmen & Kapasiti Sesi Akan Datang:
+1. Jadual Unjuran Enrolmen 3 Tahun & Kadar Penggunaan Bilik Darjah / Katil Asrama.
+2. Analisis Nisbah Guru-Murid & Pengiraan Optimum Agihan Waktu Mengajar Guru (mengelakkan lebihan beban tugas).
+3. Strategi Saringan Kemasukan Murid Baharu (Ujian Diagnostik Akademik, Bacaan Al-Quran & Temu Bual Sahsiah).
+4. Cadangan Pengoptimuman Ruang Fizikal & Belanjawan Mengurus Per Kapita.`,
+    usageInstructions: 'Gunakan semasa merancang pengambilan murid baharu dan penyusunan perjawatan guru tahun hadapan.',
+    tags: ['Unjuran Enrolmen', 'Kapasiti Kelas', 'Beban Tugas Guru', 'Analitik'],
   },
 ];
 
 export const AI_TOOLS_LIST: AIToolItem[] = [
   {
     id: 'tool-gemini',
-    name: 'Google Gemini for Education',
+    name: 'Gemini AI (Google Gemini)',
     category: 'Model Bahasa Raya (LLM)',
-    description: 'Model AI termaju Google dengan sokongan carian terkini dan pemprosesan dokumen panjang sehingga ribuan patah perkataan.',
+    description: 'Model AI pintar daripada Google dengan sokongan carian terkini, analisis imej serta pemprosesan dokumen panjang sehingga ribuan patah perkataan.',
     url: 'https://gemini.google.com',
     badge: 'Disyorkan',
     bestFor: 'Analisis laporan sekolah, sintesis pekeliling kementerian, dan penulisan teks rasmi bahasa Melayu.',
+    brandColor: 'from-blue-600 via-indigo-600 to-purple-600',
+  },
+  {
+    id: 'tool-chatgpt',
+    name: 'ChatGPT (OpenAI)',
+    category: 'Model Bahasa Raya (LLM)',
+    description: 'Pembantu AI perbualan paling meluas digunakan untuk penjanaan idea pengajaran, penulisan kertas kerja, surat rasmi dan terjemahan dwibahasa.',
+    url: 'https://chatgpt.com',
+    badge: 'Paling Popular',
+    bestFor: 'Merangka RPH, teks ucapan perhimpunan, kertas kerja program sekolah, dan latihan pengukuhan murid.',
+    brandColor: 'from-emerald-600 to-teal-700',
+  },
+  {
+    id: 'tool-perplexity',
+    name: 'Perplexity AI',
+    category: 'Enjin Carian Pintar & Rujukan',
+    description: 'Enjin carian berasaskan AI yang memberikan jawapan komprehensif berserta pautan sumber rujukan sahih dan fakta masa nyata.',
+    url: 'https://www.perplexity.ai',
+    badge: 'Carian Pantas',
+    bestFor: 'Mencari fakta perundangan, data perangkaan pendidikan semasa dan kajian ilmiah terkini berserta sitasi.',
+    brandColor: 'from-cyan-700 to-slate-900',
+  },
+  {
+    id: 'tool-claude',
+    name: 'Claude AI (Anthropic)',
+    category: 'Model Bahasa & Penulisan Halus',
+    description: 'Model AI beretika tinggi yang terkenal dengan gaya bahasa penulisan semula jadi, analisis dokumen PDF tebal dan penaakulan mendalam.',
+    url: 'https://claude.ai',
+    badge: 'Penulisan Terbaik',
+    bestFor: 'Menyunting buku panduan sekolah, merumus dokumen dasar tebal, dan penulisan artikel ilmiah/tarbiah yang bernas.',
+    brandColor: 'from-amber-700 to-orange-800',
+  },
+  {
+    id: 'tool-copilot',
+    name: 'MS Copilot (Microsoft)',
+    category: 'Pembantu Produktiviti & Web AI',
+    description: 'Pembantu AI pintar daripada Microsoft yang berintegrasi rapat dengan ekosistem carian web Bing serta aplikasi pejabat (Word, Excel, PowerPoint).',
+    url: 'https://copilot.microsoft.com',
+    badge: 'Ekosistem Microsoft',
+    bestFor: 'Membantu pentadbir dan guru merangka dokumen pengurusan, jadual data, serta carian maklumat bersepadu.',
+    brandColor: 'from-sky-500 via-blue-600 to-indigo-700',
+  },
+  {
+    id: 'tool-conker',
+    name: 'Conker AI (Bina Kuiz)',
+    category: 'Pembina Kuiz & Pentaksiran PdP',
+    description: 'Platform AI khusus untuk guru menjana kuiz interaktif, soalan aneka pilihan (MCQ) dan lembaran pentaksiran bilik darjah dalam beberapa saat.',
+    url: 'https://www.conker.ai',
+    badge: 'Bina Kuiz Guru',
+    bestFor: 'Membina kuiz pantas mengikut topik kurikulum, petikan teks buku, dan eksport terus ke Google Forms atau Canvas.',
+    brandColor: 'from-orange-500 to-rose-600',
+  },
+  {
+    id: 'tool-suno',
+    name: 'Suno AI',
+    category: 'Penjana Lagu & Audio Pendidikan',
+    description: 'Platform AI kreatif yang menghasilkan lagu pendidikan, nasyid motivasi dan audio muzik lengkap dengan vokal hanya daripada lirik atau tajuk.',
+    url: 'https://suno.com',
+    badge: 'Audio & Lagu PdP',
+    bestFor: 'Mencipta lagu hafalan sifir, lagu tema kem kepimpinan sekolah, nasyid motivasi murid dan muzik latar montaj.',
+    brandColor: 'from-fuchsia-600 via-pink-600 to-amber-500',
+  },
+  {
+    id: 'tool-pixlr',
+    name: 'Pixlr AI',
+    category: 'Suntingan Foto & Reka Grafik AI',
+    description: 'Editor foto dan grafik berasaskan web dengan fungsi AI pantas seperti buang latar belakang (Remove BG), AI Generative Fill dan penambahbaikan gambar.',
+    url: 'https://pixlr.com',
+    badge: 'Suntingan Gambar',
+    bestFor: 'Menyunting gambar aktiviti murid, membuang latar belakang gambar profil guru/PGB, dan mereka bentuk grafik hebahan sekolah.',
+    brandColor: 'from-violet-600 via-fuchsia-600 to-cyan-500',
+  },
+  {
+    id: 'tool-bing-image',
+    name: 'Bing Image Creator',
+    category: 'Penjana Imej & Ilustrasi AI',
+    description: 'Alatan penjanaan imej AI percuma dikuasakan oleh DALL·E (Microsoft) untuk menghasilkan ilustrasi visual, poster latar dan grafik kreatif daripada teks.',
+    url: 'https://www.bing.com/images/create',
+    badge: 'Jana Imej AI',
+    bestFor: 'Menjana ilustrasi bahan bantu mengajar (BBM), gambar kulit buku program, dan visual bercerita untuk murid.',
+    brandColor: 'from-blue-600 to-teal-500',
   },
   {
     id: 'tool-notebooklm',
@@ -690,15 +964,7 @@ export const AI_TOOLS_LIST: AIToolItem[] = [
     url: 'https://notebooklm.google.com',
     badge: 'Eksklusif Pengetua',
     bestFor: 'Membaca dan menyoal isi kandungan buku dasar kurikulum, teks perlembagaan dan pelan strategik sekolah.',
-  },
-  {
-    id: 'tool-perplexity',
-    name: 'Perplexity AI',
-    category: 'Enjin Carian Pintar & Rujukan',
-    description: 'Enjin carian berasaskan AI yang memberikan jawapan komprehensif berserta pautan sumber rujukan sahih.',
-    url: 'https://www.perplexity.ai',
-    badge: 'Carian Pantas',
-    bestFor: 'Mencari fakta perundangan, data perangkaan pendidikan semasa dan kajian ilmiah terkini.',
+    brandColor: 'from-slate-800 to-emerald-700',
   },
   {
     id: 'tool-canva',
@@ -708,6 +974,7 @@ export const AI_TOOLS_LIST: AIToolItem[] = [
     url: 'https://www.canva.com/education/',
     badge: 'Media & Grafik',
     bestFor: 'Penghasilan poster hebahan AGM, sijil penghargaan murid dan montaj video ringkas aktiviti sekolah.',
+    brandColor: 'from-cyan-500 via-blue-500 to-purple-600',
   },
   {
     id: 'tool-gamma',
@@ -717,5 +984,7 @@ export const AI_TOOLS_LIST: AIToolItem[] = [
     url: 'https://gamma.app',
     badge: 'Produktiviti',
     bestFor: 'Menyediakan slaid pembentangan taklimat mesyuarat pimpinan dan modul kursus guru.',
+    brandColor: 'from-indigo-600 to-violet-700',
   },
 ];
+

@@ -310,6 +310,8 @@ export interface AIToolItem {
   url: string;
   badge: string;
   bestFor: string;
+  logoUrl?: string;
+  brandColor?: string;
 }
 
 export interface LeaderProfile {
