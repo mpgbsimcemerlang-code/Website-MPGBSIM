@@ -35,6 +35,9 @@ export const PortalHeader: React.FC = () => {
     setPortalTab,
     notifications,
     unreadNotificationsCount,
+    totalUnreadChatCount,
+    unreadPersonalChatCount,
+    openDirectChatWithSchool,
     markNotificationRead,
     markAllNotificationsRead,
     logoutPortal,
@@ -45,6 +48,8 @@ export const PortalHeader: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  const unreadChatBadgeCount = unreadPersonalChatCount > 0 ? unreadPersonalChatCount : totalUnreadChatCount;
 
   const navItems: { id: PortalTab; label: string; icon: any }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: User },
@@ -132,9 +137,11 @@ export const PortalHeader: React.FC = () => {
             {/* Live Chat Quick Button */}
             <button
               onClick={() => setPortalTab('sembang-live')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
+              className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
                 portalTab === 'sembang-live'
                   ? 'bg-teal-700 text-white border-teal-500'
+                  : unreadChatBadgeCount > 0
+                  ? 'bg-rose-950/90 hover:bg-rose-900 text-white border-rose-500 shadow-md'
                   : 'bg-slate-800 hover:bg-teal-900/80 text-emerald-300 hover:text-white border-slate-700'
               }`}
               title="Ruang Sembang Live Semua PGB"
@@ -142,6 +149,11 @@ export const PortalHeader: React.FC = () => {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <MessageSquare className="w-4 h-4 text-amber-400" />
               <span className="hidden md:inline">Sembang Live</span>
+              {unreadChatBadgeCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black tracking-wide animate-pulse">
+                  {unreadChatBadgeCount} mesej baharu
+                </span>
+              )}
             </button>
 
             {/* Global Search Button */}
@@ -164,7 +176,7 @@ export const PortalHeader: React.FC = () => {
                   setIsNotifOpen(!isNotifOpen);
                   setIsUserMenuOpen(false);
                 }}
-                className="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                className="relative p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors cursor-pointer"
                 title="Pusat Pemberitahuan"
               >
                 <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -186,7 +198,7 @@ export const PortalHeader: React.FC = () => {
                     {unreadNotificationsCount > 0 && (
                       <button
                         onClick={markAllNotificationsRead}
-                        className="text-[11px] text-amber-300 hover:underline font-medium"
+                        className="text-[11px] text-amber-300 hover:underline font-medium cursor-pointer"
                       >
                         Tanda Semua Dibaca
                       </button>
@@ -201,7 +213,11 @@ export const PortalHeader: React.FC = () => {
                           key={notif.id}
                           onClick={() => {
                             markNotificationRead(notif.id);
-                            if (notif.linkTab) {
+                            if (notif.type === 'chat' || notif.chatChannelId || notif.senderSchoolCode) {
+                              openDirectChatWithSchool(
+                                notif.senderSchoolCode || notif.chatChannelId || ''
+                              );
+                            } else if (notif.linkTab) {
                               setPortalTab(notif.linkTab as PortalTab);
                             }
                             setIsNotifOpen(false);
@@ -212,11 +228,22 @@ export const PortalHeader: React.FC = () => {
                         >
                           <div
                             className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                              !notif.read ? 'bg-amber-500' : 'bg-transparent'
+                              !notif.read
+                                ? notif.type === 'chat'
+                                  ? 'bg-rose-500 animate-ping'
+                                  : 'bg-amber-500'
+                                : 'bg-transparent'
                             }`}
                           />
-                          <div className="flex-1">
-                            <div className="font-semibold text-slate-900">{notif.title}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="font-semibold text-slate-900 truncate">{notif.title}</div>
+                              {!notif.read && notif.type === 'chat' && (
+                                <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black shrink-0">
+                                  Baharu
+                                </span>
+                              )}
+                            </div>
                             <p className="text-slate-600 text-[11px] mt-0.5 line-clamp-2">{notif.message}</p>
                             <span className="text-[10px] text-slate-400 mt-1 block">
                               {new Date(notif.date).toLocaleDateString('ms-MY', {
@@ -354,14 +381,19 @@ export const PortalHeader: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => setPortalTab(item.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
                     isActive
                       ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
                   <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-slate-950' : 'text-amber-400'}`} />
-                  {item.label}
+                  <span>{item.label}</span>
+                  {item.id === 'sembang-live' && unreadChatBadgeCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black animate-pulse">
+                      {unreadChatBadgeCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -386,12 +418,19 @@ export const PortalHeader: React.FC = () => {
                     setPortalTab(item.id);
                     setIsMobileNavOpen(false);
                   }}
-                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-left transition-colors ${
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 text-left transition-colors ${
                     isActive ? 'bg-amber-500 text-slate-950 font-bold' : 'bg-slate-900 text-slate-200 hover:bg-slate-800'
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {item.id === 'sembang-live' && unreadChatBadgeCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black shrink-0 animate-pulse">
+                      {unreadChatBadgeCount}
+                    </span>
+                  )}
                 </button>
               );
             })}

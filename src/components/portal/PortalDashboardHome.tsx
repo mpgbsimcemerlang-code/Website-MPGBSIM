@@ -57,6 +57,10 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
     documents,
     bestPractices,
     registeredProgramIds,
+    totalUnreadChatCount,
+    unreadPersonalChatCount,
+    unreadPersonalSenders,
+    openDirectChatWithSchool,
   } = useMemberPortal();
 
   const { siteData } = useAdminContent();
@@ -681,29 +685,54 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
       {/* Live Chat PGB Quick-Launch Banner */}
       <div className="bg-slate-900 text-white rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start sm:items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-teal-800 border border-teal-600/50 text-amber-400 flex items-center justify-center shrink-0">
+          <div className="relative w-12 h-12 rounded-2xl bg-teal-800 border border-teal-600/50 text-amber-400 flex items-center justify-center shrink-0">
             <MessageSquare className="w-6 h-6" />
+            {totalUnreadChatCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center border-2 border-slate-900 animate-bounce">
+                {totalUnreadChatCount}
+              </span>
+            )}
           </div>
           <div>
-            <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-400 font-bold">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               <span>Rangkaian Interaksi Masa Nyata (Live Chat)</span>
+              {totalUnreadChatCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black animate-pulse">
+                  {totalUnreadChatCount} mesej baharu
+                </span>
+              )}
             </div>
             <h2 className="text-base sm:text-lg font-black text-white mt-0.5">
               Ruang Sembang Langsung Semua PGB MPGBSIM
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
-              Berinteraksi secara langsung bersama rakan Pengetua & Guru Besar seluruh Malaysia mengikut saluran topik atau mesej terus (1-ke-1).
+              {unreadPersonalSenders.length > 0
+                ? `Mesej peribadi baharu daripada ${unreadPersonalSenders[0].senderName} (${unreadPersonalSenders[0].senderSchool}): "${unreadPersonalSenders[0].lastMessageText}"`
+                : 'Berinteraksi secara langsung bersama rakan Pengetua & Guru Besar seluruh Malaysia mengikut saluran topik atau mesej terus (1-ke-1).'}
             </p>
           </div>
         </div>
         <button
           type="button"
-          onClick={() => setPortalTab('sembang-live')}
+          onClick={() => {
+            if (unreadPersonalSenders.length > 0) {
+              openDirectChatWithSchool(
+                unreadPersonalSenders[0].senderSchoolCode,
+                unreadPersonalSenders[0].channelId
+              );
+            } else {
+              setPortalTab('sembang-live');
+            }
+          }}
           className="px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shrink-0 shadow-md transition cursor-pointer"
         >
           <MessageSquare className="w-4 h-4" />
-          <span>Masuk Ruang Sembang Live →</span>
+          <span>
+            {totalUnreadChatCount > 0
+              ? `Buka Sembang (${totalUnreadChatCount} mesej baharu) →`
+              : 'Masuk Ruang Sembang Live →'}
+          </span>
         </button>
       </div>
 
@@ -719,17 +748,38 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           {quickAccessCards.map((card, idx) => {
             const Icon = card.icon;
+            const isLiveChatCard = card.id === 'sembang-live';
             return (
               <button
                 key={idx}
+                type="button"
                 onClick={() => {
-                  setPortalTab(card.id);
-                  if (card.subTab) {
-                    setPortalSubTab(card.subTab);
+                  if (isLiveChatCard && unreadPersonalSenders.length > 0) {
+                    openDirectChatWithSchool(
+                      unreadPersonalSenders[0].senderSchoolCode,
+                      unreadPersonalSenders[0].channelId
+                    );
+                  } else {
+                    if (card.subTab) {
+                      setPortalSubTab(card.subTab);
+                    }
+                    setPortalTab(card.id);
                   }
+                  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                  document.documentElement.scrollTop = 0;
+                  document.body.scrollTop = 0;
                 }}
-                className="group p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-amber-400/50 shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between"
+                className={`group relative p-4 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 border ${
+                  isLiveChatCard && totalUnreadChatCount > 0
+                    ? 'border-rose-400 ring-2 ring-rose-500/20'
+                    : 'border-slate-200 hover:border-amber-400/50'
+                } shadow-xs hover:shadow-md transition-all text-left flex flex-col justify-between cursor-pointer`}
               >
+                {isLiveChatCard && totalUnreadChatCount > 0 && (
+                  <span className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black shadow-xs animate-pulse">
+                    {totalUnreadChatCount} mesej baharu
+                  </span>
+                )}
                 <div>
                   <div
                     className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br ${card.color} text-white flex items-center justify-center shadow-xs mb-3 group-hover:scale-105 transition-transform`}
@@ -740,11 +790,13 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
                     {card.title}
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                    {card.sub}
+                    {isLiveChatCard && unreadPersonalChatCount > 0
+                      ? `${unreadPersonalChatCount} mesej peribadi PGB belum dibaca`
+                      : card.sub}
                   </p>
                 </div>
                 <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-teal-800 group-hover:text-amber-600">
-                  <span>Buka Modul</span>
+                  <span>{isLiveChatCard && totalUnreadChatCount > 0 ? 'Baca Mesej' : 'Buka Modul'}</span>
                   <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </button>

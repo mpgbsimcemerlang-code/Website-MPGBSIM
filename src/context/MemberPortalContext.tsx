@@ -14,6 +14,7 @@ import {
   NewsItem,
   FeePaymentRecord,
   FeeCategory,
+  PGBChatMessage,
 } from '../types';
 import {
   sortNewsByPublishedDate,
@@ -64,6 +65,28 @@ import {
   saveToIndexedDB,
   loadFromIndexedDB,
 } from '../utils/storage';
+
+export function normalizeSchoolCode(code?: string): string {
+  if (!code) return '';
+  return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+export function getDmChannelId(codeA: string, codeB: string): string {
+  const cleanA = normalizeSchoolCode(codeA) || 'PGB';
+  const cleanB = normalizeSchoolCode(codeB) || 'PGB';
+  return `dm_${[cleanA, cleanB].sort().join('_')}`;
+}
+
+export interface UnreadPersonalSenderSummary {
+  channelId: string;
+  senderName: string;
+  senderSchool: string;
+  senderSchoolCode: string;
+  senderAvatar?: string;
+  count: number;
+  latestText: string;
+  latestAt: string;
+}
 
 export type PortalTab =
   | 'dashboard'
@@ -183,6 +206,18 @@ interface MemberPortalContextType {
   unreadNotificationsCount: number;
   isNotificationOpen: boolean;
   setIsNotificationOpen: (open: boolean) => void;
+
+  // Live Chat Unread & Personal DM Notification metrics
+  unreadChatByChannel: Record<string, number>;
+  unreadPersonalChatCount: number;
+  totalUnreadChatCount: number;
+  unreadPersonalSenders: UnreadPersonalSenderSummary[];
+  targetChatChannelId: string | null;
+  targetChatPeerSchoolCode: string | null;
+  openDirectChatWithSchool: (schoolCodeOrChannelId: string) => void;
+  clearTargetChatNavigation: () => void;
+  markChatChannelAsRead: (channelId: string) => void;
+  sendPortalChatNotification: (notif: PortalNotification) => Promise<void>;
 
   // Fee Payment Actions
   recordFeePayment: (
@@ -497,10 +532,19 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     return null;
   });
 
-  const [portalTab, setPortalTab] = useState<PortalTab>('dashboard');
+  const [portalTab, setPortalTabState] = useState<PortalTab>('dashboard');
   const [portalSubTab, setPortalSubTab] = useState<string>('pgb');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  const setPortalTab = React.useCallback((tab: PortalTab) => {
+    setPortalTabState(tab);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }, []);
 
   // Registered programs for logged in user
   const [registeredProgramIds, setRegisteredProgramIds] = useState<string[]>(() => {
@@ -1166,6 +1210,33 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Fee payments listener error:', e);
     }
 
+    // 5. Live Chat PGB Messages (for real-time personal DM notifications & unread badges across the entire portal)
+    try {
+      const unsubChat = onSnapshot(
+        collection(db, 'pgbChatMessages'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: PGBChatMessage[] = [];
+            snapshot.forEach((docSnap) => {
+              const d = docSnap.data() as PGBChatMessage;
+              if (d && d.text !== undefined) {
+                list.push({ ...d, id: d.id || docSnap.id });
+              }
+            });
+            list.sort(
+              (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+            );
+            setPortalChatMessages(list);
+            safeLocalStorageSet('mpgbsim_pgb_live_chat_v1', JSON.stringify(list.slice(-250)));
+          }
+        },
+        (err) => handlePortalListenerError('pgbChatMessages', err)
+      );
+      unsubscribes.push(unsubChat);
+    } catch (e) {
+      console.warn('Live chat messages listener error:', e);
+    }
+
     return () => {
       cleanupPortalListeners();
     };
@@ -1173,9 +1244,353 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const currentRole: UserRole = currentUser?.role || 'PUBLIC';
 
-  const unreadNotificationsCount = notifications.filter(
-    (n) => !n.read && (n.userId === 'all' || n.userId === currentUser?.uid)
-  ).length;
+  // --- LIVE CHAT PGB UNREAD & PERSONAL DM NOTIFICATION ENGINE ---
+  const [portalChatMessages, setPortalChatMessages] = useState<PGBChatMessage[]>(() => {
+    try {
+      const saved = safeLocalStorageGet('mpgbsim_pgb_live_chat_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [targetChatChannelId, setTargetChatChannelId] = useState<string | null>(null);
+  const [targetChatPeerSchoolCode, setTargetChatPeerSchoolCode] = useState<string | null>(null);
+
+  const mySchoolCodeRaw = React.useMemo(() => {
+    if (!currentUser) return '';
+    if (currentUser.schoolCode) return currentUser.schoolCode;
+    if (currentUser.membershipNo) {
+      return currentUser.membershipNo.replace(/^MPGB-\d{4}-/i, '');
+    }
+    const matched = registeredSchools.find(
+      (s) =>
+        (currentUser.schoolId && s.id === currentUser.schoolId) ||
+        (currentUser.school && s.name && s.name.toLowerCase().trim() === currentUser.school.toLowerCase().trim())
+    );
+    return matched?.code || currentUser.uid || '';
+  }, [currentUser, registeredSchools]);
+
+  const myCleanSchoolCode = React.useMemo(
+    () => normalizeSchoolCode(mySchoolCodeRaw),
+    [mySchoolCodeRaw]
+  );
+
+  const readStorageKey = React.useMemo(
+    () => `mpgbsim_pgb_chat_read_v1_${myCleanSchoolCode || currentUser?.uid || 'guest'}`,
+    [myCleanSchoolCode, currentUser?.uid]
+  );
+
+  const [chatReadState, setChatReadState] = useState<{
+    lastReadByChannel: Record<string, string>;
+    readMessageIds: string[];
+  }>({ lastReadByChannel: {}, readMessageIds: [] });
+
+  // Load per-PGB read state whenever logged-in PGB changes
+  useEffect(() => {
+    try {
+      const saved = safeLocalStorageGet(readStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setChatReadState({
+          lastReadByChannel: parsed?.lastReadByChannel || {},
+          readMessageIds: Array.isArray(parsed?.readMessageIds) ? parsed.readMessageIds : [],
+        });
+        return;
+      }
+    } catch {}
+    setChatReadState({ lastReadByChannel: {}, readMessageIds: [] });
+  }, [readStorageKey]);
+
+  // Listen to BroadcastChannel & storage events for instant multi-tab / same-tab chat & notification updates
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'mpgbsim_pgb_live_chat_v1' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) setPortalChatMessages(parsed);
+        } catch {}
+      } else if (e.key === readStorageKey && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setChatReadState({
+            lastReadByChannel: parsed?.lastReadByChannel || {},
+            readMessageIds: Array.isArray(parsed?.readMessageIds) ? parsed.readMessageIds : [],
+          });
+        } catch {}
+      } else if (e.key === STORAGE_KEYS.NOTIFICATIONS && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) setNotifications(parsed);
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
+      bc.onmessage = (ev) => {
+        const data = ev.data;
+        if (!data) return;
+        if (data.type === 'NEW_OR_UPDATED_MSG' && data.message) {
+          const incoming = data.message as PGBChatMessage;
+          setPortalChatMessages((prev) => {
+            const exists = prev.some((m) => m.id === incoming.id);
+            const next = exists
+              ? prev.map((m) => (m.id === incoming.id ? incoming : m))
+              : [...prev, incoming];
+            return next.sort(
+              (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+            );
+          });
+        } else if (data.type === 'DELETE_MSG' && data.id) {
+          setPortalChatMessages((prev) => prev.filter((m) => m.id !== data.id));
+        } else if (data.type === 'MARK_CHANNEL_READ' && data.channelId) {
+          const targetChannel = data.channelId as string;
+          const readerCode = normalizeSchoolCode(data.readerCode);
+          if (readerCode && readerCode === myCleanSchoolCode) {
+            const nowIso = data.readAt || new Date().toISOString();
+            setChatReadState((prev) => {
+              const next = {
+                lastReadByChannel: { ...prev.lastReadByChannel, [targetChannel]: nowIso },
+                readMessageIds: Array.from(
+                  new Set([...prev.readMessageIds, ...(data.messageIds || [])])
+                ),
+              };
+              safeLocalStorageSet(readStorageKey, JSON.stringify(next));
+              return next;
+            });
+          }
+          setPortalChatMessages((prev) =>
+            prev.map((m) => {
+              if (m.channelId !== targetChannel) return m;
+              const existingReadBy = Array.isArray(m.readBy) ? m.readBy : [];
+              const codeToAdd = data.readerCode || '';
+              if (!codeToAdd || existingReadBy.includes(codeToAdd)) return m;
+              return { ...m, readBy: [...existingReadBy, codeToAdd] };
+            })
+          );
+        } else if (data.type === 'NEW_CHAT_NOTIFICATION' && data.notification) {
+          const incomingNotif = data.notification as PortalNotification;
+          setNotifications((prev) => {
+            if (prev.some((n) => n.id === incomingNotif.id)) return prev;
+            return [incomingNotif, ...prev];
+          });
+        }
+      };
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      if (bc) bc.close();
+    };
+  }, [readStorageKey, myCleanSchoolCode]);
+
+  const isChatMessageSentByMe = React.useCallback(
+    (msg: PGBChatMessage): boolean => {
+      if (!currentUser) return false;
+      if (msg.senderId && msg.senderId === currentUser.uid) return true;
+      const msgSenderClean = normalizeSchoolCode(msg.senderSchoolCode);
+      if (myCleanSchoolCode && msgSenderClean && msgSenderClean === myCleanSchoolCode) return true;
+      return false;
+    },
+    [currentUser, myCleanSchoolCode]
+  );
+
+  const isChatMessageReadByMe = React.useCallback(
+    (msg: PGBChatMessage): boolean => {
+      if (!currentUser) return true;
+      if (msg.id?.startsWith('msg-seed-')) return true;
+      if (isChatMessageSentByMe(msg)) return true;
+
+      if (Array.isArray(msg.readBy)) {
+        if (currentUser.uid && msg.readBy.includes(currentUser.uid)) return true;
+        if (
+          myCleanSchoolCode &&
+          msg.readBy.some((r) => normalizeSchoolCode(r) === myCleanSchoolCode)
+        ) {
+          return true;
+        }
+      }
+
+      if (chatReadState.readMessageIds.includes(msg.id)) return true;
+
+      const lastReadIso = chatReadState.lastReadByChannel[msg.channelId];
+      if (lastReadIso && msg.createdAt) {
+        if (new Date(msg.createdAt).getTime() <= new Date(lastReadIso).getTime()) {
+          return true;
+        }
+      }
+
+      return false;
+    },
+    [currentUser, myCleanSchoolCode, isChatMessageSentByMe, chatReadState]
+  );
+
+  const isPersonalDmForMe = React.useCallback(
+    (msg: PGBChatMessage): boolean => {
+      if (!currentUser || !myCleanSchoolCode) return false;
+      if (!msg.channelId?.startsWith('dm_')) return false;
+      if (isChatMessageSentByMe(msg)) return false;
+
+      if (msg.recipientSchoolCode) {
+        if (normalizeSchoolCode(msg.recipientSchoolCode) === myCleanSchoolCode) {
+          return true;
+        }
+      }
+
+      const parts = msg.channelId.split('_').slice(1);
+      return parts.includes(myCleanSchoolCode);
+    },
+    [currentUser, myCleanSchoolCode, isChatMessageSentByMe]
+  );
+
+  const unreadChatByChannel = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (!currentUser) return counts;
+
+    portalChatMessages.forEach((msg) => {
+      if (!msg || !msg.channelId) return;
+      if (msg.channelId.startsWith('dm_')) {
+        if (isPersonalDmForMe(msg) && !isChatMessageReadByMe(msg)) {
+          counts[msg.channelId] = (counts[msg.channelId] || 0) + 1;
+        }
+      } else {
+        if (!isChatMessageSentByMe(msg) && !isChatMessageReadByMe(msg)) {
+          counts[msg.channelId] = (counts[msg.channelId] || 0) + 1;
+        }
+      }
+    });
+
+    return counts;
+  }, [portalChatMessages, currentUser, isPersonalDmForMe, isChatMessageReadByMe, isChatMessageSentByMe]);
+
+  const unreadPersonalSenders = React.useMemo<UnreadPersonalSenderSummary[]>(() => {
+    if (!currentUser) return [];
+    const map = new Map<string, UnreadPersonalSenderSummary>();
+
+    portalChatMessages.forEach((msg) => {
+      if (!msg || !msg.channelId?.startsWith('dm_')) return;
+      if (!isPersonalDmForMe(msg) || isChatMessageReadByMe(msg)) return;
+
+      const existing = map.get(msg.channelId);
+      const senderCode = msg.senderSchoolCode || '';
+      if (!existing) {
+        map.set(msg.channelId, {
+          channelId: msg.channelId,
+          senderName: msg.senderName || 'Pengetua / Guru Besar',
+          senderSchool: msg.senderSchool || 'Sekolah Ahli MPGBSIM',
+          senderSchoolCode: senderCode,
+          senderAvatar: msg.senderAvatar,
+          count: 1,
+          latestText: msg.text || 'Menghantar mesej baharu',
+          latestAt: msg.createdAt || new Date().toISOString(),
+        });
+      } else {
+        existing.count += 1;
+        if (new Date(msg.createdAt || 0).getTime() >= new Date(existing.latestAt || 0).getTime()) {
+          existing.latestText = msg.text || existing.latestText;
+          existing.latestAt = msg.createdAt || existing.latestAt;
+          existing.senderName = msg.senderName || existing.senderName;
+          existing.senderSchool = msg.senderSchool || existing.senderSchool;
+          if (msg.senderAvatar) existing.senderAvatar = msg.senderAvatar;
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime()
+    );
+  }, [portalChatMessages, currentUser, isPersonalDmForMe, isChatMessageReadByMe]);
+
+  const unreadPersonalChatCount = React.useMemo(
+    () => unreadPersonalSenders.reduce((sum, item) => sum + item.count, 0),
+    [unreadPersonalSenders]
+  );
+
+  const totalUnreadChatCount = React.useMemo(
+    () => Object.values(unreadChatByChannel).reduce((sum, c) => sum + c, 0),
+    [unreadChatByChannel]
+  );
+
+  // Filter notifications for the current PGB and inject live unread personal chat notifications
+  // When a personal chat is opened and read, its unreadPersonalSenders entry disappears and any stored notification is marked read!
+  const visibleNotifications = React.useMemo<PortalNotification[]>(() => {
+    const unreadDmChannels = new Set(unreadPersonalSenders.map((s) => s.channelId));
+
+    const filteredStored = notifications
+      .filter((n) => {
+        if (n.recipientSchoolCode) {
+          return Boolean(
+            myCleanSchoolCode &&
+              normalizeSchoolCode(n.recipientSchoolCode) === myCleanSchoolCode
+          );
+        }
+        if (n.type === 'chat' && n.userId && n.userId !== 'all') {
+          return (
+            n.userId === currentUser?.uid ||
+            Boolean(myCleanSchoolCode && normalizeSchoolCode(n.userId) === myCleanSchoolCode)
+          );
+        }
+        return (
+          n.userId === 'all' ||
+          n.userId === currentUser?.uid ||
+          Boolean(myCleanSchoolCode && normalizeSchoolCode(n.userId) === myCleanSchoolCode)
+        );
+      })
+      .map((n) => {
+        // If this stored notification is for a chat channel that has already been opened and read, ensure it reflects read: true
+        if (
+          (n.type === 'chat' || n.chatChannelId) &&
+          n.chatChannelId &&
+          !unreadDmChannels.has(n.chatChannelId) &&
+          (chatReadState.lastReadByChannel[n.chatChannelId] || !unreadChatByChannel[n.chatChannelId])
+        ) {
+          return { ...n, read: true };
+        }
+        return n;
+      });
+
+    // Synthesize live unread notifications for any personal DM sender so the PGB is guaranteed to see "X mesej baharu" in their portal bell
+    const liveChatNotifs: PortalNotification[] = unreadPersonalSenders.map((sender) => ({
+      id: `live-dm-notif-${sender.channelId}`,
+      userId: mySchoolCodeRaw || currentUser?.uid || 'member',
+      recipientSchoolCode: mySchoolCodeRaw,
+      senderSchoolCode: sender.senderSchoolCode,
+      senderName: sender.senderName,
+      senderSchool: sender.senderSchool,
+      chatChannelId: sender.channelId,
+      title: `Mesej Peribadi PGB (${sender.count} mesej baharu)`,
+      message: `${sender.senderName} (${sender.senderSchool}): "${sender.latestText}"`,
+      type: 'chat',
+      date: sender.latestAt,
+      read: false,
+      linkTab: 'sembang-live',
+    }));
+
+    // Avoid duplicating stored notifications for the same unread DM channel
+    const nonDuplicateStored = filteredStored.filter(
+      (n) => !(n.chatChannelId && unreadDmChannels.has(n.chatChannelId))
+    );
+
+    return [...liveChatNotifs, ...nonDuplicateStored];
+  }, [
+    notifications,
+    unreadPersonalSenders,
+    myCleanSchoolCode,
+    mySchoolCodeRaw,
+    currentUser?.uid,
+    chatReadState.lastReadByChannel,
+    unreadChatByChannel,
+  ]);
+
+  const unreadNotificationsCount = React.useMemo(
+    () => visibleNotifications.filter((n) => !n.read).length,
+    [visibleNotifications]
+  );
 
   const recordAuditLog = (action: string, content: string) => {
     const newLog: AuditLogItem = {
@@ -2452,14 +2867,213 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {}
   };
 
+  const markChatChannelAsRead = React.useCallback(
+    (channelId: string) => {
+      if (!channelId || !currentUser) return;
+      const nowIso = new Date().toISOString();
+      const readerCode = myCleanSchoolCode || currentUser.uid;
+
+      // Collect all message IDs in this channel so we mark them read locally and in Firestore
+      const channelMsgIds: string[] = [];
+      const unreadMsgsToSync: PGBChatMessage[] = [];
+
+      portalChatMessages.forEach((m) => {
+        if (m.channelId === channelId) {
+          channelMsgIds.push(m.id);
+          const alreadyHasReader =
+            Array.isArray(m.readBy) &&
+            (m.readBy.some((r) => normalizeSchoolCode(r) === myCleanSchoolCode) ||
+              (currentUser.uid && m.readBy.includes(currentUser.uid)));
+          if (!alreadyHasReader && !m.id.startsWith('msg-seed-')) {
+            unreadMsgsToSync.push(m);
+          }
+        }
+      });
+
+      // 1. Update per-user read state in React & localStorage
+      setChatReadState((prev) => {
+        const mergedIds = Array.from(new Set([...prev.readMessageIds, ...channelMsgIds]));
+        const next = {
+          lastReadByChannel: {
+            ...prev.lastReadByChannel,
+            [channelId]: nowIso,
+          },
+          readMessageIds: mergedIds.slice(-500),
+        };
+        safeLocalStorageSet(readStorageKey, JSON.stringify(next));
+        return next;
+      });
+
+      // 2. Update portalChatMessages readBy array in React & localStorage
+      if (unreadMsgsToSync.length > 0) {
+        setPortalChatMessages((prev) => {
+          const updated = prev.map((m) => {
+            if (m.channelId !== channelId) return m;
+            const currentReadBy = Array.isArray(m.readBy) ? m.readBy : [];
+            const nextReadBy = Array.from(
+              new Set([
+                ...currentReadBy,
+                ...(myCleanSchoolCode ? [myCleanSchoolCode] : []),
+                ...(mySchoolCodeRaw ? [mySchoolCodeRaw] : []),
+                ...(currentUser.uid ? [currentUser.uid] : []),
+              ])
+            );
+            return { ...m, readBy: nextReadBy };
+          });
+          safeLocalStorageSet('mpgbsim_pgb_live_chat_v1', JSON.stringify(updated.slice(-250)));
+          return updated;
+        });
+
+        // Sync readBy to Firestore pgbChatMessages
+        if (!isFirestoreQuotaExceeded()) {
+          unreadMsgsToSync.forEach((m) => {
+            const currentReadBy = Array.isArray(m.readBy) ? m.readBy : [];
+            const nextReadBy = Array.from(
+              new Set([
+                ...currentReadBy,
+                ...(myCleanSchoolCode ? [myCleanSchoolCode] : []),
+                ...(mySchoolCodeRaw ? [mySchoolCodeRaw] : []),
+                ...(currentUser.uid ? [currentUser.uid] : []),
+              ])
+            );
+            setDoc(
+              doc(db, 'pgbChatMessages', m.id),
+              { readBy: nextReadBy },
+              { merge: true }
+            ).catch(() => {});
+          });
+        }
+      }
+
+      // 3. Mark any matching PortalNotification for this chat channel as read (in state & Firestore)
+      setNotifications((prev) => {
+        let changed = false;
+        const next = prev.map((n) => {
+          if (
+            !n.read &&
+            (n.chatChannelId === channelId ||
+              (n.type === 'chat' &&
+                n.senderSchoolCode &&
+                getDmChannelId(myCleanSchoolCode, n.senderSchoolCode) === channelId))
+          ) {
+            changed = true;
+            if (!isFirestoreQuotaExceeded() && !n.id.startsWith('live-dm-notif-')) {
+              updateDoc(doc(db, 'notifications', n.id), { read: true }).catch(() => {});
+            }
+            return { ...n, read: true };
+          }
+          return n;
+        });
+        if (changed) {
+          safeLocalStorageSet(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(next));
+        }
+        return changed ? next : prev;
+      });
+
+      // 4. Broadcast MARK_CHANNEL_READ across tabs/components
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
+          bc.postMessage({
+            type: 'MARK_CHANNEL_READ',
+            channelId,
+            readerCode,
+            readerUid: currentUser.uid,
+            readAt: nowIso,
+            messageIds: channelMsgIds,
+          });
+          bc.close();
+        }
+      } catch {}
+    },
+    [currentUser, myCleanSchoolCode, mySchoolCodeRaw, portalChatMessages, readStorageKey]
+  );
+
+  const openDirectChatWithSchool = React.useCallback(
+    (schoolCodeOrChannelId: string) => {
+      if (!schoolCodeOrChannelId) {
+        setPortalTab('sembang-live');
+        return;
+      }
+      if (schoolCodeOrChannelId.startsWith('dm_')) {
+        setTargetChatChannelId(schoolCodeOrChannelId);
+        const parts = schoolCodeOrChannelId.split('_').slice(1);
+        const otherCode = parts.find((p) => p !== myCleanSchoolCode) || parts[0] || null;
+        setTargetChatPeerSchoolCode(otherCode);
+        markChatChannelAsRead(schoolCodeOrChannelId);
+      } else {
+        const dmId = getDmChannelId(myCleanSchoolCode, schoolCodeOrChannelId);
+        setTargetChatChannelId(dmId);
+        setTargetChatPeerSchoolCode(schoolCodeOrChannelId);
+        markChatChannelAsRead(dmId);
+      }
+      setPortalTab('sembang-live');
+    },
+    [myCleanSchoolCode, markChatChannelAsRead]
+  );
+
+  const clearTargetChatNavigation = React.useCallback(() => {
+    setTargetChatChannelId(null);
+    setTargetChatPeerSchoolCode(null);
+  }, []);
+
+  const sendPortalChatNotification = React.useCallback(
+    async (notif: PortalNotification) => {
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notif.id)) return prev;
+        const next = [notif, ...prev].slice(0, 150);
+        safeLocalStorageSet(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(next));
+        return next;
+      });
+
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
+          bc.postMessage({ type: 'NEW_CHAT_NOTIFICATION', notification: notif });
+          bc.close();
+        }
+      } catch {}
+
+      if (!isFirestoreQuotaExceeded()) {
+        try {
+          await setDoc(doc(db, 'notifications', notif.id), notif, { merge: true });
+        } catch {}
+      }
+    },
+    []
+  );
+
   const markNotificationRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    try {
-      updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
-    } catch (e) {}
+    // Check if this is a live or stored chat notification
+    const target = visibleNotifications.find((n) => n.id === id);
+    if (target?.chatChannelId) {
+      markChatChannelAsRead(target.chatChannelId);
+    } else if (id.startsWith('live-dm-notif-')) {
+      const chId = id.replace('live-dm-notif-', '');
+      markChatChannelAsRead(chId);
+    }
+
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.id === id || (target?.chatChannelId && n.chatChannelId === target.chatChannelId)
+          ? { ...n, read: true }
+          : n
+      )
+    );
+    if (!id.startsWith('live-dm-notif-')) {
+      try {
+        updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
+      } catch (e) {}
+    }
   };
 
   const markAllNotificationsRead = () => {
+    // Also mark all currently unread personal DM channels as read
+    Object.keys(unreadChatByChannel).forEach((chId) => {
+      if (unreadChatByChannel[chId] > 0) {
+        markChatChannelAsRead(chId);
+      }
+    });
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
@@ -2725,7 +3339,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         documents,
         bestPractices,
         submissions,
-        notifications,
+        notifications: visibleNotifications,
         auditLogs,
         registeredProgramIds,
         registeredSchools,
@@ -2735,6 +3349,16 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         unreadNotificationsCount,
         isNotificationOpen,
         setIsNotificationOpen,
+        unreadChatByChannel,
+        unreadPersonalChatCount,
+        totalUnreadChatCount,
+        unreadPersonalSenders,
+        targetChatChannelId,
+        targetChatPeerSchoolCode,
+        openDirectChatWithSchool,
+        clearTargetChatNavigation,
+        markChatChannelAsRead,
+        sendPortalChatNotification,
         loginWithGoogle,
         loginWithEmail,
         loginWithEmailPassword: loginWithEmail,

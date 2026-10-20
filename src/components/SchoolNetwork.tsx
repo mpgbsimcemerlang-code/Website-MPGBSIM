@@ -24,6 +24,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { SchoolNetworkCharts, resolveSchoolMembershipType } from './SchoolNetworkCharts';
+import { SchoolNetworkMap } from './SchoolNetworkMap';
 
 interface SchoolNetworkProps {
   stats: NetworkStats;
@@ -564,6 +565,15 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
 
         {/* Visualisasi Data Taburan Sekolah & Enrolmen (Recharts) */}
         <SchoolNetworkCharts schools={effectiveSchools} />
+
+        {/* Peta Interaktif Taburan Sekolah-Sekolah Ahli Seluruh Malaysia */}
+        <SchoolNetworkMap
+          schools={filteredSchools}
+          allSchoolsCount={effectiveSchools.length}
+          selectedState={selectedState}
+          onStateSelect={(st) => setSelectedState(st === 'RESET' ? 'Semua Negeri' : st)}
+          onSelectSchool={(sch) => setSelectedSchool(sch)}
+        />
 
         {/* Member Schools Sample Directory & Filters */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">

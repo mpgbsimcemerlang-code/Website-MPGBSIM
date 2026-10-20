@@ -25,10 +25,15 @@ import {
   Download,
   ChevronUp,
   ChevronDown,
+  Bell,
 } from 'lucide-react';
-import { useMemberPortal } from '../../context/MemberPortalContext';
+import {
+  useMemberPortal,
+  normalizeSchoolCode,
+  getDmChannelId,
+} from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
-import { PGBChatMessage, PGBChatPresence, MemberSchool } from '../../types';
+import { PGBChatMessage, PGBChatPresence, MemberSchool, PortalNotification } from '../../types';
 import {
   db,
   collection,
@@ -150,14 +155,20 @@ const INITIAL_WELCOME_MESSAGES: PGBChatMessage[] = [
 
 const QUICK_EMOJIS = ['👍', '❤️', '🤲', '👏', '💡'];
 
-function getDmChannelId(codeA: string, codeB: string): string {
-  const cleanA = (codeA || 'PGB').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const cleanB = (codeB || 'PGB').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  return `dm_${[cleanA, cleanB].sort().join('_')}`;
-}
-
 export const PortalLiveChat: React.FC = () => {
-  const { currentUser, currentRole, registeredSchools } = useMemberPortal();
+  const {
+    currentUser,
+    currentRole,
+    registeredSchools,
+    unreadChatByChannel,
+    unreadPersonalChatCount,
+    unreadPersonalSenders,
+    targetChatChannelId,
+    targetChatPeerSchoolCode,
+    clearTargetChatNavigation,
+    markChatChannelAsRead,
+    sendPortalChatNotification,
+  } = useMemberPortal();
   const { siteData } = useAdminContent();
 
   const memberSchools: MemberSchool[] = useMemo(() => {
@@ -172,11 +183,20 @@ export const PortalLiveChat: React.FC = () => {
     const fullName = currentUser?.fullName || 'Ahli PGB MPGBSIM';
     const position = currentUser?.position || 'Pengetua / Guru Besar';
     const school = currentUser?.school || 'Sekolah Ahli MPGBSIM';
-    const schoolCode = currentUser?.schoolCode || currentUser?.membershipNo?.replace('MPGB-2026-', '') || uid;
+    const matchedSchool = memberSchools.find(
+      (s) =>
+        (currentUser?.schoolId && s.id === currentUser.schoolId) ||
+        (currentUser?.school && s.name && s.name.toLowerCase().trim() === currentUser.school.toLowerCase().trim())
+    );
+    const schoolCode =
+      currentUser?.schoolCode ||
+      currentUser?.membershipNo?.replace(/^MPGB-\d{4}-/i, '') ||
+      matchedSchool?.code ||
+      uid;
     const state = currentUser?.state || 'Malaysia';
     const avatarUrl = currentUser?.photoURL || currentUser?.logoUrl || '';
     return { uid, fullName, position, school, schoolCode, state, avatarUrl };
-  }, [currentUser]);
+  }, [currentUser, memberSchools]);
 
   // Messages state (initialized from localStorage or welcome seed)
   const [messages, setMessages] = useState<PGBChatMessage[]>(() => {
@@ -473,7 +493,7 @@ export const PortalLiveChat: React.FC = () => {
     return { online, offline };
   }, [memberSchools, presenceMap, myIdentity.schoolCode, currentUser, nowTick]);
 
-  // Filtered PGB peers for Direct Message or Directory (Online sorted first)
+  // Filtered PGB peers for Direct Message or Directory (Unread sorted first, then Online, then Name)
   const filteredPeers = useMemo(() => {
     return memberSchools
       .filter((sch) => {
@@ -493,27 +513,40 @@ export const PortalLiveChat: React.FC = () => {
         return matchState && matchStatus && matchQ;
       })
       .sort((a, b) => {
+        const dmA = getDmChannelId(myIdentity.schoolCode, a.code || a.id);
+        const dmB = getDmChannelId(myIdentity.schoolCode, b.code || b.id);
+        const unreadA = unreadChatByChannel[dmA] || 0;
+        const unreadB = unreadChatByChannel[dmB] || 0;
+        if (unreadA !== unreadB) return unreadB - unreadA;
+
         const aOnline = isSchoolOnline(a.code) ? 1 : 0;
         const bOnline = isSchoolOnline(b.code) ? 1 : 0;
         if (aOnline !== bOnline) return bOnline - aOnline;
         return (a.name || '').localeCompare(b.name || '');
       });
-  }, [memberSchools, stateFilter, statusFilter, memberSearch, presenceMap, myIdentity.schoolCode, currentUser, nowTick]);
+  }, [
+    memberSchools,
+    stateFilter,
+    statusFilter,
+    memberSearch,
+    presenceMap,
+    myIdentity.schoolCode,
+    currentUser,
+    nowTick,
+    unreadChatByChannel,
+  ]);
 
-  // Count messages per channel
-  const channelCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    messages.forEach((m) => {
-      map[m.channelId] = (map[m.channelId] || 0) + 1;
-    });
-    return map;
-  }, [messages]);
+  // Count total unread messages across public channels
+  const unreadPublicChannelsCount = useMemo(() => {
+    return PUBLIC_CHANNELS.reduce((sum, ch) => sum + (unreadChatByChannel[ch.id] || 0), 0);
+  }, [unreadChatByChannel]);
 
   const handleSelectPublicChannel = (channelId: string) => {
     setSelectedDmSchool(null);
     setActiveChannelId(channelId);
     setReplyTarget(null);
     setMobileShowChat(true);
+    markChatChannelAsRead(channelId);
   };
 
   const handleSelectPeerDm = (school: MemberSchool) => {
@@ -522,7 +555,76 @@ export const PortalLiveChat: React.FC = () => {
     setActiveChannelId(dmId);
     setReplyTarget(null);
     setMobileShowChat(true);
+    markChatChannelAsRead(dmId);
   };
+
+  // Handle incoming deep-link navigation from Portal Notification Bell / Toast Banner
+  useEffect(() => {
+    if (!targetChatChannelId && !targetChatPeerSchoolCode) return;
+    if (memberSchools.length === 0) return;
+
+    const targetClean = normalizeSchoolCode(targetChatPeerSchoolCode || '');
+    const matchedSchool = memberSchools.find((s) => {
+      const sClean = normalizeSchoolCode(s.code || s.id);
+      if (targetClean && sClean === targetClean) return true;
+      if (targetChatChannelId) {
+        const dmId = getDmChannelId(myIdentity.schoolCode, s.code || s.id);
+        if (dmId === targetChatChannelId) return true;
+      }
+      return false;
+    });
+
+    if (matchedSchool) {
+      const dmId = getDmChannelId(myIdentity.schoolCode, matchedSchool.code || matchedSchool.id);
+      setSelectedDmSchool(matchedSchool);
+      setActiveChannelId(dmId);
+      setReplyTarget(null);
+      setMobileShowChat(true);
+      markChatChannelAsRead(dmId);
+    } else if (targetChatChannelId) {
+      setSelectedDmSchool(null);
+      setActiveChannelId(targetChatChannelId);
+      setMobileShowChat(true);
+      markChatChannelAsRead(targetChatChannelId);
+    }
+    clearTargetChatNavigation();
+  }, [
+    targetChatChannelId,
+    targetChatPeerSchoolCode,
+    memberSchools,
+    myIdentity.schoolCode,
+    markChatChannelAsRead,
+    clearTargetChatNavigation,
+  ]);
+
+  // Automatically mark the currently open channel as read when viewing it and window has focus
+  useEffect(() => {
+    if (!activeChannelId) return;
+    const unreadInActive = unreadChatByChannel[activeChannelId] || 0;
+    if (unreadInActive <= 0) return;
+
+    const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
+    const isChatPaneVisible = isDesktop || mobileShowChat;
+    const isWindowFocused = typeof document !== 'undefined' ? document.hasFocus() : true;
+
+    if (isChatPaneVisible && isWindowFocused) {
+      markChatChannelAsRead(activeChannelId);
+    }
+  }, [activeChannelId, unreadChatByChannel, mobileShowChat, markChatChannelAsRead]);
+
+  // Also mark active channel as read when window regains focus
+  useEffect(() => {
+    const handleFocus = () => {
+      if (activeChannelId && (unreadChatByChannel[activeChannelId] || 0) > 0) {
+        const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
+        if (isDesktop || mobileShowChat) {
+          markChatChannelAsRead(activeChannelId);
+        }
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [activeChannelId, unreadChatByChannel, mobileShowChat, markChatChannelAsRead]);
 
   const handleUploadChatImage = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -551,7 +653,23 @@ export const PortalLiveChat: React.FC = () => {
     if (!inputText.trim() && !uploadedImage && !attachmentUrl.trim()) return;
 
     setIsSending(true);
+    const nowIso = new Date().toISOString();
     const msgId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const msgText =
+      inputText.trim() || (uploadedImage ? 'Berkongsi gambar / poster' : 'Berkongsi lampiran dokumen');
+    const isDm = Boolean(selectedDmSchool || activeChannelId.startsWith('dm_'));
+    const recipientCode = selectedDmSchool?.code || selectedDmSchool?.id || '';
+
+    const initialReadBy = Array.from(
+      new Set(
+        [
+          normalizeSchoolCode(myIdentity.schoolCode),
+          myIdentity.schoolCode,
+          myIdentity.uid,
+        ].filter(Boolean)
+      )
+    );
+
     const newMsg: PGBChatMessage = {
       id: msgId,
       channelId: activeChannelId,
@@ -562,7 +680,16 @@ export const PortalLiveChat: React.FC = () => {
       senderSchoolCode: myIdentity.schoolCode,
       senderState: myIdentity.state,
       ...(myIdentity.avatarUrl ? { senderAvatar: myIdentity.avatarUrl } : {}),
-      text: inputText.trim() || (uploadedImage ? 'Berkongsi gambar / poster' : 'Berkongsi lampiran dokumen'),
+      ...(isDm
+        ? {
+            isDirectMessage: true,
+            recipientSchoolCode: recipientCode,
+            recipientSchoolName: selectedDmSchool?.name || '',
+            recipientName: selectedDmSchool?.principal || 'Pengetua / Guru Besar',
+          }
+        : {}),
+      readBy: initialReadBy,
+      text: msgText,
       ...(uploadedImage ? { imageUrl: uploadedImage } : {}),
       ...(attachmentUrl.trim() ? { attachmentUrl: attachmentUrl.trim() } : {}),
       ...(attachmentName.trim() ? { attachmentName: attachmentName.trim() } : {}),
@@ -575,12 +702,13 @@ export const PortalLiveChat: React.FC = () => {
         : {}),
       pinned: false,
       reactions: {},
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso,
     };
 
     // Optimistic update
     setMessages((prev) => [...prev, newMsg]);
     broadcastRef.current?.postMessage({ type: 'NEW_OR_UPDATED_MSG', message: newMsg });
+    markChatChannelAsRead(activeChannelId);
 
     // Clear composer
     setInputText('');
@@ -590,6 +718,26 @@ export const PortalLiveChat: React.FC = () => {
     setAttachmentName('');
     setAttachmentUrl('');
     setShowAttachmentInput(false);
+
+    // If this is a personal 1-to-1 chat to another PGB, dispatch a portal notification to that PGB's portal
+    if (isDm && recipientCode) {
+      const dmNotif: PortalNotification = {
+        id: `notif-dm-${msgId}`,
+        userId: recipientCode,
+        recipientSchoolCode: recipientCode,
+        senderSchoolCode: myIdentity.schoolCode,
+        senderName: myIdentity.fullName,
+        senderSchool: myIdentity.school,
+        chatChannelId: activeChannelId,
+        title: `Mesej Peribadi Baharu daripada ${myIdentity.fullName}`,
+        message: `${myIdentity.school}: "${msgText.slice(0, 140)}"`,
+        type: 'chat',
+        date: nowIso,
+        read: false,
+        linkTab: 'sembang-live',
+      };
+      sendPortalChatNotification(dmNotif).catch(() => {});
+    }
 
     try {
       await setDoc(doc(db, 'pgbChatMessages', msgId), newMsg, { merge: true });
@@ -695,6 +843,57 @@ export const PortalLiveChat: React.FC = () => {
         </div>
       </div>
 
+      {/* Live Unread Personal Message Notification Banner inside Ruang Sembang PGB (Automatically disappears once opened & read) */}
+      {unreadPersonalSenders.length > 0 && (
+        <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-teal-800 p-0.5 rounded-2xl shadow-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 text-white rounded-[14px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 animate-bounce">
+                <Bell className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[11px] font-black tracking-wide">
+                    {unreadPersonalChatCount} mesej baharu
+                  </span>
+                  <span className="text-xs font-bold text-amber-300 truncate">
+                    Mesej Peribadi daripada {unreadPersonalSenders[0].senderName} ({unreadPersonalSenders[0].senderSchool})
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 truncate mt-0.5">
+                  "{unreadPersonalSenders[0].latestText}"
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const sender = unreadPersonalSenders[0];
+                  const senderClean = normalizeSchoolCode(sender.senderSchoolCode);
+                  const peer = memberSchools.find(
+                    (s) =>
+                      normalizeSchoolCode(s.code || s.id) === senderClean ||
+                      getDmChannelId(myIdentity.schoolCode, s.code || s.id) === sender.channelId
+                  );
+                  if (peer) {
+                    handleSelectPeerDm(peer);
+                  } else {
+                    setActiveChannelId(sender.channelId);
+                    setMobileShowChat(true);
+                    markChatChannelAsRead(sender.channelId);
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Buka & Baca ({unreadPersonalSenders[0].count} mesej baharu)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Split Chat Workspace */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden grid grid-cols-1 lg:grid-cols-12 h-[740px] lg:h-[780px] min-h-0">
         {/* LEFT SIDEBAR: Channels & PGB Directory */}
@@ -709,26 +908,36 @@ export const PortalLiveChat: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSidebarTab('saluran')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                   sidebarTab === 'saluran'
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Hash className="w-3.5 h-3.5" />
-                <span>Saluran Topik ({PUBLIC_CHANNELS.length})</span>
+                <Hash className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Saluran Topik ({PUBLIC_CHANNELS.length})</span>
+                {unreadPublicChannelsCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black shrink-0 animate-pulse">
+                    {unreadPublicChannelsCount}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => setSidebarTab('ahli')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                className={`py-2 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
                   sidebarTab === 'ahli'
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Users className="w-3.5 h-3.5" />
-                <span>Direktori PGB ({memberSchools.length})</span>
+                <Users className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Direktori PGB ({memberSchools.length})</span>
+                {unreadPersonalChatCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black shrink-0 animate-pulse">
+                    {unreadPersonalChatCount} baharu
+                  </span>
+                )}
               </button>
             </div>
 
@@ -783,7 +992,7 @@ export const PortalLiveChat: React.FC = () => {
                 </div>
                 {PUBLIC_CHANNELS.map((ch) => {
                   const isSelected = !selectedDmSchool && activeChannelId === ch.id;
-                  const count = channelCounts[ch.id] || 0;
+                  const unreadCount = isSelected ? 0 : unreadChatByChannel[ch.id] || 0;
                   return (
                     <button
                       key={ch.id}
@@ -792,6 +1001,8 @@ export const PortalLiveChat: React.FC = () => {
                       className={`w-full text-left p-3 rounded-2xl border transition cursor-pointer flex items-start gap-3 ${
                         isSelected
                           ? 'bg-teal-900 text-white border-teal-800 shadow-sm'
+                          : unreadCount > 0
+                          ? 'bg-amber-50/80 hover:bg-amber-50 text-slate-900 border-amber-400 shadow-2xs'
                           : 'bg-white hover:bg-teal-50/50 text-slate-800 border-slate-200/80'
                       }`}
                     >
@@ -805,15 +1016,9 @@ export const PortalLiveChat: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-bold text-xs truncate">{ch.name}</span>
-                          {count > 0 && (
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                                isSelected
-                                  ? 'bg-amber-400 text-slate-950'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
-                            >
-                              {count} mesej
+                          {unreadCount > 0 && (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-md shrink-0 bg-rose-600 text-white animate-pulse">
+                              {unreadCount} mesej baharu
                             </span>
                           )}
                         </div>
@@ -847,7 +1052,7 @@ export const PortalLiveChat: React.FC = () => {
                     {filteredPeers.map((sch) => {
                       const dmId = getDmChannelId(myIdentity.schoolCode, sch.code || sch.id);
                       const isSelected = selectedDmSchool?.id === sch.id;
-                      const dmCount = channelCounts[dmId] || 0;
+                      const unreadDmCount = isSelected ? 0 : unreadChatByChannel[dmId] || 0;
                       const isOnline = isSchoolOnline(sch.code);
                       const photo = sch.principalPhotoUrl || sch.logoUrl;
                       return (
@@ -858,6 +1063,8 @@ export const PortalLiveChat: React.FC = () => {
                           className={`w-full text-left p-2.5 rounded-xl border transition cursor-pointer flex items-center gap-2.5 ${
                             isSelected
                               ? 'bg-slate-900 text-white border-slate-800'
+                              : unreadDmCount > 0
+                              ? 'bg-amber-50/90 hover:bg-amber-100/80 text-slate-900 border-rose-400 ring-1 ring-rose-400/50 shadow-xs'
                               : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-200/70'
                           }`}
                         >
@@ -903,9 +1110,9 @@ export const PortalLiveChat: React.FC = () => {
                               </span>
                             </div>
                           </div>
-                          {dmCount > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black">
-                              {dmCount}
+                          {unreadDmCount > 0 && (
+                            <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black shrink-0 animate-pulse shadow-2xs">
+                              {unreadDmCount} mesej baharu
                             </span>
                           )}
                         </button>
@@ -987,7 +1194,7 @@ export const PortalLiveChat: React.FC = () => {
                 {filteredPeers.map((sch) => {
                   const dmId = getDmChannelId(myIdentity.schoolCode, sch.code || sch.id);
                   const isSelected = selectedDmSchool?.id === sch.id;
-                  const dmCount = channelCounts[dmId] || 0;
+                  const unreadDmCount = isSelected ? 0 : unreadChatByChannel[dmId] || 0;
                   const isOnline = isSchoolOnline(sch.code);
                   const photo = sch.principalPhotoUrl || sch.logoUrl;
 
@@ -999,6 +1206,8 @@ export const PortalLiveChat: React.FC = () => {
                       className={`w-full text-left p-2.5 rounded-2xl border transition cursor-pointer flex items-center gap-3 ${
                         isSelected
                           ? 'bg-teal-900 text-white border-teal-800 shadow-xs'
+                          : unreadDmCount > 0
+                          ? 'bg-amber-50/90 hover:bg-amber-100/80 text-slate-900 border-rose-400 ring-1 ring-rose-400/50 shadow-xs'
                           : 'bg-white hover:bg-teal-50/50 text-slate-800 border-slate-200/80'
                       }`}
                     >
@@ -1053,9 +1262,9 @@ export const PortalLiveChat: React.FC = () => {
                         </div>
                       </div>
 
-                      {dmCount > 0 && (
-                        <span className="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-black shrink-0">
-                          {dmCount}
+                      {unreadDmCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black shrink-0 animate-pulse shadow-2xs">
+                          {unreadDmCount} mesej baharu
                         </span>
                       )}
                     </button>
@@ -1068,6 +1277,11 @@ export const PortalLiveChat: React.FC = () => {
 
         {/* RIGHT PANEL: Active Chat Conversation */}
         <div
+          onClick={() => {
+            if (activeChannelId && (unreadChatByChannel[activeChannelId] || 0) > 0) {
+              markChatChannelAsRead(activeChannelId);
+            }
+          }}
           className={`lg:col-span-8 xl:col-span-8 flex flex-col h-full min-h-0 bg-white overflow-hidden ${
             !mobileShowChat ? 'hidden lg:flex' : 'flex'
           }`}

@@ -389,8 +389,9 @@ export function repairSchoolIntegrity(
     }
   });
 
-  // Enforce correct school level & designation for institutions with potential legacy cache drift
+  // Enforce correct school level, designation & official Google Maps address for institutions with potential legacy cache drift
   schoolsMap.forEach((s) => {
+    const sNameLower = (s.name || '').toLowerCase();
     if (s.code === 'BLAD001' || s.name?.includes('SEKOLAH MENENGAH SRI AL-AMIN BANGI')) {
       s.type = 'Sekolah Menengah';
       s.designation = 'Pengetua';
@@ -400,6 +401,18 @@ export function repairSchoolIntegrity(
     } else if (s.code === 'AYR2001' || s.name?.includes('SEKOLAH RENDAH ISLAM AL HIDAYAH IPOH')) {
       s.type = 'Sekolah Rendah';
       s.designation = 'Guru Besar';
+    }
+
+    if (sNameLower.includes('al amin kuching') || sNameLower.includes('al-amin kuching')) {
+      s.state = 'Sarawak';
+      s.district = s.district && s.district.toLowerCase() !== 'selangor' ? s.district : 'Kuching';
+      if (sNameLower.includes('menengah') || /\bsm\b|\bsmi\b/i.test(s.name || '')) {
+        s.type = 'Sekolah Menengah';
+        s.address =
+          '1st Floor, Sublot No. 1, 10 to 68, 71, 72, Lot 10010, Section 65, KTLD, The Hub@Matang Jaya, 93050 Kuching, Sarawak';
+      } else if (!s.address || !s.address.toLowerCase().includes('kuching')) {
+        s.address = 'Matang Jaya, 93050 Kuching, Sarawak';
+      }
     }
   });
 
@@ -424,7 +437,7 @@ export function repairSchoolIntegrity(
       serviceStartYear: 2026,
       pgbStartYear: 2026,
       website: 'https://imuslehmelaka.edu.my',
-      address: 'Batu 4 1/2, Jalan Peringgit, 75400 Melaka',
+      address: 'No. 25-1, Jalan TU 49A, Kompleks Komersial Boulevard, 75450 Ayer Keroh, Melaka',
       description: 'Sekolah Ahli Berdaftar MPGBSIM di bawah kepimpinan Abdul Qayyum bin Yaakop.',
       logoUrl: '/mpgbsim-official-logo.png',
       schoolPhotoUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80',
@@ -434,8 +447,13 @@ export function repairSchoolIntegrity(
     schoolsMap.set('sch-musleh-1', sriMusleh);
     schoolsMap.set('code:MJAC011', sriMusleh);
     actionsTaken.push('Memastikan entiti rasmi Sekolah Rendah Islam I Musleh (Kod: MJAC011) terpelihara');
-  } else if (!sriMusleh.icNumber) {
-    sriMusleh.icNumber = '850312-04-5123';
+  } else {
+    if (!sriMusleh.icNumber) {
+      sriMusleh.icNumber = '850312-04-5123';
+    }
+    if (!sriMusleh.address || sriMusleh.address.toLowerCase().includes('peringgit')) {
+      sriMusleh.address = 'No. 25-1, Jalan TU 49A, Kompleks Komersial Boulevard, 75450 Ayer Keroh, Melaka';
+    }
   }
 
   // 2. Ensure Sekolah Menengah Agama I-Musleh exists (JAIM/SAS(M)130)

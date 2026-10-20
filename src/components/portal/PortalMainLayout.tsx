@@ -19,10 +19,35 @@ import { PortalAdminDashboard } from './PortalAdminDashboard';
 import { PortalGlobalSearchModal } from './PortalGlobalSearchModal';
 import { PortalNotificationModal } from './PortalNotificationModal';
 import { PortalLoginView } from './PortalLoginView';
-import { ShieldAlert, MessageSquare } from 'lucide-react';
+import { ShieldAlert, MessageSquare, Bell } from 'lucide-react';
 
 export const PortalMainLayout: React.FC = () => {
-  const { portalTab, currentRole, setPortalTab, currentUser } = useMemberPortal();
+  const {
+    portalTab,
+    portalSubTab,
+    currentRole,
+    setPortalTab,
+    currentUser,
+    unreadPersonalSenders,
+    unreadPersonalChatCount,
+    totalUnreadChatCount,
+    openDirectChatWithSchool,
+  } = useMemberPortal();
+
+  const unreadChatBadgeCount = unreadPersonalChatCount > 0 ? unreadPersonalChatCount : totalUnreadChatCount;
+
+  // Ensure clicking any module (e.g. from Pusat Akses Pantas) always positions the view at the very top
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const rafId = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [portalTab, portalSubTab]);
 
   // If user is not logged in, render the dedicated integrated Member Portal Login View
   if (!currentUser) {
@@ -90,6 +115,46 @@ export const PortalMainLayout: React.FC = () => {
       {/* Top Header */}
       <PortalHeader />
 
+      {/* Portal-Wide Real-Time Personal Chat Notification Alert (Visible on any Portal page when another PGB sends a personal message) */}
+      {portalTab !== 'sembang-live' && unreadPersonalSenders.length > 0 && (
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-teal-800 p-0.5 rounded-2xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="bg-slate-900 text-white rounded-[14px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 animate-bounce">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[11px] font-black tracking-wide">
+                      {unreadPersonalChatCount} mesej baharu
+                    </span>
+                    <span className="text-xs font-bold text-amber-300 truncate">
+                      Mesej Peribadi PGB daripada {unreadPersonalSenders[0].senderName} ({unreadPersonalSenders[0].senderSchool})
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 truncate mt-0.5">
+                    "{unreadPersonalSenders[0].latestText}"
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  openDirectChatWithSchool(
+                    unreadPersonalSenders[0].senderSchoolCode || unreadPersonalSenders[0].channelId
+                  )
+                }
+                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Buka & Baca Mesej</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {renderContent()}
@@ -99,7 +164,15 @@ export const PortalMainLayout: React.FC = () => {
       {portalTab !== 'sembang-live' && (
         <button
           type="button"
-          onClick={() => setPortalTab('sembang-live')}
+          onClick={() => {
+            if (unreadPersonalSenders.length > 0) {
+              openDirectChatWithSchool(
+                unreadPersonalSenders[0].senderSchoolCode || unreadPersonalSenders[0].channelId
+              );
+            } else {
+              setPortalTab('sembang-live');
+            }
+          }}
           className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-2xl bg-teal-900 hover:bg-teal-800 text-white font-bold text-xs sm:text-sm flex items-center gap-2.5 shadow-xl border border-teal-700 transition-transform hover:scale-105 cursor-pointer"
           title="Buka Ruang Sembang Live PGB"
         >
@@ -109,6 +182,11 @@ export const PortalMainLayout: React.FC = () => {
           </span>
           <MessageSquare className="w-4 h-4 text-amber-400" />
           <span>Sembang Live PGB</span>
+          {unreadChatBadgeCount > 0 && (
+            <span className="px-2 py-0.5 rounded-lg bg-rose-600 text-white text-[10px] font-black animate-pulse">
+              {unreadChatBadgeCount} mesej baharu
+            </span>
+          )}
         </button>
       )}
 

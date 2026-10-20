@@ -602,7 +602,7 @@ export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
     pgbStartYear: 2026,
     website: 'https://imuslehmelaka.edu.my',
     description: 'Sekolah Ahli Berdaftar MPGBSIM di bawah kepimpinan Abdul Qayyum bin Yaakop.',
-    address: 'Batu 4 1/2, Jalan Peringgit, 75400 Melaka',
+    address: 'No. 25-1, Jalan TU 49A, Kompleks Komersial Boulevard, 75450 Ayer Keroh, Melaka',
     phone: '+60 6-335 1290',
     email: 'abdulqayyumyaakop@imuslehmelaka.edu.my',
     schoolPhone: '+60 6-335 1290',

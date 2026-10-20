@@ -675,7 +675,7 @@ export const PortalAIDigitalHub: React.FC = () => {
           {/* ================================================================= */}
           <div
             ref={studioRef}
-            className="rounded-3xl bg-white border-2 border-purple-900/20 shadow-lg overflow-hidden scroll-mt-6"
+            className="rounded-3xl bg-white border-2 border-purple-900/20 shadow-lg overflow-hidden scroll-mt-28"
           >
             {/* Studio Top Bar */}
             <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-indigo-950 text-white p-5 sm:p-6">

@@ -276,11 +276,16 @@ export interface PortalNotification {
   userId: string;
   title: string;
   message: string;
-  type: 'program' | 'dokumen' | 'pengumuman' | 'submission' | 'info';
+  type: 'program' | 'dokumen' | 'pengumuman' | 'submission' | 'info' | 'chat';
   date: string;
   time?: string;
   read: boolean;
   linkTab?: string;
+  recipientSchoolCode?: string;
+  senderSchoolCode?: string;
+  senderName?: string;
+  senderSchool?: string;
+  chatChannelId?: string;
 }
 
 export interface AuditLogItem {
@@ -571,6 +576,11 @@ export interface PGBChatMessage {
   senderSchoolCode?: string;
   senderState?: string;
   senderAvatar?: string;
+  isDirectMessage?: boolean;
+  recipientSchoolCode?: string;
+  recipientSchoolName?: string;
+  recipientName?: string;
+  readBy?: string[]; // schoolCodes / userIds who have opened and read this message
   text: string;
   imageUrl?: string;
   attachmentUrl?: string;

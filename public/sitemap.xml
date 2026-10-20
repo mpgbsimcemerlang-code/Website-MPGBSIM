@@ -1,75 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml"
+  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+>
   <url>
     <loc>https://www.mpgbsim.org/</loc>
     <lastmod>2026-10-20</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#tentang</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#fokus-strategik</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#berita</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#best-practice</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#program</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#peperiksaan</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#bayar-yuran</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#sekolah-ahli</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#kepimpinan</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#sumber</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://www.mpgbsim.org/#hubungi</loc>
-    <lastmod>2026-10-20</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="ms-MY" href="https://www.mpgbsim.org/" />
+    <xhtml:link rel="alternate" hreflang="ms" href="https://www.mpgbsim.org/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.mpgbsim.org/" />
+    <image:image>
+      <image:loc>https://www.mpgbsim.org/mpgbsim-official-logo.png</image:loc>
+      <image:title>MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia</image:title>
+      <image:caption>Logo Rasmi Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)</image:caption>
+    </image:image>
   </url>
 </urlset>
+

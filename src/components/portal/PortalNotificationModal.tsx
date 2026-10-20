@@ -10,6 +10,7 @@ import {
   ClipboardList,
   AlertCircle,
   ExternalLink,
+  MessageSquare,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 
@@ -22,13 +23,16 @@ export const PortalNotificationModal: React.FC = () => {
     markNotificationAsRead,
     markAllNotificationsAsRead,
     setPortalTab,
+    openDirectChatWithSchool,
   } = useMemberPortal();
 
   if (!isNotificationOpen) return null;
 
   const handleItemClick = (notif: any) => {
     markNotificationAsRead(notif.id);
-    if (notif.linkTab) {
+    if (notif.type === 'chat' || notif.chatChannelId || notif.senderSchoolCode) {
+      openDirectChatWithSchool(notif.senderSchoolCode || notif.chatChannelId || '');
+    } else if (notif.linkTab) {
       setPortalTab(notif.linkTab as PortalTab);
     }
     setIsNotificationOpen(false);
@@ -36,6 +40,8 @@ export const PortalNotificationModal: React.FC = () => {
 
   const getNotifIcon = (type: string) => {
     switch (type) {
+      case 'chat':
+        return <MessageSquare className="w-4 h-4 text-rose-600" />;
       case 'program':
         return <Calendar className="w-4 h-4 text-teal-600" />;
       case 'dokumen':

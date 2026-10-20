@@ -24,6 +24,7 @@ import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool } from '../../types';
 import { SchoolNetworkCharts, resolveSchoolMembershipType } from '../SchoolNetworkCharts';
+import { SchoolNetworkMap } from '../SchoolNetworkMap';
 
 export const PortalDirectory: React.FC = () => {
   const { portalSubTab, setPortalSubTab, currentUser, registeredSchools } = useMemberPortal();
@@ -38,6 +39,7 @@ export const PortalDirectory: React.FC = () => {
     portalSubTab === 'sekolah' ? 'sekolah' : 'pgb'
   );
   const [showAnalyticsChart, setShowAnalyticsChart] = useState(false);
+  const [showInteractiveMap, setShowInteractiveMap] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('Semua');
@@ -198,6 +200,19 @@ export const PortalDirectory: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <button
             type="button"
+            onClick={() => setShowInteractiveMap(!showInteractiveMap)}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+              showInteractiveMap
+                ? 'bg-emerald-900 text-white border-emerald-900 shadow-xs'
+                : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-amber-400" />
+            <span>{showInteractiveMap ? 'Tutup Peta Sekolah' : 'Peta Taburan Sekolah'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowAnalyticsChart(!showAnalyticsChart)}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
               showAnalyticsChart
@@ -342,6 +357,17 @@ export const PortalDirectory: React.FC = () => {
 
       {/* Carta Analisis Taburan Sekolah Ahli Biasa & Ahli Bersekutu */}
       {showAnalyticsChart && <SchoolNetworkCharts schools={schools} />}
+
+      {/* Peta Interaktif Taburan Sekolah-Sekolah Ahli Seluruh Malaysia */}
+      {showInteractiveMap && (
+        <SchoolNetworkMap
+          schools={filteredSchools}
+          allSchoolsCount={schools.length}
+          selectedState={selectedState}
+          onStateSelect={(st) => setSelectedState(st === 'RESET' ? 'Semua' : st)}
+          onSelectSchool={(sch) => setSelectedSchool(sch)}
+        />
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
