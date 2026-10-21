@@ -42,6 +42,7 @@ import { MemberSchool } from '../../types';
 import { Logo } from '../Logo';
 import QRCode from 'qrcode';
 import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
+import { OfficialSchoolCertificateModal } from './OfficialSchoolCertificateModal';
 import { compressImageFile, compressDataUrl } from '../../utils/imageCompressor';
 import { downloadElementAsSinglePagePdf } from '../../utils/pdfGenerator';
 
@@ -114,6 +115,7 @@ export const PortalProfile: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [pdfDownloadSuccess, setPdfDownloadSuccess] = useState(false);
   const [isDigitalCardModalOpen, setIsDigitalCardModalOpen] = useState(false);
@@ -680,6 +682,15 @@ export const PortalProfile: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             type="button"
+            onClick={() => setIsCertificateModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+            title="Lihat, Cetak & Muat Turun Sijil Perakuan Keahlian Rasmi Sekolah MPGBSIM (PDF)"
+          >
+            <Award className="w-4 h-4 text-amber-300" />
+            <span>Sijil Rasmi Keahlian Sekolah</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setIsDigitalCardModalOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
             title="Muat Turun & Papar Kad Keahlian Digital (QR Code)"
@@ -855,6 +866,15 @@ export const PortalProfile: React.FC = () => {
           >
             <Download className="w-4 h-4 text-slate-950" />
             <span>Muat Turun Kad Keahlian Digital (QR Code)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsCertificateModalOpen(true)}
+            className="w-full py-3 px-4 rounded-2xl bg-teal-800 hover:bg-teal-900 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+          >
+            <Award className="w-4 h-4 text-amber-300" />
+            <span>Lihat & Muat Turun Sijil Rasmi Keahlian Sekolah</span>
           </button>
 
           <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
@@ -1718,340 +1738,354 @@ export const PortalProfile: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Cetak Profil & Muat Turun PDF (1 Muka Surat A4) */}
+      {/* Modal Cetak Profil & Muat Turun PDF (Saiz Penuh 1 Muka Surat A4) */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-start p-3 sm:p-6 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible">
-          {/* Action Header (Hidden in print) */}
-          <div className="no-print max-w-4xl w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-white shadow-xl">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-teal-500/20 text-teal-300">
-                <FileText className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xs flex flex-col overflow-hidden print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible">
+          {/* Sticky Action Header (Hidden in print) */}
+          <div className="no-print shrink-0 w-full bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-3.5 text-white shadow-xl z-20">
+            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-teal-500/20 text-teal-300 shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Pratonton Rekod Profil Rasmi Kepimpinan (Saiz Penuh A4 — 210mm × 297mm)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Tatal (scroll) ke bawah untuk menyemak keseluruhan rekod profil sebelum muat turun PDF atau cetak penuh 1 muka surat A4.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Pratonton Rekod Profil Rasmi Kepimpinan (Format PDF — 1 Muka Surat)</h3>
-                <p className="text-[11px] text-slate-400">
-                  Muat turun terus sebagai fail PDF 1 muka surat A4 yang sama tepat seperti pratonton di bawah atau cetak terus.
-                </p>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={isDownloadingPdf}
+                  onClick={handleDownloadProfilePdf}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-slate-950 font-black text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+                  title="Muat turun terus fail PDF penuh 1 muka surat A4 yang sama seperti pratonton ini"
+                >
+                  <FileDown className="w-4 h-4 text-slate-950" />
+                  <span>{isDownloadingPdf ? 'Menjana PDF A4...' : 'Muat Turun PDF (Penuh A4)'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
+                  title="Cetak lembaran rasmi ini penuh 1 muka surat A4"
+                >
+                  <Printer className="w-4 h-4 text-amber-300" />
+                  <span>Cetak (Penuh A4)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPrintModalOpen(false)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                  title="Tutup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <button
-                type="button"
-                disabled={isDownloadingPdf}
-                onClick={handleDownloadProfilePdf}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-slate-950 font-black text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
-                title="Muat turun terus fail PDF 1 muka surat A4 yang sama seperti pratonton ini"
-              >
-                <FileDown className="w-4 h-4 text-slate-950" />
-                <span>{isDownloadingPdf ? 'Menjana PDF (1 Muka)...' : 'Muat Turun PDF (1 Muka)'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
-                title="Cetak lembaran rasmi ini dalam 1 muka surat A4"
-              >
-                <Printer className="w-4 h-4 text-amber-300" />
-                <span>Cetak (1 Muka)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPrintModalOpen(false)}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
-                title="Tutup"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            {pdfDownloadSuccess && (
+              <div className="max-w-5xl mx-auto mt-3 p-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-between shadow-md">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                  <span>Fail PDF Rekod Profil Rasmi Kepimpinan (Saiz Penuh 1 Muka Surat A4) telah berjaya dimuat turun!</span>
+                </div>
+                <span className="text-[10px] font-mono bg-emerald-700 px-2 py-0.5 rounded">SAIZ PENUH A4</span>
+              </div>
+            )}
           </div>
 
-          {pdfDownloadSuccess && (
-            <div className="no-print max-w-4xl w-full mb-3 p-3 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-between shadow-md">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 shrink-0" />
-                <span>Fail PDF Rekod Profil Rasmi Kepimpinan (1 Muka Surat A4) telah berjaya dimuat turun!</span>
-              </div>
-              <span className="text-[10px] font-mono bg-emerald-700 px-2 py-0.5 rounded">1 MUKA SURAT A4</span>
-            </div>
-          )}
+          {/* Scrollable Preview Viewport */}
+          <div className="flex-1 w-full overflow-y-auto overflow-x-auto p-4 sm:p-8 flex flex-col items-center justify-start print:p-0 print:overflow-visible">
+            {/* Official Document Sheet (Exact Full 1-Page A4 Portrait: 794px x 1123px) */}
+            <div
+              ref={printAreaRef}
+              id="official-profile-print-area"
+              className="shrink-0 w-[794px] min-h-[1123px] bg-white text-slate-900 rounded-xl shadow-2xl p-7 border border-slate-200 flex flex-col justify-between relative box-border"
+            >
+              {/* TOP & BODY CONTENT */}
+              <div className="flex-1 flex flex-col justify-between">
+                <div>
+                  {/* Top Corporate Strip */}
+                  <div className="h-2.5 bg-gradient-to-r from-teal-800 via-amber-500 to-teal-800 rounded-t-lg -mt-7 -mx-7 mb-5" />
 
-          {/* Official Document Sheet (1-Page A4 Calibrated Layout) */}
-          <div
-            ref={printAreaRef}
-            id="official-profile-print-area"
-            className="bg-white text-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full p-5 sm:p-7 border border-slate-200 relative overflow-hidden"
-          >
-            {/* Top Corporate Strip */}
-            <div className="h-2 bg-gradient-to-r from-teal-800 via-amber-500 to-teal-800 rounded-t-xl -mt-5 -mx-5 sm:-mt-7 sm:-mx-7 mb-4" />
+                  {/* Letterhead Header */}
+                  <div className="flex flex-row items-start gap-4 pb-3.5 border-b-2 border-teal-900/80">
+                    <div className="shrink-0 p-1 bg-white rounded-xl">
+                      <Logo showText={false} size="lg" className="shrink-0" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <h1 className="text-base font-black text-teal-950 uppercase tracking-tight">
+                        Majlis Pengetua & Guru Besar Sekolah Islam Malaysia (MPGBSIM)
+                      </h1>
+                      <p className="text-[10.5px] font-semibold text-amber-800 mt-0.5">
+                        Pertubuhan Kebangsaan Kepimpinan Pentadbir Sekolah Islam Malaysia (PPM-002-10-23041996)
+                      </p>
+                      <p className="text-[9.5px] text-slate-500 mt-0.5 leading-snug">
+                        D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Emel: mpgbsim.cemerlang@gmail.com • Web: https://www.mpgbsim.org/
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="inline-block px-2.5 py-1 rounded-lg bg-teal-50 border border-teal-200 text-teal-900 font-mono font-bold text-[11px]">
+                        {membershipNumber}
+                      </span>
+                      <span className="block text-[8.5px] text-slate-400 mt-0.5 font-semibold">STATUS: AHLI AKTIF & SAH</span>
+                    </div>
+                  </div>
 
-            {/* Letterhead Header */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3.5 pb-3 border-b-2 border-teal-900/80">
-              <div className="shrink-0 p-1 bg-white rounded-xl">
-                <Logo showText={false} size="lg" className="shrink-0" />
-              </div>
-              <div className="text-center sm:text-left flex-1">
-                <h1 className="text-sm sm:text-base font-black text-teal-950 uppercase tracking-tight">
-                  Majlis Pengetua & Guru Besar Sekolah Islam Malaysia (MPGBSIM)
-                </h1>
-                <p className="text-[10px] font-semibold text-amber-800 mt-0.5">
-                  Pertubuhan Kebangsaan Kepimpinan Pentadbir Sekolah Islam Malaysia (PPM-002-10-23041996)
-                </p>
-                <p className="text-[9.5px] text-slate-500 mt-0.5 leading-snug">
-                  D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Emel: mpgbsim.cemerlang@gmail.com • Web: https://www.mpgbsim.org/
-                </p>
-              </div>
-              <div className="text-center sm:text-right shrink-0">
-                <span className="inline-block px-2.5 py-1 rounded-lg bg-teal-50 border border-teal-200 text-teal-900 font-mono font-bold text-[11px]">
-                  {membershipNumber}
-                </span>
-                <span className="block text-[8.5px] text-slate-400 mt-0.5 font-semibold">STATUS: AHLI AKTIF & SAH</span>
-              </div>
-            </div>
+                  {/* Title & Document Badge */}
+                  <div className="mt-4 text-center bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3">
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-wide">
+                      Lembaran Rekod Rasmi Profil Kepimpinan & Institusi Sekolah Ahli
+                    </h2>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Penyata maklumat Pengetua/Guru Besar dan data sekolah berdaftar di bawah MPGBSIM (Tahun {new Date().getFullYear()})
+                    </p>
+                  </div>
 
-            {/* Title & Document Badge */}
-            <div className="mt-3 text-center bg-slate-50 border border-slate-200 rounded-xl py-2 px-3">
-              <h2 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wide">
-                Lembaran Rekod Rasmi Profil Kepimpinan & Institusi Sekolah Ahli
-              </h2>
-              <p className="text-[9.5px] text-slate-500 mt-0.5">
-                Penyata maklumat Pengetua/Guru Besar dan data sekolah berdaftar di bawah MPGBSIM (Tahun {new Date().getFullYear()})
-              </p>
-            </div>
+                  {/* Grid 3 Key Badges */}
+                  <div className="grid grid-cols-3 gap-3 mt-4 text-xs">
+                    <div className="p-2.5 rounded-xl bg-teal-50/50 border border-teal-200">
+                      <span className="text-[9.5px] text-slate-500 block">No. Keahlian Rasmi:</span>
+                      <strong className="text-teal-950 font-mono text-xs">{membershipNumber}</strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200">
+                      <span className="text-[9.5px] text-slate-500 block">Status Pengiktirafan:</span>
+                      <strong className="text-amber-900 flex items-center gap-1 font-bold text-xs">
+                        <CheckCircle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                        <span>Diperakui Sah & Aktif</span>
+                      </strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                      <span className="text-[9.5px] text-slate-500 block">Tarikh Cetakan Dokumen:</span>
+                      <strong className="text-slate-800 text-xs">
+                        {new Intl.DateTimeFormat('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
+                      </strong>
+                    </div>
+                  </div>
 
-            {/* Grid 3 Key Badges */}
-            <div className="grid grid-cols-3 gap-2.5 mt-3 text-xs">
-              <div className="p-2 rounded-xl bg-teal-50/50 border border-teal-200">
-                <span className="text-[9px] text-slate-500 block">No. Keahlian Rasmi:</span>
-                <strong className="text-teal-950 font-mono text-[11px]">{membershipNumber}</strong>
-              </div>
-              <div className="p-2 rounded-xl bg-amber-50/50 border border-amber-200">
-                <span className="text-[9px] text-slate-500 block">Status Pengiktirafan:</span>
-                <strong className="text-amber-900 flex items-center gap-1 font-bold text-[11px]">
-                  <CheckCircle className="w-3 h-3 text-amber-700 shrink-0" />
-                  <span>Diperakui Sah & Aktif</span>
-                </strong>
-              </div>
-              <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                <span className="text-[9px] text-slate-500 block">Tarikh Cetakan Dokumen:</span>
-                <strong className="text-slate-800 text-[11px]">
-                  {new Intl.DateTimeFormat('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
-                </strong>
-              </div>
-            </div>
+                  {/* BAHAGIAN 1: MAKLUMAT PENGETUA / GURU BESAR (PGB) */}
+                  <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-teal-900 text-white px-4 py-2 flex items-center justify-between">
+                      <h3 className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+                        <span>1. Maklumat Pengetua / Guru Besar (PGB)</span>
+                      </h3>
+                      <span className="text-[9.5px] bg-teal-800 px-2 py-0.5 rounded font-semibold text-teal-200">
+                        Kepimpinan Institusi
+                      </span>
+                    </div>
 
-            {/* BAHAGIAN 1: MAKLUMAT PENGETUA / GURU BESAR (PGB) */}
-            <div className="mt-3.5 border border-slate-200 rounded-xl overflow-hidden">
-              <div className="bg-teal-900 text-white px-3.5 py-1.5 flex items-center justify-between">
-                <h3 className="font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                  <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
-                  <span>1. Maklumat Pengetua / Guru Besar (PGB)</span>
-                </h3>
-                <span className="text-[9px] bg-teal-800 px-2 py-0.5 rounded font-semibold text-teal-200">
-                  Kepimpinan Institusi
-                </span>
-              </div>
-
-              <div className="p-3.5 flex flex-row items-start gap-4 bg-white">
-                <div className="w-20 h-24 rounded-xl bg-slate-100 border-2 border-teal-800/20 overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
-                  {photoURL ? (
-                    <img src={photoURL} alt={fullName} crossOrigin="anonymous" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-8 h-8 text-slate-400" />
-                  )}
-                </div>
-
-                <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-[11px] w-full">
-                  <div className="col-span-2 sm:col-span-1">
-                    <span className="text-[9px] text-slate-500 block">Nama Penuh PGB:</span>
-                    <strong className="text-slate-900 font-bold text-xs block">{fullName || '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Jawatan Hakiki PGB:</span>
-                    <strong className="text-teal-900 font-bold">{position || '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Tahun Menjadi PGB:</span>
-                    <strong className="text-amber-800 font-bold font-mono">{serviceStartYear || '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">No. Kad Pengenalan PGB:</span>
-                    <span className="text-slate-800 font-mono">{icNumber || 'Dalam Rekod Rasmi'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Email Rasmi PGB:</span>
-                    <span className="text-slate-800 break-all">{pgbEmail || currentUser?.email || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">No. Telefon PGB:</span>
-                    <span className="text-slate-800 font-mono">{phone || '-'}</span>
-                  </div>
-                  <div className="col-span-2 sm:col-span-3 pt-1 border-t border-slate-100 flex items-center gap-2">
-                    <span className="text-[9px] text-slate-500">Alamat Emel Akaun Log Masuk:</span>
-                    <span className="text-slate-700 font-mono text-[10.5px] font-semibold">{currentUser?.email || '-'}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* BAHAGIAN 2: MAKLUMAT INSTITUSI SEKOLAH */}
-            <div className="mt-3.5 border border-slate-200 rounded-xl overflow-hidden">
-              <div className="bg-teal-900 text-white px-3.5 py-1.5 flex items-center justify-between">
-                <h3 className="font-bold text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                  <School className="w-3.5 h-3.5 text-amber-300" />
-                  <span>2. Maklumat Institusi Sekolah Ahli</span>
-                </h3>
-                <span className="text-[9px] bg-teal-800 px-2 py-0.5 rounded font-semibold text-teal-200">
-                  Data Rasmi Sekolah
-                </span>
-              </div>
-
-              <div className="p-3.5 bg-white space-y-2.5 text-[11px]">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
-                    <span className="text-[9px] text-slate-500 block">Nama Penuh Institusi Sekolah:</span>
-                    <strong className="text-slate-900 font-bold text-xs block">{school || '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Kod Sekolah:</span>
-                    <span className="font-mono font-bold text-teal-900">{schoolCode || '-'}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Status Keahlian (Fasal 4):</span>
-                    <strong className={membershipType === 'Ahli Bersekutu' ? 'text-indigo-800' : 'text-teal-900'}>
-                      {membershipType}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Kategori Sekolah:</span>
-                    <strong className="text-slate-800">{schoolType || '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Tahun Ahli MPGBSIM:</span>
-                    <strong className="text-teal-900 font-bold font-mono">{joinYear || currentUser?.joinYear || '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Negeri Institusi:</span>
-                    <strong className="text-slate-800">{state || '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Daerah:</span>
-                    <span className="text-slate-800">{district || '-'}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100">
-                  <div className="sm:col-span-2">
-                    <span className="text-[9px] text-slate-500 block">Alamat Lengkap Institusi:</span>
-                    <span className="text-slate-800">{address || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Laman Web Rasmi:</span>
-                    <span className="text-slate-800 truncate block">{website || '-'}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Email Pejabat Sekolah:</span>
-                    <span className="text-slate-800 break-all">{schoolEmail || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">No. Tel. Pejabat Sekolah:</span>
-                    <span className="text-slate-800 font-mono">{schoolPhone || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Jumlah Murid / Pelajar:</span>
-                    <strong className="text-slate-800 font-mono">{studentCount || 0} orang</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 block">Jumlah Tenaga Pengajar:</span>
-                    <strong className="text-slate-800 font-mono">{teacherCount || 0} orang</strong>
-                  </div>
-                </div>
-
-                {(schoolPhotoUrl || logoUrl) && (
-                  <div className="flex items-center gap-4 pt-2 border-t border-slate-100">
-                    {logoUrl && (
-                      <div className="flex items-center gap-2">
-                        <img src={logoUrl} alt="Logo" crossOrigin="anonymous" className="w-8 h-8 object-contain rounded border border-slate-200 p-0.5" />
-                        <span className="text-[9px] text-slate-500">Logo Institusi</span>
+                    <div className="p-4 flex flex-row items-start gap-4 bg-white">
+                      <div className="w-24 h-28 rounded-xl bg-slate-100 border-2 border-teal-800/20 overflow-hidden shrink-0 shadow-xs flex items-center justify-center">
+                        {photoURL ? (
+                          <img src={photoURL} alt={fullName} crossOrigin="anonymous" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-8 h-8 text-slate-400" />
+                        )}
                       </div>
-                    )}
-                    {schoolPhotoUrl && (
-                      <div className="flex items-center gap-2">
-                        <img src={schoolPhotoUrl} alt="Foto Sekolah" crossOrigin="anonymous" className="w-14 h-8 object-cover rounded border border-slate-200" />
-                        <span className="text-[9px] text-slate-500">Mercu Tanda Sekolah</span>
+
+                      <div className="flex-1 grid grid-cols-3 gap-x-4 gap-y-2.5 text-xs w-full">
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Nama Penuh PGB:</span>
+                          <strong className="text-slate-900 font-bold text-xs block">{fullName || '-'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Jawatan Hakiki PGB:</span>
+                          <strong className="text-teal-900 font-bold">{position || '-'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Tahun Menjadi PGB:</span>
+                          <strong className="text-amber-800 font-bold font-mono">{serviceStartYear || '-'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">No. Kad Pengenalan PGB:</span>
+                          <span className="text-slate-800 font-mono">{icNumber || 'Dalam Rekod Rasmi'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Email Rasmi PGB:</span>
+                          <span className="text-slate-800 break-all">{pgbEmail || currentUser?.email || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">No. Telefon PGB:</span>
+                          <span className="text-slate-800 font-mono">{phone || '-'}</span>
+                        </div>
+                        <div className="col-span-3 pt-1.5 border-t border-slate-100 flex items-center gap-2">
+                          <span className="text-[9.5px] text-slate-500">Alamat Emel Akaun Log Masuk:</span>
+                          <span className="text-slate-700 font-mono text-[11px] font-semibold">{currentUser?.email || '-'}</span>
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            {/* BAHAGIAN 3: KEPIMPINAN, KEPAKARAN & KAWALAN PRIVASI */}
-            <div className="mt-3.5 border border-slate-200 rounded-xl overflow-hidden">
-              <div className="bg-slate-100 text-slate-900 px-3.5 py-1.5 border-b border-slate-200">
-                <h3 className="font-bold text-[11px] uppercase tracking-wider">
-                  3. Kawalan Privasi, Bidang Kepakaran & Minat Kepimpinan
-                </h3>
-              </div>
-              <div className="p-3 bg-white grid grid-cols-3 gap-3 text-[11px]">
-                <div>
-                  <span className="text-[9px] text-slate-500 block">Bidang Kepakaran:</span>
-                  <span className="text-slate-800 font-medium">{expertiseStr || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 block">Minat Profesional:</span>
-                  <span className="text-slate-800 font-medium">{interestsStr || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-[9px] text-slate-500 block">Status Privasi Telefon:</span>
-                  <span className="text-slate-800">
-                    {hidePhone ? 'Dilindungi (Urus Setia Sahaja)' : 'Dipaparkan di Direktori Awam'}
-                  </span>
-                </div>
-              </div>
-            </div>
+                  {/* BAHAGIAN 2: MAKLUMAT INSTITUSI SEKOLAH */}
+                  <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-teal-900 text-white px-4 py-2 flex items-center justify-between">
+                      <h3 className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <School className="w-3.5 h-3.5 text-amber-300" />
+                        <span>2. Maklumat Institusi Sekolah Ahli</span>
+                      </h3>
+                      <span className="text-[9.5px] bg-teal-800 px-2 py-0.5 rounded font-semibold text-teal-200">
+                        Data Rasmi Sekolah
+                      </span>
+                    </div>
 
-            {/* BAHAGIAN 4: PENGESAHAN URUS SETIA RASMI */}
-            <div className="mt-4 pt-3 border-t-2 border-slate-200 grid grid-cols-3 gap-3 items-center">
-              <div className="flex items-center gap-2">
-                <div className="w-12 h-12 rounded-xl border border-slate-300 flex items-center justify-center p-1 bg-white shrink-0">
-                  {cardQrCodeUrl ? (
-                    <img src={cardQrCodeUrl} alt="QR Verifikasi" className="w-full h-full object-contain" />
-                  ) : (
-                    <QrCode className="w-10 h-10 text-slate-800" />
-                  )}
+                    <div className="p-4 bg-white space-y-3 text-xs">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-2">
+                          <span className="text-[9.5px] text-slate-500 block">Nama Penuh Institusi Sekolah:</span>
+                          <strong className="text-slate-900 font-bold text-xs block">{school || '-'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Kod Sekolah:</span>
+                          <span className="font-mono font-bold text-teal-900">{schoolCode || '-'}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-2.5 pt-2.5 border-t border-slate-100">
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Status Keahlian (Fasal 4):</span>
+                          <strong className={membershipType === 'Ahli Bersekutu' ? 'text-indigo-800' : 'text-teal-900'}>
+                            {membershipType}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Kategori Sekolah:</span>
+                          <strong className="text-slate-800">{schoolType || '-'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Tahun Ahli MPGBSIM:</span>
+                          <strong className="text-teal-900 font-bold font-mono">{joinYear || currentUser?.joinYear || '-'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Negeri Institusi:</span>
+                          <strong className="text-slate-800">{state || '-'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Daerah:</span>
+                          <span className="text-slate-800">{district || '-'}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2.5 pt-2.5 border-t border-slate-100">
+                        <div className="col-span-2">
+                          <span className="text-[9.5px] text-slate-500 block">Alamat Lengkap Institusi:</span>
+                          <span className="text-slate-800">{address || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Laman Web Rasmi:</span>
+                          <span className="text-slate-800 truncate block">{website || '-'}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2.5 pt-2.5 border-t border-slate-100">
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Email Pejabat Sekolah:</span>
+                          <span className="text-slate-800 break-all">{schoolEmail || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">No. Tel. Pejabat Sekolah:</span>
+                          <span className="text-slate-800 font-mono">{schoolPhone || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Jumlah Murid / Pelajar:</span>
+                          <strong className="text-slate-800 font-mono">{studentCount || 0} orang</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Jumlah Tenaga Pengajar:</span>
+                          <strong className="text-slate-800 font-mono">{teacherCount || 0} orang</strong>
+                        </div>
+                      </div>
+
+                      {(schoolPhotoUrl || logoUrl) && (
+                        <div className="flex items-center gap-4 pt-2.5 border-t border-slate-100">
+                          {logoUrl && (
+                            <div className="flex items-center gap-2">
+                              <img src={logoUrl} alt="Logo" crossOrigin="anonymous" className="w-9 h-9 object-contain rounded border border-slate-200 p-0.5" />
+                              <span className="text-[9.5px] text-slate-500">Logo Institusi</span>
+                            </div>
+                          )}
+                          {schoolPhotoUrl && (
+                            <div className="flex items-center gap-2">
+                              <img src={schoolPhotoUrl} alt="Foto Sekolah" crossOrigin="anonymous" className="w-16 h-9 object-cover rounded border border-slate-200" />
+                              <span className="text-[9.5px] text-slate-500">Mercu Tanda Sekolah</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* BAHAGIAN 3: KEPIMPINAN, KEPAKARAN & KAWALAN PRIVASI */}
+                  <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-slate-100 text-slate-900 px-4 py-2 border-b border-slate-200">
+                      <h3 className="font-bold text-xs uppercase tracking-wider">
+                        3. Kawalan Privasi, Bidang Kepakaran & Minat Kepimpinan
+                      </h3>
+                    </div>
+                    <div className="p-3.5 bg-white grid grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <span className="text-[9.5px] text-slate-500 block">Bidang Kepakaran:</span>
+                        <span className="text-slate-800 font-medium">{expertiseStr || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] text-slate-500 block">Minat Profesional:</span>
+                        <span className="text-slate-800 font-medium">{interestsStr || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9.5px] text-slate-500 block">Status Privasi Telefon:</span>
+                        <span className="text-slate-800">
+                          {hidePhone ? 'Dilindungi (Urus Setia Sahaja)' : 'Dipaparkan di Direktori Awam'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[8.5px] text-slate-400 block font-mono">KOD VERIFIKASI:</span>
-                  <strong className="text-[10px] text-teal-900 font-mono block">VERIFIED-{effectiveCardCode}</strong>
-                  <span className="text-[8.5px] text-slate-500">Imbas untuk semakan rasmi</span>
+
+                {/* BAHAGIAN 4: PENGESAHAN URUS SETIA RASMI (Pinned at bottom of A4 sheet) */}
+                <div className="mt-5">
+                  <div className="pt-4 border-t-2 border-slate-200 grid grid-cols-3 gap-3 items-center">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-14 h-14 rounded-xl border border-slate-300 flex items-center justify-center p-1 bg-white shrink-0">
+                        {cardQrCodeUrl ? (
+                          <img src={cardQrCodeUrl} alt="QR Verifikasi" className="w-full h-full object-contain" />
+                        ) : (
+                          <QrCode className="w-11 h-11 text-slate-800" />
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-[8.5px] text-slate-400 block font-mono">KOD VERIFIKASI:</span>
+                        <strong className="text-[10.5px] text-teal-900 font-mono block">VERIFIED-{effectiveCardCode}</strong>
+                        <span className="text-[8.5px] text-slate-500">Imbas untuk semakan rasmi</span>
+                      </div>
+                    </div>
+
+                    <div className="text-center p-2.5 rounded-xl bg-amber-50/60 border border-amber-200">
+                      <span className="text-[10px] font-bold text-amber-950 block">METERAI RASMI KEAHLIAN</span>
+                      <span className="text-[9px] text-amber-800 block">MPGBSIM KEBANGSAAN</span>
+                      <span className="text-[8.5px] text-amber-700 font-mono">SELESAI DISEMAK & DISAHKAN</span>
+                    </div>
+
+                    <div className="text-right text-xs">
+                      <span className="text-[9px] text-slate-400 block">DIKELUARKAN OLEH:</span>
+                      <strong className="text-slate-900 block text-xs">Urus Setia Kebangsaan MPGBSIM</strong>
+                      <span className="text-[9.5px] text-slate-500">Majlis Pengetua & Guru Besar Sekolah Islam Malaysia</span>
+                    </div>
+                  </div>
+
+                  {/* Official Footnote */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 text-center">
+                    <p className="text-[9px] text-slate-400 leading-tight">
+                      Dokumen ini merupakan salinan rekod profil rasmi yang dijana secara digital daripada Portal Ahli MPGBSIM (https://www.mpgbsim.org/) pada {new Intl.DateTimeFormat('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}. Cetakan atau muat turun fail PDF 1 muka surat A4 ini diperakui sah sebagai bukti keahlian dan rekod institusi sekolah.
+                    </p>
+                  </div>
                 </div>
               </div>
-
-              <div className="text-center p-2 rounded-xl bg-amber-50/60 border border-amber-200">
-                <span className="text-[9.5px] font-bold text-amber-950 block">METERAI RASMI KEAHLIAN</span>
-                <span className="text-[8.5px] text-amber-800 block">MPGBSIM KEBANGSAAN</span>
-                <span className="text-[8px] text-amber-700 font-mono">SELESAI DISEMAK & DISAHKAN</span>
-              </div>
-
-              <div className="text-right text-[11px]">
-                <span className="text-[9px] text-slate-400 block">DIKELUARKAN OLEH:</span>
-                <strong className="text-slate-900 block text-[11px]">Urus Setia Kebangsaan MPGBSIM</strong>
-                <span className="text-[9px] text-slate-500">Majlis Pengetua & Guru Besar Sekolah Islam Malaysia</span>
-              </div>
-            </div>
-
-            {/* Official Footnote */}
-            <div className="mt-3 pt-2 border-t border-slate-100 text-center">
-              <p className="text-[8.5px] text-slate-400 leading-tight">
-                Dokumen ini merupakan salinan rekod profil rasmi yang dijana secara digital daripada Portal Ahli MPGBSIM (https://www.mpgbsim.org/) pada {new Intl.DateTimeFormat('ms-MY', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}. Cetakan atau muat turun fail PDF 1 muka surat ini diperakui sah sebagai bukti keahlian dan rekod institusi sekolah.
-              </p>
             </div>
           </div>
         </div>
@@ -2061,6 +2095,12 @@ export const PortalProfile: React.FC = () => {
       <DigitalMembershipCardModal
         isOpen={isDigitalCardModalOpen}
         onClose={() => setIsDigitalCardModalOpen(false)}
+      />
+
+      {/* Official School Membership Certificate Modal */}
+      <OfficialSchoolCertificateModal
+        isOpen={isCertificateModalOpen}
+        onClose={() => setIsCertificateModalOpen(false)}
       />
     </div>
   );

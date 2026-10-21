@@ -25,6 +25,7 @@ import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool } from '../../types';
 import { SchoolNetworkCharts, resolveSchoolMembershipType } from '../SchoolNetworkCharts';
 import { SchoolNetworkMap } from '../SchoolNetworkMap';
+import { OfficialSchoolCertificateModal } from './OfficialSchoolCertificateModal';
 
 export const PortalDirectory: React.FC = () => {
   const { portalSubTab, setPortalSubTab, currentUser, registeredSchools } = useMemberPortal();
@@ -50,6 +51,7 @@ export const PortalDirectory: React.FC = () => {
   // Detail Modal States
   const [selectedPGB, setSelectedPGB] = useState<any | null>(null);
   const [selectedSchool, setSelectedSchool] = useState<MemberSchool | null>(null);
+  const [certificateSchool, setCertificateSchool] = useState<MemberSchool | null>(null);
 
   const statesList = [
     'Semua',
@@ -635,19 +637,16 @@ export const PortalDirectory: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                    {sch.website ? (
-                      <a
-                        href={sch.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-teal-800 hover:underline flex items-center gap-1 font-semibold"
-                      >
-                        <Globe className="w-3.5 h-3.5" /> Laman Web
-                      </a>
-                    ) : (
-                      <span className="text-slate-400 text-[11px]">Tiada web rasmi</span>
-                    )}
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setCertificateSchool(sch)}
+                      className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Lihat & Muat Turun Sijil Rasmi Keahlian Sekolah"
+                    >
+                      <Award className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Sijil Rasmi</span>
+                    </button>
 
                     <button
                       onClick={() => setSelectedSchool(sch)}
@@ -859,19 +858,31 @@ export const PortalDirectory: React.FC = () => {
               </div>
             )}
 
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-              {activeSchool.website ? (
-                <a
-                  href={activeSchool.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 rounded-xl bg-teal-800 text-white text-xs font-semibold hover:bg-teal-900 flex items-center gap-1.5"
+            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = activeSchool;
+                    setSelectedSchool(null);
+                    setCertificateSchool(target);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  <Globe className="w-3.5 h-3.5" /> Laman Web Rasmi
-                </a>
-              ) : (
-                <div />
-              )}
+                  <Award className="w-3.5 h-3.5 text-slate-950" /> Lihat Sijil Rasmi Keahlian
+                </button>
+
+                {activeSchool.website && (
+                  <a
+                    href={activeSchool.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 rounded-xl bg-teal-800 text-white text-xs font-semibold hover:bg-teal-900 flex items-center gap-1.5"
+                  >
+                    <Globe className="w-3.5 h-3.5" /> Laman Web Rasmi
+                  </a>
+                )}
+              </div>
               <button
                 onClick={() => setSelectedSchool(null)}
                 className="px-5 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer"
@@ -882,6 +893,13 @@ export const PortalDirectory: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Official School Membership Certificate Modal */}
+      <OfficialSchoolCertificateModal
+        isOpen={Boolean(certificateSchool)}
+        onClose={() => setCertificateSchool(null)}
+        schoolOverride={certificateSchool}
+      />
     </div>
   );
 };

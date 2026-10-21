@@ -37,6 +37,7 @@ import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { BestPracticeItem, MemberSchool } from '../../types';
 import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
+import { OfficialSchoolCertificateModal } from './OfficialSchoolCertificateModal';
 
 interface PortalDashboardHomeProps {
   onOpenAnnouncementModal?: (ann: any) => void;
@@ -67,6 +68,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
   const programs = siteData.programs || [];
 
   const [isDigitalCardModalOpen, setIsDigitalCardModalOpen] = React.useState(false);
+  const [isCertificateModalOpen, setIsCertificateModalOpen] = React.useState(false);
   const [selectedDashboardAnnouncement, setSelectedDashboardAnnouncement] = React.useState<any | null>(null);
 
   const getAnnouncementDownloadUrl = (ann: any): string => {
@@ -390,6 +392,15 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
               <button
                 type="button"
+                onClick={() => setIsCertificateModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-600 text-white font-extrabold text-xs flex items-center gap-2 border border-amber-400/40 shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              >
+                <Award className="w-4 h-4 text-amber-300" />
+                <span>Sijil Rasmi Keahlian Sekolah</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setPortalTab('peperiksaan')}
                 className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-extrabold text-xs flex items-center gap-2 border border-amber-400/30 transition cursor-pointer"
               >
@@ -535,7 +546,15 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCertificateModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Award className="w-3.5 h-3.5 text-slate-950" />
+              <span>Sijil Rasmi Keahlian Sekolah</span>
+            </button>
             <button
               onClick={() => setPortalTab('profil')}
               className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
@@ -1243,6 +1262,12 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
       <DigitalMembershipCardModal
         isOpen={isDigitalCardModalOpen}
         onClose={() => setIsDigitalCardModalOpen(false)}
+      />
+
+      {/* Official School Membership Certificate Modal */}
+      <OfficialSchoolCertificateModal
+        isOpen={isCertificateModalOpen}
+        onClose={() => setIsCertificateModalOpen(false)}
       />
     </div>
   );

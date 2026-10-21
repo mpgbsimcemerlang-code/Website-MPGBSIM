@@ -21,6 +21,7 @@ import { QuoteSection } from './components/QuoteSection';
 import { ResourcesSection } from './components/ResourcesSection';
 import { CallToAction } from './components/CallToAction';
 import { ContactSection } from './components/ContactSection';
+import { FAQSection } from './components/FAQSection';
 import { Footer } from './components/Footer';
 import { DetailModal, ModalContentType } from './components/DetailModal';
 
@@ -158,6 +159,7 @@ function AppContent() {
         'kepimpinan',
         'sumber',
         'hubungi',
+        'soalan-lazim',
       ];
 
       const scrollPosition = window.scrollY + 160;
@@ -198,6 +200,7 @@ function AppContent() {
       kepimpinan: 'Jawatankuasa Kepimpinan Pusat | MPGBSIM',
       sumber: 'Pusat Sumber & Muat Turun Dokumen Rasmi | MPGBSIM',
       hubungi: 'Hubungi Sekretariat Kebangsaan | MPGBSIM',
+      'soalan-lazim': 'Soalan Lazim (FAQ) Keahlian & Portal PGB | MPGBSIM',
     };
     document.title = sectionTitles[activeSection] || 'MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia';
   }, [viewMode, activeSection, detailModalContent]);
@@ -339,6 +342,12 @@ function AppContent() {
 
         {/* HUBUNGI KAMI */}
         <ContactSection />
+
+        {/* SOALAN LAZIM (FAQ) KEAHLIAN & PORTAL MPGBSIM (Schema.org FAQPage) */}
+        <FAQSection
+          onOpenPortal={handleOpenPortal}
+          onNavigateSection={handleScrollTo}
+        />
       </main>
 
       {/* 11. FOOTER */}

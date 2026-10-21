@@ -26,28 +26,24 @@ function strToUint8(str: string): Uint8Array {
 }
 
 /**
- * Embeds a rendered HTMLCanvasElement onto a single A4 portrait page (595.28 x 841.89 pt)
+ * Embeds a rendered HTMLCanvasElement onto a full single A4 portrait page (595.28 x 841.89 pt)
  * and returns a valid PDF 1.4 Blob.
  */
 export function canvasToSinglePageA4PdfBlob(canvas: HTMLCanvasElement): Blob {
   const pageWidthPt = 595.28;
   const pageHeightPt = 841.89;
-  const marginPt = 16;
-
-  const maxDrawWidth = pageWidthPt - marginPt * 2;
-  const maxDrawHeight = pageHeightPt - marginPt * 2;
 
   const imgWidthPx = canvas.width;
   const imgHeightPx = canvas.height;
 
-  // Scale proportionally so the entire preview fits strictly on 1 A4 page
-  const scale = Math.min(maxDrawWidth / imgWidthPx, maxDrawHeight / imgHeightPx);
+  // Fill the full A4 page while preserving exact aspect ratio
+  const scale = Math.min(pageWidthPt / imgWidthPx, pageHeightPt / imgHeightPx);
   const drawWidth = Number((imgWidthPx * scale).toFixed(2));
   const drawHeight = Number((imgHeightPx * scale).toFixed(2));
 
-  // Center horizontally and align cleanly near the top of the A4 page
+  // Center on the A4 page
   const offsetX = Number(((pageWidthPt - drawWidth) / 2).toFixed(2));
-  const offsetY = Number((pageHeightPt - marginPt - drawHeight).toFixed(2));
+  const offsetY = Number(((pageHeightPt - drawHeight) / 2).toFixed(2));
 
   const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.96);
   const jpegBytes = dataUrlToUint8Array(jpegDataUrl);
@@ -116,30 +112,38 @@ export function canvasToSinglePageA4PdfBlob(canvas: HTMLCanvasElement): Blob {
 }
 
 /**
- * Renders the target DOM element exactly as shown in the Official Profile Preview
- * (using an offscreen desktop-width clone if needed so layout never wraps awkwardly)
- * and downloads a single-page A4 PDF.
+ * Renders the target DOM element as a full A4 portrait page (794px x 1123px)
+ * matching the preview and downloads a single-page A4 PDF.
  */
 export async function downloadElementAsSinglePagePdf(
   element: HTMLElement,
   filename: string
 ): Promise<void> {
-  // Clone element into an offscreen container locked to 840px width so even on mobile
-  // the PDF matches the full desktop "Pratonton Rekod Profil Rasmi Kepimpinan (Format PDF)" layout
+  // Exact A4 portrait pixel dimensions at 96 DPI (210mm x 297mm -> 794px x 1123px)
+  const A4_WIDTH_PX = 794;
+  const A4_HEIGHT_PX = 1123;
+
   const wrapper = document.createElement('div');
   wrapper.style.position = 'fixed';
   wrapper.style.left = '-99999px';
   wrapper.style.top = '0';
-  wrapper.style.width = '840px';
+  wrapper.style.width = `${A4_WIDTH_PX}px`;
+  wrapper.style.minHeight = `${A4_HEIGHT_PX}px`;
   wrapper.style.background = '#ffffff';
   wrapper.style.zIndex = '-1';
 
   const clone = element.cloneNode(true) as HTMLElement;
-  clone.style.width = '840px';
-  clone.style.maxWidth = '840px';
+  clone.style.width = `${A4_WIDTH_PX}px`;
+  clone.style.minWidth = `${A4_WIDTH_PX}px`;
+  clone.style.maxWidth = `${A4_WIDTH_PX}px`;
+  clone.style.minHeight = `${A4_HEIGHT_PX}px`;
   clone.style.margin = '0';
   clone.style.boxShadow = 'none';
-  clone.style.borderRadius = '16px';
+  clone.style.borderRadius = '0';
+  clone.style.display = 'flex';
+  clone.style.flexDirection = 'column';
+  clone.style.justifyContent = 'space-between';
+  clone.style.boxSizing = 'border-box';
 
   wrapper.appendChild(clone);
   document.body.appendChild(wrapper);
@@ -151,7 +155,7 @@ export async function downloadElementAsSinglePagePdf(
       allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
-      width: 840,
+      width: A4_WIDTH_PX,
       windowWidth: 1024,
     });
 
