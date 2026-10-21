@@ -16,7 +16,9 @@ import {
   AlumniRecord,
   AnnouncementItem,
   ExamCalendarItem,
+  BirthdaySettingsConfig,
 } from '../types';
+import { DEFAULT_BIRTHDAY_SETTINGS } from '../utils/birthdayUtils';
 
 import {
   persistSiteContent,
@@ -160,6 +162,7 @@ export interface SiteContentState {
   alumni?: AlumniRecord[];
   announcements?: AnnouncementItem[];
   examCalendar?: ExamCalendarItem[];
+  birthdaySettings?: BirthdaySettingsConfig;
 }
 
 export interface AdminUser {
@@ -249,6 +252,8 @@ interface AdminContentContextType {
   deleteMemberApplication: (id: string) => Promise<void>;
   // Dashboard Elements Config
   updateDashboardConfig: (data: Partial<DashboardConfig>) => Promise<void>;
+  // Birthday Greetings Config
+  updateBirthdaySettings: (data: Partial<BirthdaySettingsConfig>) => Promise<void>;
   // Contact Info
   updateContactInfo: (data: Partial<ContactInfoData>) => Promise<void>;
   // Submissions CRUD
@@ -597,7 +602,7 @@ export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
     logoUrl: '/mpgbsim-official-logo.png',
     studentCount: 428,
     teacherCount: 32,
-    joinYear: 2026,
+    joinYear: 2011,
     serviceStartYear: 2026,
     pgbStartYear: 2026,
     website: 'https://imuslehmelaka.edu.my',
@@ -1242,6 +1247,14 @@ const mergeSchoolsPreservingMedia = (
       appMatch?.icNumber ||
       extractIcFromSubmissions(submissions, codeNorm, nameNorm, pgbEmailNorm, principalNorm) ||
       '';
+    const verifiedBirthDate =
+      sch.verifiedBirthDate ||
+      prevMatch?.verifiedBirthDate ||
+      '';
+    const cachedBirthMonthDay =
+      sch.cachedBirthMonthDay ||
+      prevMatch?.cachedBirthMonthDay ||
+      '';
     const pgbEmail =
       sch.pgbEmail ||
       prevMatch?.pgbEmail ||
@@ -1260,13 +1273,24 @@ const mergeSchoolsPreservingMedia = (
       appMatch?.membershipType ||
       (sch.type === 'Rakan Musleh' || (sch.type || '').toLowerCase().includes('rakan') ? 'Ahli Bersekutu' : 'Ahli Biasa');
 
+    const isSriMusleh =
+      sch.id === 'sch-musleh-1' ||
+      codeNorm === 'mjac011' ||
+      (nameNorm.includes('musleh') && (nameNorm.includes('rendah') || nameNorm.includes('sri')));
+    const resolvedJoinYear = isSriMusleh
+      ? (sch.joinYear && sch.joinYear !== 2026 ? sch.joinYear : (prevMatch?.joinYear && prevMatch.joinYear !== 2026 ? prevMatch.joinYear : 2011))
+      : (sch.joinYear || prevMatch?.joinYear || appMatch?.joinYear);
+
     return {
       ...sch,
       membershipType,
+      ...(resolvedJoinYear ? { joinYear: resolvedJoinYear } : {}),
       ...(schoolPhotoUrl ? { schoolPhotoUrl } : {}),
       ...(logoUrl ? { logoUrl } : {}),
       ...(principalPhotoUrl ? { principalPhotoUrl } : {}),
       ...(icNumber ? { icNumber } : {}),
+      ...(verifiedBirthDate ? { verifiedBirthDate } : {}),
+      ...(cachedBirthMonthDay ? { cachedBirthMonthDay } : {}),
       ...(pgbEmail ? { pgbEmail } : {}),
       ...(pgbPhone ? { pgbPhone } : {}),
     };
@@ -1695,6 +1719,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       alumni: rawAlumni,
       announcements: rawAnnouncements,
       examCalendar: rawExams,
+      birthdaySettings:
+        cachedCms?.birthdaySettings ||
+        initialSync?.birthdaySettings ||
+        prev?.birthdaySettings ||
+        DEFAULT_BIRTHDAY_SETTINGS,
     };
   };
 
@@ -1902,6 +1931,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
                   ? cached.announcements
                   : prev.announcements),
               examCalendar: Array.isArray(cached.examCalendar) ? cached.examCalendar : prev.examCalendar,
+              birthdaySettings: cached.birthdaySettings
+                ? { ...DEFAULT_BIRTHDAY_SETTINGS, ...cached.birthdaySettings }
+                : prev.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
             };
           });
         }
@@ -2115,6 +2147,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               leadership: prev.leadership?.length ? prev.leadership : DEFAULT_LEADERSHIP,
               resources: prev.resources?.length ? prev.resources : DEFAULT_RESOURCES,
               dashboardConfig: d.dashboardConfig ? { ...prev.dashboardConfig, ...d.dashboardConfig } : prev.dashboardConfig,
+              birthdaySettings: d.birthdaySettings
+                ? { ...DEFAULT_BIRTHDAY_SETTINGS, ...prev.birthdaySettings, ...d.birthdaySettings }
+                : prev.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
             }));
             clearFirestoreQuotaBreaker();
             setIsReadOnlyMode(false);
@@ -2325,7 +2360,18 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           const rawList: MemberSchool[] = [];
           if (!snapshot.empty) {
             snapshot.forEach((docSnap) => {
-              rawList.push({ id: docSnap.id, ...(docSnap.data() as any) });
+              const d = docSnap.data() as any;
+              // Auto-heal Sekolah Rendah Islam I Musleh joinYear in Firestore if it was overwritten with 2026
+              if (
+                (docSnap.id === 'sch-musleh-1' || d?.code === 'MJAC011') &&
+                (!d?.joinYear || Number(d.joinYear) === 2026)
+              ) {
+                d.joinYear = 2011;
+                if (!isFirestoreQuotaExceeded()) {
+                  setDoc(doc(db, 'schools', docSnap.id), { joinYear: 2011 }, { merge: true }).catch(() => {});
+                }
+              }
+              rawList.push({ id: docSnap.id, ...d });
             });
           }
           const sanitizedSchools = rawList.length > 0 ? sanitizeMemberSchoolsList(rawList) : [];
@@ -2610,13 +2656,6 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               nextApps,
               prev.submissions
             );
-            // Backfill missing icNumber into Firestore 'schools' documents if recovered from memberApplications
-            enrichedSchools.forEach((sch) => {
-              const prevSch = (prev.memberSchools || []).find((p) => p.id === sch.id);
-              if (sch.icNumber && (!prevSch || !prevSch.icNumber) && !isFirestoreQuotaExceeded()) {
-                setDoc(doc(db, 'schools', sch.id), { icNumber: sch.icNumber }, { merge: true }).catch(() => {});
-              }
-            });
             return {
               ...prev,
               memberApplications: nextApps,
@@ -2796,6 +2835,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       cta: siteData.cta,
       contactInfo: siteData.contactInfo,
       dashboardConfig: siteData.dashboardConfig,
+      birthdaySettings: siteData.birthdaySettings,
     });
     cacheFirestoreCollection('news', siteData.news);
     cacheFirestoreCollection('events', siteData.programs);
@@ -2834,6 +2874,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           cta: siteData.cta,
           contactInfo: siteData.contactInfo,
           dashboardConfig: siteData.dashboardConfig,
+          birthdaySettings: siteData.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -3650,6 +3691,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           }
           if (updated.logoUrl) {
             portalUser.logoUrl = updated.logoUrl;
+          }
+          if (updated.joinYear) {
+            portalUser.joinYear = Number(updated.joinYear);
           }
           if (updated.serviceStartYear) {
             portalUser.serviceStartYear = updated.serviceStartYear;
@@ -4478,6 +4522,25 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {}
   };
 
+  const updateBirthdaySettings = async (data: Partial<BirthdaySettingsConfig>): Promise<void> => {
+    let nextSettings: BirthdaySettingsConfig = DEFAULT_BIRTHDAY_SETTINGS;
+    setSiteData((prev) => {
+      nextSettings = {
+        ...(prev.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS),
+        ...data,
+        updatedAt: new Date().toISOString(),
+      };
+      return {
+        ...prev,
+        birthdaySettings: nextSettings,
+      };
+    });
+    await saveCmsContentToFirestore({ birthdaySettings: nextSettings });
+    try {
+      window.dispatchEvent(new Event('mpgbsim_birthday_updated'));
+    } catch {}
+  };
+
   const purgeMockData = () => {
     localStorage.setItem('mpgbsim_mock_cleared', 'true');
     const defaultNewsIds = new Set(DEFAULT_NEWS.map((n) => n.id));
@@ -4541,6 +4604,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       dashboardConfig: DEFAULT_DASHBOARD_CONFIG,
       alumni: [],
       announcements: [],
+      birthdaySettings: DEFAULT_BIRTHDAY_SETTINGS,
     });
     localStorage.removeItem(STORAGE_KEYS.SITE_CONTENT);
     purgeObsoleteLocalStorage();
@@ -4610,6 +4674,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         rejectMemberApplication,
         deleteMemberApplication,
         updateDashboardConfig,
+        updateBirthdaySettings,
         updateContactInfo,
         addSubmission,
         updateSubmissionStatus,

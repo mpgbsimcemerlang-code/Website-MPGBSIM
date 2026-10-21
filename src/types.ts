@@ -70,6 +70,8 @@ export interface UserProfile {
   role: UserRole;
   position?: string;
   icNumber?: string;
+  verifiedBirthDate?: string;
+  cachedBirthMonthDay?: string;
   school?: string;
   schoolId?: string;
   schoolCode?: string;
@@ -288,6 +290,16 @@ export interface PortalNotification {
   chatChannelId?: string;
 }
 
+export type ActivityLogCategory =
+  | 'LOG_MASUK'
+  | 'SIJIL_KAD'
+  | 'PROFIL'
+  | 'DOKUMEN'
+  | 'YURAN'
+  | 'PROGRAM_AMALAN'
+  | 'KESELAMATAN'
+  | 'LAIN_LAIN';
+
 export interface AuditLogItem {
   id: string;
   user: string;
@@ -295,6 +307,13 @@ export interface AuditLogItem {
   action: string;
   content: string;
   timestamp: string;
+  isoTimestamp?: string;
+  schoolName?: string;
+  schoolCode?: string;
+  state?: string;
+  position?: string;
+  membershipNo?: string;
+  category?: ActivityLogCategory;
 }
 
 export interface AIPromptItem {
@@ -344,6 +363,8 @@ export interface MemberSchool {
   principal: string;
   designation?: 'Pengetua' | 'Guru Besar' | string;
   icNumber?: string;
+  verifiedBirthDate?: string;
+  cachedBirthMonthDay?: string;
   principalPhotoUrl?: string;
   studentCount: number;
   teacherCount?: number;
@@ -605,5 +626,34 @@ export interface PGBChatPresence {
   lastActiveAt: string; // ISO timestamp
   statusText?: string;
 }
+
+export interface BirthdayMemberOverride {
+  memberKey: string;
+  verifiedBirthDate?: string; // Format YYYY-MM-DD jika disahkan oleh ahli/admin
+  centuryOverride?: 1900 | 2000; // Pembetulan abad kelahiran jika 2 digit tahun tidak jelas
+  hiddenFromBirthday?: boolean; // Sembunyikan ucapan bagi ahli tertentu jika diminta
+  customGreeting?: string; // Ucapan khas pilihan untuk ahli tertentu
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface BirthdaySettingsConfig {
+  enabled: boolean;
+  showOnPublicWebsite: boolean;
+  showOnMemberPortal: boolean;
+  upcomingDaysWindow: number;
+  showMemberName: boolean;
+  showSchoolName: boolean;
+  showPosition: boolean;
+  showState: boolean;
+  showPhoto: boolean;
+  sectionTitlePublic: string;
+  sectionSubtitlePublic: string;
+  emptyTodayMessagePublic: string;
+  greetingTemplates: string[];
+  memberOverrides: Record<string, BirthdayMemberOverride>;
+  updatedAt?: string;
+}
+
 
 

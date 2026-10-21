@@ -160,6 +160,11 @@ service cloud.firestore {
     match /pgbChatPresence/{presenceId} {
       allow read, write: if true;
     }
+
+    // 22. Member Profiles (PGB Portal Profile & Login Metadata)
+    match /memberProfiles/{profileId} {
+      allow read, write: if true;
+    }
   }
 }
 

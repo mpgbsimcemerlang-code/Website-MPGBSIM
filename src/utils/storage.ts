@@ -56,38 +56,55 @@ export function safeLocalStorageRemove(key: string): void {
 }
 
 /**
+ * Extracts only non-PII MM-DD month/day from a Malaysian IC string if valid,
+ * so localStorage never stores raw IC numbers or birth years.
+ */
+function extractSafeMonthDayFromIc(rawIc: unknown): string | undefined {
+  if (typeof rawIc !== 'string') return undefined;
+  const digits = rawIc.trim().replace(/[\s-]/g, '');
+  if (!/^\d{6}(\d{6})?$/.test(digits) || /^0+$/.test(digits)) return undefined;
+  const mm = parseInt(digits.slice(2, 4), 10);
+  const dd = parseInt(digits.slice(4, 6), 10);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return undefined;
+  return `${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+}
+
+/**
  * Safely save site content across IndexedDB and localStorage
- * Handles QuotaExceededError gracefully without throwing
+ * Handles QuotaExceededError gracefully without throwing, and strips raw IC numbers
+ * from localStorage / cache for PDPA & privacy compliance.
  */
 export async function persistSiteContent(data: any): Promise<void> {
-  // 1. Always save full high-res data into IndexedDB (virtually unlimited quota)
-  await saveToIndexedDB(CONTENT_KEY, data);
+  const privacySafeData = stripLargeBase64(data, 500000);
+  // 1. Save privacy-sanitized data into IndexedDB
+  await saveToIndexedDB(CONTENT_KEY, privacySafeData);
 
   // 2. Always purge obsolete legacy keys first
   StorageManagementService.purgeObsoleteKeys();
 
   // 3. Proactively compact base64 before writing to localStorage to prevent quota exhaustion
   try {
-    const serialized = JSON.stringify(data);
+    const serialized = JSON.stringify(privacySafeData);
     if (serialized.length > 700000) {
-      const compact = stripLargeBase64(data, 25000);
+      const compact = stripLargeBase64(privacySafeData, 25000);
       StorageManagementService.setItem(LOCAL_STORAGE_KEYS.SITE_CONTENT, JSON.stringify(compact));
       return;
     }
     StorageManagementService.setItem(LOCAL_STORAGE_KEYS.SITE_CONTENT, serialized);
   } catch (err: any) {
     try {
-      const compact = stripLargeBase64(data, 12000);
+      const compact = stripLargeBase64(privacySafeData, 12000);
       StorageManagementService.setItem(LOCAL_STORAGE_KEYS.SITE_CONTENT, JSON.stringify(compact));
     } catch {
-      // IndexedDB has already persisted full data!
+      // IndexedDB has already persisted sanitized data!
     }
   }
 }
 
 /**
- * Helper to strip very large base64 data URLs for the localStorage cache fallback
- * Preserves avatarUrl and photoUrl up to limit so leader and user profiles never lose photos
+ * Helper to strip very large base64 data URLs and raw IC numbers (PII) for the localStorage cache fallback.
+ * Preserves avatarUrl and photoUrl up to limit so leader and user profiles never lose photos,
+ * and replaces icNumber with non-PII cachedBirthMonthDay (MM-DD).
  */
 export function stripLargeBase64(obj: any, customLimit?: number): any {
   if (!obj || typeof obj !== 'object') return obj;
@@ -97,6 +114,14 @@ export function stripLargeBase64(obj: any, customLimit?: number): any {
   const copy: any = {};
   for (const key of Object.keys(obj)) {
     const val = obj[key];
+    // Never store raw icNumber in localStorage or public cache
+    if (key === 'icNumber') {
+      const safeMonthDay = extractSafeMonthDayFromIc(val);
+      if (safeMonthDay && !copy.cachedBirthMonthDay && !obj.cachedBirthMonthDay) {
+        copy.cachedBirthMonthDay = safeMonthDay;
+      }
+      continue;
+    }
     const isProtectedPhoto =
       key === 'avatarUrl' ||
       key === 'photoUrl' ||

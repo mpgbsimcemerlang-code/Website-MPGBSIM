@@ -45,6 +45,7 @@ import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
 import { OfficialSchoolCertificateModal } from './OfficialSchoolCertificateModal';
 import { compressImageFile, compressDataUrl } from '../../utils/imageCompressor';
 import { downloadElementAsSinglePagePdf } from '../../utils/pdfGenerator';
+import { maskIcNumber, parseBirthDateFromIc } from '../../utils/birthdayUtils';
 
 const normalizeSchoolCategory = (t?: string): string => {
   if (!t) return 'Sekolah Menengah';
@@ -58,7 +59,7 @@ const normalizeSchoolCategory = (t?: string): string => {
 };
 
 export const PortalProfile: React.FC = () => {
-  const { currentUser, updateUserProfile, changeUserPassword, registeredSchools, setPortalTab } = useMemberPortal();
+  const { currentUser, updateUserProfile, changeUserPassword, registeredSchools, setPortalTab, recordAuditLog } = useMemberPortal();
   const { siteData, updateMemberSchool } = useAdminContent();
 
   const allSchools =
@@ -253,10 +254,10 @@ export const PortalProfile: React.FC = () => {
       (matchedSchool as any)?.pgbStartYear ||
       (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : 2020);
 
-    const effectiveJoinYear =
-      currentUser?.joinYear ||
-      matchedSchool?.joinYear ||
-      (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : 2024);
+    const rawJoinYear = currentUser?.joinYear || matchedSchool?.joinYear;
+    const effectiveJoinYear = isPrimaryMusleh
+      ? (rawJoinYear && Number(rawJoinYear) !== 2026 ? Number(rawJoinYear) : 2011)
+      : (rawJoinYear || (isSecondaryMusleh ? 2023 : 2024));
 
     const effectivePgbEmail =
       currentUser?.pgbEmail ||
@@ -368,8 +369,13 @@ export const PortalProfile: React.FC = () => {
       if (currentUser?.interests && currentUser.interests.length > 0) {
         setInterestsStr(currentUser.interests.join(', '));
       }
-    } else if (!icNumber && effectiveIcNumber) {
-      setIcNumber(effectiveIcNumber);
+    } else {
+      if (!icNumber && effectiveIcNumber) {
+        setIcNumber(effectiveIcNumber);
+      }
+      if (isPrimaryMusleh && Number(joinYear) === 2026 && effectiveJoinYear === 2011) {
+        setJoinYear(2011);
+      }
     }
   }, [currentUser, allSchools, siteData.memberApplications, siteData.submissions]);
 
@@ -653,6 +659,19 @@ export const PortalProfile: React.FC = () => {
       await downloadElementAsSinglePagePdf(
         printAreaRef.current,
         `Rekod_Profil_Rasmi_MPGBSIM_${safeCode}_${safeName}.pdf`
+      );
+      recordAuditLog(
+        'Muat Turun Rekod Profil Rasmi (PDF)',
+        `Memuat turun Rekod Profil Rasmi Kepimpinan (Format PDF 1 Muka A4) bagi ${fullName} (${school}, Kod: ${effectiveCardCode}).`,
+        {
+          user: fullName,
+          schoolName: school,
+          schoolCode: effectiveCardCode,
+          state,
+          position,
+          membershipNo: membershipNumber,
+          category: 'PROFIL',
+        }
       );
       setPdfDownloadSuccess(true);
       setTimeout(() => setPdfDownloadSuccess(false), 4500);
@@ -1026,7 +1045,7 @@ export const PortalProfile: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">No. Kad Pengenalan PGB</label>
+                    <label className="block font-bold text-slate-700 mb-1">No. Kad Pengenalan PGB (Sulit)</label>
                     <input
                       type="text"
                       value={icNumber}
@@ -1034,7 +1053,21 @@ export const PortalProfile: React.FC = () => {
                       placeholder="cth: 750101-01-5555"
                       className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-900 focus:ring-2 focus:ring-teal-700 focus:outline-none"
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">No. pengenalan diri rasmi PGB</span>
+                    {(() => {
+                      const parsed = parseBirthDateFromIc(icNumber);
+                      if (parsed.isValid) {
+                        return (
+                          <span className="text-[10px] text-teal-700 font-semibold mt-0.5 block">
+                            Tarikh Hari Lahir Dikesan: {parsed.formattedDayMonth} (Dilindungi daripada paparan awam penuh)
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          No. pengenalan diri rasmi PGB (dilindungi & disulitkan untuk paparan awam)
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1771,7 +1804,22 @@ export const PortalProfile: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    recordAuditLog(
+                      'Cetak Rekod Profil Rasmi (A4)',
+                      `Mencetak Rekod Profil Rasmi Kepimpinan (Saiz A4) bagi ${fullName} (${school}, Kod: ${effectiveCardCode}).`,
+                      {
+                        user: fullName,
+                        schoolName: school,
+                        schoolCode: effectiveCardCode,
+                        state,
+                        position,
+                        membershipNo: membershipNumber,
+                        category: 'PROFIL',
+                      }
+                    );
+                    window.print();
+                  }}
                   className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
                   title="Cetak lembaran rasmi ini penuh 1 muka surat A4"
                 >
@@ -1904,8 +1952,8 @@ export const PortalProfile: React.FC = () => {
                           <strong className="text-amber-800 font-bold font-mono">{serviceStartYear || '-'}</strong>
                         </div>
                         <div>
-                          <span className="text-[9.5px] text-slate-500 block">No. Kad Pengenalan PGB:</span>
-                          <span className="text-slate-800 font-mono">{icNumber || 'Dalam Rekod Rasmi'}</span>
+                          <span className="text-[9.5px] text-slate-500 block">No. Kad Pengenalan PGB (Dilindungi):</span>
+                          <span className="text-slate-800 font-mono">{icNumber ? maskIcNumber(icNumber) : 'Dalam Rekod Rasmi'}</span>
                         </div>
                         <div>
                           <span className="text-[9.5px] text-slate-500 block">Email Rasmi PGB:</span>

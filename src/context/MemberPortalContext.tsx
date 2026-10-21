@@ -9,6 +9,7 @@ import {
   PortalResource,
   PortalNotification,
   AuditLogItem,
+  ActivityLogCategory,
   ProgramEvent,
   MemberSchool,
   NewsItem,
@@ -103,8 +104,52 @@ export type PortalTab =
   | 'kongsi-amalan'
   | 'kejayaan-sekolah'
   | 'profil'
+  | 'log-keaktifan'
+  | 'hari-lahir'
   | 'admin-hub'
   | 'ajk-admin';
+
+export function inferActivityCategory(action: string): ActivityLogCategory {
+  const lower = (action || '').toLowerCase();
+  if (lower.includes('log masuk') || lower.includes('log keluar') || lower.includes('sesi')) {
+    return 'LOG_MASUK';
+  }
+  if (
+    lower.includes('sijil') ||
+    lower.includes('kad digital') ||
+    lower.includes('kad keahlian') ||
+    lower.includes('qr')
+  ) {
+    return 'SIJIL_KAD';
+  }
+  if (lower.includes('profil')) {
+    return 'PROFIL';
+  }
+  if (lower.includes('dokumen') || lower.includes('pekeliling') || lower.includes('sumber')) {
+    return 'DOKUMEN';
+  }
+  if (
+    lower.includes('yuran') ||
+    lower.includes('bayaran') ||
+    lower.includes('resit') ||
+    lower.includes('herepay')
+  ) {
+    return 'YURAN';
+  }
+  if (lower.includes('kata laluan') || lower.includes('password') || lower.includes('keselamatan')) {
+    return 'KESELAMATAN';
+  }
+  if (
+    lower.includes('program') ||
+    lower.includes('amalan') ||
+    lower.includes('kejayaan') ||
+    lower.includes('berita') ||
+    lower.includes('submisi')
+  ) {
+    return 'PROGRAM_AMALAN';
+  }
+  return 'LAIN_LAIN';
+}
 
 export const INITIAL_FEE_PAYMENTS: FeePaymentRecord[] = [
   {
@@ -258,7 +303,7 @@ interface MemberPortalContextType {
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   markAllNotificationsAsRead: () => void;
-  recordAuditLog: (action: string, content: string) => void;
+  recordAuditLog: (action: string, content: string, meta?: Partial<AuditLogItem>) => void;
 
   // PGB School Achievement News Management (Live directly to MPGBSIM Website)
   submitSchoolNews: (newsInput: {
@@ -393,7 +438,7 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
 };
 
 export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { siteData } = useAdminContent();
+  const { siteData, isAdmin, isCMSOpen } = useAdminContent();
 
   // View mode: 'public' (landing page) or 'portal' (dedicated member portal application)
   const [viewMode, setViewMode] = useState<'public' | 'portal'>(() => {
@@ -474,7 +519,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           user.membershipNo = 'MPGB-2026-MJAC011';
           user.schoolCode = 'MJAC011';
           user.phone = user.phone || '+60 6-335 1290';
-          user.joinYear = 2026;
+          user.joinYear = user.joinYear && Number(user.joinYear) !== 2026 ? Number(user.joinYear) : 2011;
           // Sanitize any legacy oversized base64 data URLs (>180KB) in cache to prevent QuotaExceededError
           if (typeof user.schoolPhotoUrl === 'string' && user.schoolPhotoUrl.startsWith('data:') && user.schoolPhotoUrl.length > 180 * 1024) {
             user.schoolPhotoUrl = 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1000&q=80';
@@ -624,7 +669,30 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: AuditLogItem[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const cleaned = parsed
+            .filter(
+              (l) =>
+                l.schoolCode !== 'MPGB-0042' &&
+                l.schoolCode !== 'HQ-001' &&
+                !(l.schoolName || '').toLowerCase().includes('as-syakirin')
+            )
+            .map((l) =>
+              l.schoolCode === 'MIA1009'
+                ? { ...l, schoolCode: 'JAIM/SAS(M)130', membershipNo: 'MPGB-2026-JAIM/SAS(M)130' }
+                : l
+            );
+          const existingIds = new Set(cleaned.map((c) => c.id));
+          INITIAL_AUDIT_LOGS.forEach((initLog) => {
+            if (!existingIds.has(initLog.id)) {
+              cleaned.push(initLog);
+            }
+          });
+          return cleaned;
+        }
+      }
     } catch (e) {
       // ignore
     }
@@ -668,8 +736,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   useEffect(() => {
     if (currentUser) {
-      safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
-      saveToIndexedDB('portal_user', currentUser).catch(() => {});
+      // Jangan simpan icNumber penuh dalam localStorage atau cache awam
+      const { icNumber: _omitIc, ...safeUserForStorage } = currentUser;
+      safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(safeUserForStorage));
+      saveToIndexedDB('portal_user', safeUserForStorage).catch(() => {});
     } else {
       safeLocalStorageRemove(STORAGE_KEYS.CURRENT_USER);
       saveToIndexedDB('portal_user', null).catch(() => {});
@@ -743,6 +813,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             ...(detail.updated.state ? { state: detail.updated.state } : {}),
             ...(detail.updated.phone ? { phone: detail.updated.phone } : {}),
             ...(detail.updated.icNumber ? { icNumber: detail.updated.icNumber } : {}),
+            ...(detail.updated.joinYear ? { joinYear: Number(detail.updated.joinYear) } : {}),
+            ...(detail.updated.serviceStartYear
+              ? {
+                  serviceStartYear: Number(detail.updated.serviceStartYear),
+                  pgbStartYear: Number(detail.updated.serviceStartYear),
+                }
+              : {}),
             ...(detail.updated.principalPhotoUrl ? { photoURL: detail.updated.principalPhotoUrl } : {}),
             ...(detail.updated.schoolPhotoUrl ? { schoolPhotoUrl: detail.updated.schoolPhotoUrl } : {}),
             ...(detail.updated.logoUrl ? { logoUrl: detail.updated.logoUrl } : {}),
@@ -906,7 +983,12 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           expertise: savedProfile?.expertise || currentUser?.expertise || (isSecondaryMusleh ? ['Kepimpinan Kurikulum Menengah Agama', 'Tadbir Urus Sekolah Islam'] : ['Kepimpinan Pendidikan Islam', 'Kurikulum Dini Rabbani']),
           interests: savedProfile?.interests || currentUser?.interests || ['Transformasi Digital & AI', 'Pendidikan Bersepadu'],
           membershipNo,
-          joinYear: isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : matchedSchool?.joinYear || savedProfile?.joinYear || currentUser?.joinYear || 2026,
+          joinYear: isPrimaryMusleh
+            ? ((savedProfile?.joinYear && Number(savedProfile.joinYear) !== 2026 ? Number(savedProfile.joinYear) : undefined) ||
+               (matchedSchool?.joinYear && Number(matchedSchool.joinYear) !== 2026 ? Number(matchedSchool.joinYear) : undefined) ||
+               (currentUser?.joinYear && Number(currentUser.joinYear) !== 2026 ? Number(currentUser.joinYear) : undefined) ||
+               2011)
+            : (savedProfile?.joinYear || matchedSchool?.joinYear || currentUser?.joinYear || (isSecondaryMusleh ? 2023 : 2026)),
           serviceStartYear: savedProfile?.serviceStartYear || savedProfile?.pgbStartYear || (matchedSchool as any)?.serviceStartYear || (matchedSchool as any)?.pgbStartYear || (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : 2020),
           pgbStartYear: savedProfile?.pgbStartYear || savedProfile?.serviceStartYear || (matchedSchool as any)?.pgbStartYear || (matchedSchool as any)?.serviceStartYear || (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : 2020),
           status: 'active',
@@ -1051,10 +1133,25 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
           const targetCode = isSecondaryMusleh ? 'JAIM/SAS(M)130' : (matched.code || prev.schoolCode);
           const targetMemNo = isSecondaryMusleh ? 'MPGB-2026-JAIM/SAS(M)130' : (prev.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || prev.membershipNo);
+          const targetJoinYear = isPrimaryMusleh
+            ? (matched.joinYear && Number(matched.joinYear) !== 2026
+                ? Number(matched.joinYear)
+                : prev.joinYear && Number(prev.joinYear) !== 2026
+                ? Number(prev.joinYear)
+                : 2011)
+            : (matched.joinYear || prev.joinYear);
+          const targetServiceStartYear =
+            (matched as any).serviceStartYear ||
+            (matched as any).pgbStartYear ||
+            prev.serviceStartYear ||
+            prev.pgbStartYear;
+
           const needsUpdate =
             (targetCode && targetCode !== prev.schoolCode) ||
             (targetMemNo && targetMemNo !== prev.membershipNo) ||
             (targetIc && targetIc !== prev.icNumber) ||
+            (targetJoinYear && targetJoinYear !== prev.joinYear) ||
+            (targetServiceStartYear && targetServiceStartYear !== prev.serviceStartYear) ||
             (matched.principal && matched.principal !== prev.fullName) ||
             (matched.name && matched.name !== prev.school) ||
             (matched.state && matched.state !== prev.state) ||
@@ -1071,6 +1168,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             ...(targetCode ? { schoolCode: targetCode } : {}),
             ...(targetMemNo ? { membershipNo: targetMemNo } : {}),
             ...(targetIc ? { icNumber: targetIc } : {}),
+            ...(targetJoinYear ? { joinYear: targetJoinYear } : {}),
+            ...(targetServiceStartYear
+              ? { serviceStartYear: targetServiceStartYear, pgbStartYear: targetServiceStartYear }
+              : {}),
             ...(matched.principal ? { fullName: matched.principal } : {}),
             ...(matched.name ? { school: matched.name } : {}),
             ...(matched.state ? { state: matched.state } : {}),
@@ -1089,9 +1190,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   }, [siteData.memberSchools, siteData.memberApplications, siteData.submissions]);
 
-  // On-demand Portal-only Firestore Listeners (only attached when user enters Portal mode and quota allows)
+  // On-demand Portal & Admin CMS Firestore Listeners (attached when user enters Portal mode or Admin CMS and quota allows)
   useEffect(() => {
-    if (viewMode !== 'portal' || isFirestoreQuotaExceeded()) {
+    if ((viewMode !== 'portal' && !isAdmin && !isCMSOpen) || isFirestoreQuotaExceeded()) {
       return;
     }
 
@@ -1237,10 +1338,50 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Live chat messages listener error:', e);
     }
 
+    // 6. Member Activity & Audit Logs (Real-time sync across portal sessions)
+    try {
+      const unsubAudit = onSnapshot(
+        collection(db, 'auditLogs'),
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const remoteLogs: AuditLogItem[] = [];
+            snapshot.forEach((docSnap) => {
+              const data = docSnap.data() as AuditLogItem;
+              if (data && data.action) {
+                remoteLogs.push({
+                  ...data,
+                  id: data.id || docSnap.id,
+                  category: data.category || inferActivityCategory(data.action),
+                });
+              }
+            });
+            setAuditLogs((prev) => {
+              const map = new Map<string, AuditLogItem>();
+              prev.forEach((l) =>
+                map.set(l.id, { ...l, category: l.category || inferActivityCategory(l.action) })
+              );
+              remoteLogs.forEach((l) => map.set(l.id, l));
+              const merged = Array.from(map.values()).sort((a, b) => {
+                const timeA = a.isoTimestamp ? new Date(a.isoTimestamp).getTime() : 0;
+                const timeB = b.isoTimestamp ? new Date(b.isoTimestamp).getTime() : 0;
+                if (timeA && timeB) return timeB - timeA;
+                return b.id.localeCompare(a.id);
+              });
+              return merged.slice(0, 500);
+            });
+          }
+        },
+        (err) => handlePortalListenerError('auditLogs', err)
+      );
+      unsubscribes.push(unsubAudit);
+    } catch (e) {
+      console.warn('Audit logs listener error:', e);
+    }
+
     return () => {
       cleanupPortalListeners();
     };
-  }, [viewMode]);
+  }, [viewMode, isAdmin, isCMSOpen]);
 
   const currentRole: UserRole = currentUser?.role || 'PUBLIC';
 
@@ -1592,14 +1733,24 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     [visibleNotifications]
   );
 
-  const recordAuditLog = (action: string, content: string) => {
+  const recordAuditLog = (
+    action: string,
+    content: string,
+    meta?: Partial<AuditLogItem>
+  ) => {
+    const now = new Date();
+    const resolvedSchoolCode =
+      meta?.schoolCode ||
+      currentUser?.schoolCode ||
+      currentUser?.membershipNo?.replace(/^MPGB-\d{4}-/i, '') ||
+      '';
     const newLog: AuditLogItem = {
-      id: `log-${Date.now()}`,
-      user: currentUser?.fullName || 'Pengguna Awam',
-      email: currentUser?.email || 'tetamu@mpgbsim.org',
+      id: `log-${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
+      user: meta?.user || currentUser?.fullName || 'Pengetua / Guru Besar',
+      email: meta?.email || currentUser?.email || currentUser?.pgbEmail || 'ahli@mpgbsim.org',
       action,
       content,
-      timestamp: new Date().toLocaleString('ms-MY', {
+      timestamp: now.toLocaleString('ms-MY', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -1607,11 +1758,20 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         minute: '2-digit',
         second: '2-digit',
       }),
+      isoTimestamp: now.toISOString(),
+      schoolName: meta?.schoolName || currentUser?.school || 'Institusi Sekolah Ahli MPGBSIM',
+      schoolCode: resolvedSchoolCode,
+      state: meta?.state || currentUser?.state || 'Malaysia',
+      position: meta?.position || currentUser?.position || 'Pengetua / Guru Besar',
+      membershipNo:
+        meta?.membershipNo ||
+        currentUser?.membershipNo ||
+        (resolvedSchoolCode ? `MPGB-2026-${resolvedSchoolCode}` : 'MPGB-AHLI'),
+      category: meta?.category || inferActivityCategory(action),
     };
-    setAuditLogs((prev) => [newLog, ...prev]);
+    setAuditLogs((prev) => [newLog, ...prev.filter((l) => l.id !== newLog.id)].slice(0, 500));
 
-    // Optional firestore write
-    if (currentUser) {
+    if (!isFirestoreQuotaExceeded()) {
       setDoc(doc(db, 'auditLogs', newLog.id), newLog).catch(() => {});
     }
   };
@@ -1756,7 +1916,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           '/mpgbsim-official-logo.png',
         status: 'active',
         membershipNo: defaultMembershipNo,
-        joinYear: isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : savedProfile?.joinYear || matchedSchool?.joinYear || 2026,
+        joinYear: isPrimaryMusleh
+          ? ((savedProfile?.joinYear && Number(savedProfile.joinYear) !== 2026 ? Number(savedProfile.joinYear) : undefined) ||
+             (matchedSchool?.joinYear && Number(matchedSchool.joinYear) !== 2026 ? Number(matchedSchool.joinYear) : undefined) ||
+             2011)
+          : (savedProfile?.joinYear || matchedSchool?.joinYear || (isSecondaryMusleh ? 2023 : 2026)),
         expertise: savedProfile?.expertise || ['Kepimpinan Pendidikan Islam', 'Kurikulum Dini Rabbani'],
         interests: savedProfile?.interests || ['Transformasi Digital & AI', 'Pendidikan Bersepadu'],
         hidePhone: true,
@@ -1773,7 +1937,20 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         console.warn('Firestore profile persist notice:', e);
       }
 
-      recordAuditLog('Log Masuk Google', `Pengguna sah ${user.email} (${profile.fullName}) berjaya log masuk ke Portal Ahli.`);
+      recordAuditLog(
+        'Log Masuk Portal Ahli (Google)',
+        `PGB ${profile.fullName} dari ${profile.school} (${profile.state}) berjaya log masuk ke Portal Ahli melalui Google Auth.`,
+        {
+          user: profile.fullName,
+          email: profile.email,
+          schoolName: profile.school,
+          schoolCode: profile.schoolCode,
+          state: profile.state,
+          position: profile.position,
+          membershipNo: profile.membershipNo,
+          category: 'LOG_MASUK',
+        }
+      );
     } catch (err: any) {
       console.error('Google Sign-In Error:', err);
       throw err;
@@ -1816,7 +1993,20 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         setCurrentUser(profile);
         setViewMode('portal');
         setPortalTab('dashboard');
-        recordAuditLog('Log Masuk Emel', `Pengguna ${input} berjaya log masuk melalui Firebase Auth.`);
+        recordAuditLog(
+          'Log Masuk Portal Ahli (Emel)',
+          `Pengguna ${profile.fullName} (${input}) berjaya log masuk ke Portal Ahli.`,
+          {
+            user: profile.fullName,
+            email: profile.email,
+            schoolName: profile.school,
+            schoolCode: profile.schoolCode || 'HQ',
+            state: profile.state,
+            position: profile.position,
+            membershipNo: profile.membershipNo,
+            category: 'LOG_MASUK',
+          }
+        );
         return;
       } catch (fbErr: any) {
         // Fall through to verify against registered schools in database
@@ -2035,13 +2225,19 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.warn('Direct Firestore school fetch on login notice:', e);
     }
 
-    // Also check saved user profile in 'users' collection if icNumber or custom fields were saved there
+    // Also check saved user profile in 'users' collection if icNumber, joinYear, or custom fields were saved there
     let savedUserIc = '';
+    let savedUserJoinYear: number | undefined;
+    let savedUserServiceStartYear: number | undefined;
     try {
       const userSnap = await getDoc(doc(db, 'users', `sch-user-${liveSchool.id}`));
       if (userSnap.exists()) {
         const uData = userSnap.data();
         if (uData?.icNumber) savedUserIc = uData.icNumber;
+        if (uData?.joinYear) savedUserJoinYear = Number(uData.joinYear);
+        if (uData?.serviceStartYear || uData?.pgbStartYear) {
+          savedUserServiceStartYear = Number(uData.serviceStartYear || uData.pgbStartYear);
+        }
       }
     } catch {}
 
@@ -2163,12 +2359,23 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       expertise: ['Kepimpinan Instruksional', 'Pengurusan Sekolah Islam', 'Pendidikan Bersepadu'],
       interests: ['Transformasi Digital & AI', 'Pembangunan Sahsiah Rabbani', 'Inovasi Kokurikulum'],
       membershipNo: `MPGB-2026-${cleanCode}`,
-      joinYear: isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : liveSchool.joinYear || 2026,
-      serviceStartYear: (liveSchool as any).serviceStartYear || (liveSchool as any).pgbStartYear || (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2018 : liveSchool.joinYear || 2020),
-      pgbStartYear: (liveSchool as any).pgbStartYear || (liveSchool as any).serviceStartYear || (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2018 : liveSchool.joinYear || 2020),
+      joinYear: isPrimaryMusleh
+        ? ((liveSchool.joinYear && Number(liveSchool.joinYear) !== 2026 ? Number(liveSchool.joinYear) : undefined) ||
+           (savedUserJoinYear && Number(savedUserJoinYear) !== 2026 ? Number(savedUserJoinYear) : undefined) ||
+           (school.joinYear && Number(school.joinYear) !== 2026 ? Number(school.joinYear) : undefined) ||
+           2011)
+        : (liveSchool.joinYear || savedUserJoinYear || school.joinYear || (isSecondaryMusleh ? 2023 : 2026)),
+      serviceStartYear: (liveSchool as any).serviceStartYear || (liveSchool as any).pgbStartYear || savedUserServiceStartYear || (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : liveSchool.joinYear || 2020),
+      pgbStartYear: (liveSchool as any).pgbStartYear || (liveSchool as any).serviceStartYear || savedUserServiceStartYear || (isSecondaryMusleh ? 2023 : isPrimaryMusleh ? 2026 : liveSchool.joinYear || 2020),
       status: 'active',
       hidePhone: true,
     };
+
+    // If Primary Musleh (MJAC011) had legacy joinYear 2026 in Firestore, heal both 'schools' and 'users' documents
+    if (isPrimaryMusleh && (!liveSchool.joinYear || Number(liveSchool.joinYear) === 2026) && !isFirestoreQuotaExceeded()) {
+      setDoc(doc(db, 'schools', liveSchool.id), { joinYear: profile.joinYear }, { merge: true }).catch(() => {});
+      setDoc(doc(db, 'users', profile.uid), { joinYear: profile.joinYear }, { merge: true }).catch(() => {});
+    }
 
     if (currentUser && currentUser.schoolCode && currentUser.schoolCode !== profile.schoolCode) {
       markPgbPresenceOffline(currentUser).catch(() => {});
@@ -2179,8 +2386,18 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     setViewMode('portal');
     setPortalTab('dashboard');
     recordAuditLog(
-      'Log Masuk Sekolah Ahli',
-      `PGB ${profile.fullName} dari ${liveSchool.name} (${liveSchool.state}) telah log masuk ke Portal Ahli.`
+      'Log Masuk Portal Ahli',
+      `${profile.position || 'PGB'} ${profile.fullName} dari ${profile.school} [Kod: ${profile.schoolCode}] (${profile.state}) telah log masuk ke Portal Ahli.`,
+      {
+        user: profile.fullName,
+        email: profile.pgbEmail || profile.email,
+        schoolName: profile.school,
+        schoolCode: profile.schoolCode,
+        state: profile.state,
+        position: profile.position,
+        membershipNo: profile.membershipNo,
+        category: 'LOG_MASUK',
+      }
     );
   };
 
@@ -2306,6 +2523,22 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const logoutPortal = async () => {
     const outgoingUser = currentUser;
+    if (outgoingUser) {
+      recordAuditLog(
+        'Log Keluar Portal Ahli',
+        `${outgoingUser.position || 'PGB'} ${outgoingUser.fullName} dari ${outgoingUser.school} telah log keluar dari Portal Ahli.`,
+        {
+          user: outgoingUser.fullName,
+          email: outgoingUser.pgbEmail || outgoingUser.email,
+          schoolName: outgoingUser.school,
+          schoolCode: outgoingUser.schoolCode,
+          state: outgoingUser.state,
+          position: outgoingUser.position,
+          membershipNo: outgoingUser.membershipNo,
+          category: 'LOG_MASUK',
+        }
+      );
+    }
     setCurrentUser(null);
     await markPgbPresenceOffline(outgoingUser);
     try {
@@ -2313,7 +2546,6 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {
       // ignore
     }
-    recordAuditLog('Log Keluar Portal', `Pengguna ${outgoingUser?.fullName || 'Ahli'} telah log keluar.`);
   };
 
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
@@ -2330,7 +2562,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         state: updates.state || 'Melaka',
         status: 'active',
         membershipNo: 'MPGB-2026-MJAC011',
-        joinYear: 2026,
+        joinYear: updates.joinYear || 2011,
         serviceStartYear: updates.serviceStartYear || 2018,
         pgbStartYear: updates.pgbStartYear || 2018,
       };
@@ -2364,10 +2596,23 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     setCurrentUser(updated);
     safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
 
-    recordAuditLog('Kemas Kini Profil', `Mengemas kini maklumat profil peribadi.`);
+    recordAuditLog(
+      'Kemas Kini Profil Kepimpinan & Sekolah',
+      `Mengemas kini maklumat profil kepimpinan ${updated.position || 'PGB'} (${updated.fullName}) dan rekod institusi ${updated.school} [Kod: ${updated.schoolCode || '-'}, Tahun Ahli: ${updated.joinYear || 2024}].`,
+      {
+        user: updated.fullName,
+        email: updated.pgbEmail || updated.email,
+        schoolName: updated.school,
+        schoolCode: updated.schoolCode,
+        state: updated.state,
+        position: updated.position,
+        membershipNo: updated.membershipNo,
+        category: 'PROFIL',
+      }
+    );
 
     try {
-      await updateDoc(doc(db, 'users', updated.uid), safeUpdates);
+      await setDoc(doc(db, 'users', updated.uid), safeUpdates, { merge: true });
     } catch (e) {
       // local updated
     }
@@ -2379,56 +2624,67 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         const sch = d.data() as MemberSchool;
         const matchCode = Boolean(
           sch.code &&
-            ((currentUser.schoolCode && sch.code.trim().toUpperCase() === currentUser.schoolCode.trim().toUpperCase()) ||
-              (currentUser.membershipNo && currentUser.membershipNo.toUpperCase().includes(sch.code.toUpperCase())))
+            ((updated.schoolCode && sch.code.trim().toUpperCase() === updated.schoolCode.trim().toUpperCase()) ||
+              (updated.membershipNo && updated.membershipNo.toUpperCase().includes(sch.code.toUpperCase())))
         );
         const isPrimaryUser = Boolean(
-          currentUser.membershipNo?.includes('MJAC011') ||
-          currentUser.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-          (currentUser.school?.toLowerCase().includes('rendah') && currentUser.school?.toLowerCase().includes('musleh'))
+          updated.membershipNo?.includes('MJAC011') ||
+          updated.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+          (updated.school?.toLowerCase().includes('rendah') && updated.school?.toLowerCase().includes('musleh'))
         );
         const isSecondaryUser = Boolean(
-          currentUser.membershipNo?.includes('JAIM/SAS') ||
-          currentUser.membershipNo?.includes('MIA1009') ||
-          currentUser.email === 'smimmelaka@gmail.com' ||
-          (currentUser.school?.toLowerCase().includes('menengah') && currentUser.school?.toLowerCase().includes('musleh'))
+          updated.membershipNo?.includes('JAIM/SAS') ||
+          updated.membershipNo?.includes('MIA1009') ||
+          updated.email === 'smimmelaka@gmail.com' ||
+          (updated.school?.toLowerCase().includes('menengah') && updated.school?.toLowerCase().includes('musleh'))
         );
         const matchMusleh = Boolean(
-          (isPrimaryUser && (sch.code === 'MJAC011' || sch.id === 'sch-musleh-1')) ||
+          (isPrimaryUser && (sch.code === 'MJAC011' || sch.id === 'sch-musleh-1' || d.id === 'sch-musleh-1')) ||
           (isSecondaryUser && (sch.code === 'JAIM/SAS(M)130' || sch.code === 'MIA1009' || sch.id === 'sch-musleh-menengah-1' || sch.email === 'smimmelaka@gmail.com'))
         );
         const matchPgbEmail = Boolean(
-          sch.pgbEmail && currentUser.email && sch.pgbEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
+          sch.pgbEmail && updated.email && sch.pgbEmail.trim().toLowerCase() === updated.email.trim().toLowerCase()
         );
         const matchExactName = Boolean(
-          sch.name && currentUser.school && sch.name.trim().toLowerCase() === currentUser.school.trim().toLowerCase()
+          sch.name && updated.school && sch.name.trim().toLowerCase() === updated.school.trim().toLowerCase()
         );
         const isMatchedSchool = matchCode || matchMusleh || (matchExactName && (matchPgbEmail || !sch.pgbEmail)) || matchPgbEmail;
 
         if (isMatchedSchool) {
-          updateDoc(doc(db, 'schools', d.id), {
-            ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
-            ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
-            ...(safeUpdates.icNumber !== undefined ? { icNumber: safeUpdates.icNumber } : {}),
-            ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
-            ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
-            ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
-            ...(safeUpdates.membershipType ? { membershipType: safeUpdates.membershipType } : {}),
-            ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
-            ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
-            ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
-            ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone } : {}),
-            ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail } : {}),
-            ...(safeUpdates.phone ? { pgbPhone: safeUpdates.phone } : {}),
-            ...(safeUpdates.pgbEmail ? { pgbEmail: safeUpdates.pgbEmail } : {}),
-            ...(safeUpdates.studentCount !== undefined ? { studentCount: safeUpdates.studentCount } : {}),
-            ...(safeUpdates.teacherCount !== undefined ? { teacherCount: safeUpdates.teacherCount } : {}),
-            ...(safeUpdates.website ? { website: safeUpdates.website } : {}),
-            ...(safeUpdates.photoURL ? { principalPhotoUrl: safeUpdates.photoURL } : {}),
-            ...(safeUpdates.logoUrl ? { logoUrl: safeUpdates.logoUrl } : {}),
-            ...(safeUpdates.schoolPhotoUrl ? { schoolPhotoUrl: safeUpdates.schoolPhotoUrl } : {}),
-            updatedAt: new Date().toISOString(),
-          }).catch(() => {});
+          setDoc(
+            doc(db, 'schools', d.id),
+            {
+              ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
+              ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
+              ...(safeUpdates.icNumber !== undefined ? { icNumber: safeUpdates.icNumber } : {}),
+              ...(safeUpdates.joinYear !== undefined ? { joinYear: Number(safeUpdates.joinYear) } : {}),
+              ...(safeUpdates.serviceStartYear !== undefined
+                ? {
+                    serviceStartYear: Number(safeUpdates.serviceStartYear),
+                    pgbStartYear: Number(safeUpdates.serviceStartYear),
+                  }
+                : {}),
+              ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
+              ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
+              ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
+              ...(safeUpdates.membershipType ? { membershipType: safeUpdates.membershipType } : {}),
+              ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
+              ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
+              ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
+              ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone, schoolPhone: safeUpdates.schoolPhone } : {}),
+              ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail, schoolEmail: safeUpdates.schoolEmail } : {}),
+              ...(safeUpdates.phone ? { pgbPhone: safeUpdates.phone } : {}),
+              ...(safeUpdates.pgbEmail ? { pgbEmail: safeUpdates.pgbEmail } : {}),
+              ...(safeUpdates.studentCount !== undefined ? { studentCount: safeUpdates.studentCount } : {}),
+              ...(safeUpdates.teacherCount !== undefined ? { teacherCount: safeUpdates.teacherCount } : {}),
+              ...(safeUpdates.website ? { website: safeUpdates.website } : {}),
+              ...(safeUpdates.photoURL ? { principalPhotoUrl: safeUpdates.photoURL } : {}),
+              ...(safeUpdates.logoUrl ? { logoUrl: safeUpdates.logoUrl } : {}),
+              ...(safeUpdates.schoolPhotoUrl ? { schoolPhotoUrl: safeUpdates.schoolPhotoUrl } : {}),
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          ).catch(() => {});
         }
       });
     } catch (e) {}
@@ -2443,29 +2699,29 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
             const matchCode = Boolean(
               s.code &&
-                ((currentUser.schoolCode && s.code.trim().toUpperCase() === currentUser.schoolCode.trim().toUpperCase()) ||
-                  (currentUser.membershipNo && currentUser.membershipNo.toUpperCase().includes(s.code.toUpperCase())))
+                ((updated.schoolCode && s.code.trim().toUpperCase() === updated.schoolCode.trim().toUpperCase()) ||
+                  (updated.membershipNo && updated.membershipNo.toUpperCase().includes(s.code.toUpperCase())))
             );
             const isPrimaryUser = Boolean(
-              currentUser.membershipNo?.includes('MJAC011') ||
-              currentUser.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
-              (currentUser.school?.toLowerCase().includes('rendah') && currentUser.school?.toLowerCase().includes('musleh'))
+              updated.membershipNo?.includes('MJAC011') ||
+              updated.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
+              (updated.school?.toLowerCase().includes('rendah') && updated.school?.toLowerCase().includes('musleh'))
             );
             const isSecondaryUser = Boolean(
-              currentUser.membershipNo?.includes('JAIM/SAS') ||
-              currentUser.membershipNo?.includes('MIA1009') ||
-              currentUser.email === 'smimmelaka@gmail.com' ||
-              (currentUser.school?.toLowerCase().includes('menengah') && currentUser.school?.toLowerCase().includes('musleh'))
+              updated.membershipNo?.includes('JAIM/SAS') ||
+              updated.membershipNo?.includes('MIA1009') ||
+              updated.email === 'smimmelaka@gmail.com' ||
+              (updated.school?.toLowerCase().includes('menengah') && updated.school?.toLowerCase().includes('musleh'))
             );
             const matchMusleh = Boolean(
               (isPrimaryUser && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) ||
               (isSecondaryUser && (s.code === 'JAIM/SAS(M)130' || s.code === 'MIA1009' || s.id === 'sch-musleh-menengah-1' || s.email === 'smimmelaka@gmail.com'))
             );
             const matchPgbEmail = Boolean(
-              s.pgbEmail && currentUser.email && s.pgbEmail.trim().toLowerCase() === currentUser.email.trim().toLowerCase()
+              s.pgbEmail && updated.email && s.pgbEmail.trim().toLowerCase() === updated.email.trim().toLowerCase()
             );
             const matchExactName = Boolean(
-              s.name && currentUser.school && s.name.trim().toLowerCase() === currentUser.school.trim().toLowerCase()
+              s.name && updated.school && s.name.trim().toLowerCase() === updated.school.trim().toLowerCase()
             );
             const isMatchedSchool = matchCode || matchMusleh || (matchExactName && (matchPgbEmail || !s.pgbEmail)) || matchPgbEmail;
 
@@ -2475,6 +2731,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
                 ...(safeUpdates.fullName ? { principal: safeUpdates.fullName } : {}),
                 ...(safeUpdates.position ? { designation: safeUpdates.position } : {}),
                 ...(safeUpdates.icNumber !== undefined ? { icNumber: safeUpdates.icNumber } : {}),
+                ...(safeUpdates.joinYear !== undefined ? { joinYear: Number(safeUpdates.joinYear) } : {}),
+                ...(safeUpdates.serviceStartYear !== undefined
+                  ? {
+                      serviceStartYear: Number(safeUpdates.serviceStartYear),
+                      pgbStartYear: Number(safeUpdates.serviceStartYear),
+                    }
+                  : {}),
                 ...(safeUpdates.school ? { name: safeUpdates.school } : {}),
                 ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
                 ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
@@ -2482,8 +2745,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
                 ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
                 ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
                 ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
-                ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone } : {}),
-                ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail } : {}),
+                ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone, schoolPhone: safeUpdates.schoolPhone } : {}),
+                ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail, schoolEmail: safeUpdates.schoolEmail } : {}),
                 ...(safeUpdates.phone ? { pgbPhone: safeUpdates.phone } : {}),
                 ...(safeUpdates.pgbEmail ? { pgbEmail: safeUpdates.pgbEmail } : {}),
                 ...(safeUpdates.studentCount !== undefined ? { studentCount: safeUpdates.studentCount } : {}),

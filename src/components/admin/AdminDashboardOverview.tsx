@@ -23,8 +23,12 @@ import {
   AlertTriangle,
   Sparkles,
   Database,
+  Activity,
+  UserCheck,
+  LogIn,
 } from 'lucide-react';
 import { useAdminContent, DEFAULT_DASHBOARD_CONFIG } from '../../context/AdminContentContext';
+import { useMemberPortal } from '../../context/MemberPortalContext';
 import { ContactSubmission } from '../../types';
 import { AdminDashboardEditorModal } from './AdminDashboardEditorModal';
 
@@ -43,6 +47,8 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
     rejectMemberApplication,
     eventRegistrations,
   } = useAdminContent();
+
+  const { auditLogs, currentUser } = useMemberPortal();
 
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ success: boolean; message: string } | null>(null);
@@ -88,6 +94,92 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
 
   const submissions = siteData.submissions || [];
   const unreadSubmissions = submissions.filter((s) => s.status === 'unread').length;
+
+  // Live Portal Active Users & Login metrics for Admin CMS Overview (diselaraskan dengan Direktori 53 Sekolah)
+  const portalMonitoringSummary = React.useMemo(() => {
+    const logs = auditLogs || [];
+    const activeSchoolIds = new Set<string>();
+    let loginCount = 0;
+    let certCount = 0;
+    let profileCount = 0;
+
+    const matchSchoolFromLog = (l: typeof logs[number]) => {
+      const code = (l.schoolCode || '').toLowerCase().trim();
+      const name = (l.schoolName || '').toLowerCase().trim();
+      const email = (l.email || '').toLowerCase().trim();
+      const user = (l.user || '').toLowerCase().trim();
+
+      if (code === 'hq-001' || code === 'mpgb-0042') return null;
+
+      return schoolsList.find((s) => {
+        const sCode = (s.code || '').toLowerCase().trim();
+        const sName = (s.name || '').toLowerCase().trim();
+        const sEmail = (s.email || '').toLowerCase().trim();
+        const sPgb = (s.principalName || '').toLowerCase().trim();
+        if (code && sCode && (sCode === code || (code === 'mia1009' && sCode === 'jaim/sas(m)130'))) return true;
+        if (name && sName && (sName === name || sName.includes(name) || name.includes(sName))) return true;
+        if (email && email !== 'mpgbsim.cemerlang@gmail.com' && sEmail === email) return true;
+        if (user && sPgb && sPgb.length > 4 && (sPgb === user || user.includes(sPgb) || sPgb.includes(user))) return true;
+        return false;
+      });
+    };
+
+    logs.forEach((l) => {
+      const matchedSchool = matchSchoolFromLog(l);
+      if (!matchedSchool) return;
+
+      const act = (l.action || '').toLowerCase();
+      const isAutoVerify =
+        act.includes('pengesahan keahlian') || act.includes('direktori rasmi');
+
+      if (!isAutoVerify) {
+        activeSchoolIds.add(matchedSchool.id);
+      }
+
+      if (l.category === 'LOG_MASUK' || act.includes('log masuk') || act.includes('daftar masuk')) {
+        if (!isAutoVerify) loginCount += 1;
+      } else if (l.category === 'SIJIL_KAD' || act.includes('sijil') || act.includes('kad')) {
+        certCount += 1;
+      } else if (l.category === 'PROFIL' || act.includes('profil')) {
+        profileCount += 1;
+      }
+    });
+
+    if (currentUser?.schoolCode || currentUser?.school) {
+      const currCode = (currentUser.schoolCode || '').toLowerCase().trim();
+      const currName = (currentUser.school || '').toLowerCase().trim();
+      const matchedCurr = schoolsList.find(
+        (s) =>
+          (currCode && (s.code || '').toLowerCase().trim() === currCode) ||
+          (currName && (s.name || '').toLowerCase().trim() === currName)
+      );
+      if (matchedCurr) {
+        activeSchoolIds.add(matchedCurr.id);
+      }
+    }
+
+    const recentLogins = logs
+      .filter((l) => {
+        if (!matchSchoolFromLog(l)) return false;
+        const act = (l.action || '').toLowerCase();
+        return (
+          l.category === 'LOG_MASUK' ||
+          act.includes('log masuk') ||
+          l.category === 'SIJIL_KAD' ||
+          l.category === 'PROFIL'
+        );
+      })
+      .slice(0, 5);
+
+    return {
+      activeUsersCount: Math.min(activeSchoolIds.size, schoolsList.length),
+      loginCount: Math.max(loginCount, activeSchoolIds.size),
+      certCount,
+      profileCount,
+      totalLogs: logs.length,
+      recentLogins,
+    };
+  }, [auditLogs, currentUser, schoolsList]);
 
   const handleApproveApp = async (id: string) => {
     setAppActionLoading(id);
@@ -380,6 +472,141 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
             <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span className="text-blue-700 font-semibold">{statesCovered} Negeri & Wilayah</span>
               <span>SMKA / SABK / Swasta</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* LIVE PORTAL ACTIVE USERS & LOGIN MONITORING WIDGET */}
+      <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+        <div className="p-5 bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center shrink-0">
+              <Activity className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-extrabold uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Pemantauan Langsung Portal Ahli
+                </span>
+                <h3 className="text-sm sm:text-base font-black text-white">
+                  Dashboard Pengguna Aktif & Rekod Log Masuk Portal PGB
+                </h3>
+              </div>
+              <p className="text-xs text-teal-100/90 mt-1 max-w-2xl leading-relaxed">
+                Pantau senarai Pengetua / Guru Besar (PGB) yang sedang aktif melog masuk ke portal, tarikh dan masa sesi terakhir, muat turun sijil keahlian, serta kemas kini profil rasmi.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onNavigateTab('pengguna-aktif-portal')}
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition flex items-center gap-2 shrink-0 self-start lg:self-center cursor-pointer shadow-md shadow-amber-500/20"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Buka Dashboard Pengguna Aktif</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Mini KPI Strip + Recent Active Logins */}
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div
+              onClick={() => onNavigateTab('pengguna-aktif-portal')}
+              className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 cursor-pointer hover:bg-emerald-50 transition"
+            >
+              <span className="text-[10px] font-bold uppercase text-emerald-800 block">
+                PGB / Sekolah Aktif Log Masuk
+              </span>
+              <strong className="text-xl font-black text-emerald-950 mt-0.5 block">
+                {portalMonitoringSummary.activeUsersCount}{' '}
+                <span className="text-xs font-semibold text-emerald-700">/ {totalSchools} Sekolah</span>
+              </strong>
+            </div>
+
+            <div
+              onClick={() => onNavigateTab('pengguna-aktif-portal')}
+              className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 cursor-pointer hover:bg-blue-50 transition"
+            >
+              <span className="text-[10px] font-bold uppercase text-blue-800 block">
+                Jumlah Sesi Log Masuk
+              </span>
+              <strong className="text-xl font-black text-blue-950 mt-0.5 block">
+                {portalMonitoringSummary.loginCount} Sesi
+              </strong>
+            </div>
+
+            <div
+              onClick={() => onNavigateTab('pengguna-aktif-portal')}
+              className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 cursor-pointer hover:bg-amber-50 transition"
+            >
+              <span className="text-[10px] font-bold uppercase text-amber-800 block">
+                Muat Turun Sijil & Kad
+              </span>
+              <strong className="text-xl font-black text-amber-950 mt-0.5 block">
+                {portalMonitoringSummary.certCount} Rekod
+              </strong>
+            </div>
+
+            <div
+              onClick={() => onNavigateTab('pengguna-aktif-portal')}
+              className="p-3.5 rounded-xl bg-teal-50/70 border border-teal-200 cursor-pointer hover:bg-teal-50 transition"
+            >
+              <span className="text-[10px] font-bold uppercase text-teal-800 block">
+                Kemas Kini Profil PGB
+              </span>
+              <strong className="text-xl font-black text-teal-950 mt-0.5 block">
+                {portalMonitoringSummary.profileCount} Rekod
+              </strong>
+            </div>
+          </div>
+
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-[11px] font-bold text-slate-700">
+              <span className="flex items-center gap-1.5">
+                <LogIn className="w-3.5 h-3.5 text-teal-700" />
+                5 Rekod Log Masuk & Aktiviti PGB Terkini di Portal Ahli
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('pengguna-aktif-portal')}
+                className="text-teal-800 hover:underline font-extrabold cursor-pointer"
+              >
+                Lihat Semua ({portalMonitoringSummary.totalLogs}) →
+              </button>
+            </div>
+            <div className="divide-y divide-slate-100 text-xs">
+              {portalMonitoringSummary.recentLogins.map((log) => (
+                <div
+                  key={log.id}
+                  onClick={() => onNavigateTab('pengguna-aktif-portal')}
+                  className="px-4 py-2.5 hover:bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 cursor-pointer"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <strong className="text-slate-900">{log.user}</strong>
+                    {log.schoolCode && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-900 text-amber-300 font-mono text-[10px] font-bold">
+                        {log.schoolCode}
+                      </span>
+                    )}
+                    {log.schoolName && (
+                      <span className="text-slate-600 font-medium truncate max-w-[240px]">
+                        ({log.schoolName})
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-900 border border-teal-200 text-[10px] font-bold">
+                      {log.action}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500 shrink-0">
+                    {log.timestamp}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

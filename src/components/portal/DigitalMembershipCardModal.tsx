@@ -39,7 +39,7 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
   isOpen,
   onClose,
 }) => {
-  const { currentUser, registeredSchools } = useMemberPortal();
+  const { currentUser, registeredSchools, recordAuditLog } = useMemberPortal();
   const { siteData } = useAdminContent();
 
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('front');
@@ -162,7 +162,11 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
     phones: '03-4251 6157, 03-4251 6167',
   };
 
-  const joinYear = currentUser?.joinYear || matchedSchool?.joinYear || 2024;
+  const rawJoinYear = currentUser?.joinYear || matchedSchool?.joinYear;
+  const joinYear =
+    isPrimaryMusleh && (!rawJoinYear || Number(rawJoinYear) === 2026)
+      ? 2011
+      : rawJoinYear || 2024;
   const serviceStartYear =
     currentUser?.serviceStartYear || currentUser?.pgbStartYear || (matchedSchool as any)?.serviceStartYear || 2018;
 
@@ -234,17 +238,44 @@ export const DigitalMembershipCardModal: React.FC<DigitalMembershipCardModalProp
       link.href = image;
       link.click();
 
+      recordAuditLog(
+        'Muat Turun Kad Keahlian Digital (QR)',
+        `Memuat turun Kad Keahlian Digital MPGBSIM (${activeSide === 'front' ? 'Muka Hadapan' : 'Muka Belakang'}) bagi ${fullName} (${school}).`,
+        {
+          user: fullName,
+          schoolName: school,
+          schoolCode: effectiveCode,
+          state,
+          position,
+          membershipNo: membershipNumber,
+          category: 'SIJIL_KAD',
+        }
+      );
+
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 4000);
     } catch (err) {
       console.error('Ralat semasa memuat turun kad keahlian:', err);
-      alert('Gagal menjana imej kad. Sila cuba lagi atau guna butang Cetak.');
+      window.print();
     } finally {
       setIsDownloading(false);
     }
   };
 
   const handlePrintCard = () => {
+    recordAuditLog(
+      'Cetak Kad Keahlian Digital (QR)',
+      `Mencetak Kad Keahlian Digital MPGBSIM bagi ${fullName} (${school}).`,
+      {
+        user: fullName,
+        schoolName: school,
+        schoolCode: effectiveCode,
+        state,
+        position,
+        membershipNo: membershipNumber,
+        category: 'SIJIL_KAD',
+      }
+    );
     window.print();
   };
 

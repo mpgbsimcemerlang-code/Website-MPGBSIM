@@ -370,6 +370,9 @@ export function repairSchoolIntegrity(
         district: sch.district || existing.district,
         phone: sch.phone || existing.phone,
         email: sch.email || existing.email,
+        joinYear: sch.joinYear || existing.joinYear,
+        serviceStartYear: (sch as any).serviceStartYear || (existing as any).serviceStartYear,
+        pgbStartYear: (sch as any).pgbStartYear || (existing as any).pgbStartYear,
         studentCount: Math.max(sch.studentCount || 0, existing.studentCount || 0),
         teacherCount: Math.max(sch.teacherCount || 0, existing.teacherCount || 0),
         updatedAt: new Date().toISOString(),
@@ -433,7 +436,7 @@ export function repairSchoolIntegrity(
       phone: '+60 6-335 1290',
       studentCount: 428,
       teacherCount: 32,
-      joinYear: 2026,
+      joinYear: 2011,
       serviceStartYear: 2026,
       pgbStartYear: 2026,
       website: 'https://imuslehmelaka.edu.my',
@@ -450,6 +453,9 @@ export function repairSchoolIntegrity(
   } else {
     if (!sriMusleh.icNumber) {
       sriMusleh.icNumber = '850312-04-5123';
+    }
+    if (!sriMusleh.joinYear || sriMusleh.joinYear === 2026) {
+      sriMusleh.joinYear = 2011;
     }
     if (!sriMusleh.address || sriMusleh.address.toLowerCase().includes('peringgit')) {
       sriMusleh.address = 'No. 25-1, Jalan TU 49A, Kompleks Komersial Boulevard, 75450 Ayer Keroh, Melaka';
@@ -567,6 +573,9 @@ export function repairSchoolIntegrity(
       repairedUser.schoolType = sriMusleh.type;
       repairedUser.position = 'Guru Besar';
       repairedUser.state = sriMusleh.state;
+      if (!repairedUser.joinYear || repairedUser.joinYear === 2026) {
+        repairedUser.joinYear = sriMusleh.joinYear && sriMusleh.joinYear !== 2026 ? sriMusleh.joinYear : 2011;
+      }
       if (!repairedUser.icNumber && sriMusleh.icNumber) {
         repairedUser.icNumber = sriMusleh.icNumber;
       }

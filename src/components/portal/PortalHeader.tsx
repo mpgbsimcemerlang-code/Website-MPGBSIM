@@ -23,6 +23,8 @@ import {
   CalendarDays,
   CreditCard,
   MessageSquare,
+  Activity,
+  Cake,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { Logo } from '../Logo';
@@ -65,7 +67,9 @@ export const PortalHeader: React.FC = () => {
     { id: 'ai-hub', label: 'AI & Digital', icon: Sparkles },
     { id: 'sumber', label: 'Sumber', icon: BookOpen },
     { id: 'kongsi-amalan', label: 'Kongsi Amalan', icon: Share2 },
+    { id: 'hari-lahir', label: 'Hari Lahir Ahli', icon: Cake },
     { id: 'profil', label: 'Profil Saya', icon: User },
+    { id: 'log-keaktifan', label: 'Log Keaktifan Ahli', icon: Activity },
   ];
 
   if (currentRole === 'ADMIN' || currentRole === 'MEDIA_AJK') {
@@ -322,6 +326,16 @@ export const PortalHeader: React.FC = () => {
                     >
                       <User className="w-4 h-4 text-slate-500" />
                       Profil & Kad Ahli Saya
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPortalTab('log-keaktifan');
+                        setIsUserMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-emerald-50 flex items-center gap-2 font-semibold text-emerald-800"
+                    >
+                      <Activity className="w-4 h-4 text-emerald-600" />
+                      Log Keaktifan Ahli
                     </button>
                     <button
                       onClick={() => {

@@ -15,6 +15,7 @@ import { UpcomingProgramsSection } from './components/UpcomingPrograms';
 import { ExamPublicSection } from './components/exams/ExamPublicSection';
 import { FeePaymentSection } from './components/FeePaymentSection';
 import { SchoolNetworkSection } from './components/SchoolNetwork';
+import { PublicBirthdaySection } from './components/PublicBirthdaySection';
 import { LeadershipSection } from './components/LeadershipSection';
 import { AlumniPublicSection } from './components/alumni/AlumniPublicSection';
 import { QuoteSection } from './components/QuoteSection';
@@ -321,6 +322,9 @@ function AppContent() {
           onUpdateStats={updateStats}
           schools={siteData.memberSchools || []}
         />
+
+        {/* SAMBUTAN HARI LAHIR AHLI MPGBSIM (Ucapan Automatik Mesra Privasi) */}
+        <PublicBirthdaySection />
 
         {/* KEPIMPINAN (Barisan Kepimpinan PGB Kebangsaan - Managed via CMS) */}
         <LeadershipSection leaders={siteData.leadership || []} />

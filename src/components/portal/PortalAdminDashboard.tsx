@@ -22,6 +22,7 @@ import {
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { AdminAlumniManagement } from '../admin/AdminAlumniManagement';
+import { AdminActivePortalUsersDashboard } from '../admin/AdminActivePortalUsersDashboard';
 
 export const PortalAdminDashboard: React.FC = () => {
   const {
@@ -50,7 +51,7 @@ export const PortalAdminDashboard: React.FC = () => {
   } = useAdminContent();
 
   const [activeAdminTab, setActiveAdminTab] = useState<
-    'overview' | 'submissions' | 'practices' | 'applications' | 'alumni' | 'audit' | 'roles'
+    'overview' | 'active-users' | 'submissions' | 'practices' | 'applications' | 'alumni' | 'audit' | 'roles'
   >('overview');
   const [auditSearch, setAuditSearch] = useState('');
   const [appFeedback, setAppFeedback] = useState<string | null>(null);
@@ -127,6 +128,7 @@ export const PortalAdminDashboard: React.FC = () => {
         <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-800 border border-slate-700 overflow-x-auto">
           {[
             { id: 'overview', label: 'Ringkasan' },
+            { id: 'active-users', label: 'Pengguna Aktif Log Masuk' },
             { id: 'submissions', label: `Submisi (${pendingSubmissionsCount})` },
             { id: 'applications', label: `Permohonan (${pendingAppsCount})` },
             { id: 'practices', label: 'Amalan Terbaik' },
@@ -318,6 +320,9 @@ export const PortalAdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* VIEW: ACTIVE PORTAL USERS & LOGIN MONITORING */}
+      {activeAdminTab === 'active-users' && <AdminActivePortalUsersDashboard />}
 
       {/* VIEW: SUBMISSIONS REVIEW QUEUE */}
       {activeAdminTab === 'submissions' && (

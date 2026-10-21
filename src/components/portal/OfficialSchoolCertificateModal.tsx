@@ -26,7 +26,7 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
   onClose,
   schoolOverride,
 }) => {
-  const { currentUser, registeredSchools } = useMemberPortal();
+  const { currentUser, registeredSchools, recordAuditLog } = useMemberPortal();
   const { siteData } = useAdminContent();
 
   const certRef = useRef<HTMLDivElement | null>(null);
@@ -188,11 +188,13 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
     : currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') ||
       `MPGB-2026-${effectiveCode}`;
 
-  const joinYear = schoolOverride
-    ? schoolOverride.joinYear || 2024
-    : currentUser?.joinYear ||
-      matchedSchool?.joinYear ||
-      (isSecondaryMusleh ? 2023 : 2026);
+  const rawJoinYear = schoolOverride
+    ? schoolOverride.joinYear
+    : currentUser?.joinYear || matchedSchool?.joinYear;
+  const joinYear =
+    isPrimaryMusleh && (!rawJoinYear || Number(rawJoinYear) === 2026)
+      ? 2011
+      : rawJoinYear || (isSecondaryMusleh ? 2023 : 2024);
 
   const logoUrl = schoolOverride
     ? schoolOverride.logoUrl || '/mpgbsim-official-logo.png'
@@ -253,6 +255,17 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
         certRef.current,
         `Sijil_Rasmi_Keahlian_MPGBSIM_${safeCode}.pdf`
       );
+      recordAuditLog(
+        'Muat Turun Sijil Rasmi Keahlian (PDF)',
+        `Memuat turun Sijil Perakuan Keahlian Rasmi (Format PDF Saiz A4) bagi institusi ${schoolName} (Kod: ${effectiveCode}, No. Ahli: ${membershipNumber}).`,
+        {
+          schoolName,
+          schoolCode: effectiveCode,
+          state,
+          membershipNo: membershipNumber,
+          category: 'SIJIL_KAD',
+        }
+      );
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 4500);
     } catch (err) {
@@ -298,7 +311,20 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
             </button>
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => {
+                recordAuditLog(
+                  'Cetak Sijil Rasmi Keahlian (A4)',
+                  `Mencetak Sijil Perakuan Keahlian Rasmi (Saiz A4) bagi institusi ${schoolName} (Kod: ${effectiveCode}, No. Ahli: ${membershipNumber}).`,
+                  {
+                    schoolName,
+                    schoolCode: effectiveCode,
+                    state,
+                    membershipNo: membershipNumber,
+                    category: 'SIJIL_KAD',
+                  }
+                );
+                window.print();
+              }}
               className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4 text-amber-300" />

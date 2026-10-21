@@ -20,7 +20,7 @@ import { useAdminContent } from '../../context/AdminContentContext';
 import { PortalDocument, ResourceDocument } from '../../types';
 
 export const PortalDocuments: React.FC = () => {
-  const { currentRole, addDocument, deleteDocument, currentUser } = useMemberPortal();
+  const { currentRole, addDocument, deleteDocument, currentUser, recordAuditLog } = useMemberPortal();
   const { siteData, addResource, deleteResource } = useAdminContent();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,11 +93,20 @@ export const PortalDocuments: React.FC = () => {
   });
 
   const handleDownload = (docItem: PortalDocument) => {
+    recordAuditLog(
+      'Muat Turun Dokumen Rasmi',
+      `Memuat turun dokumen "${docItem.title}" (Kategori: ${docItem.category}, Format: ${docItem.fileFormat || 'PDF'}).`,
+      { category: 'DOKUMEN' }
+    );
     const driveLink =
       docItem.downloadUrl ||
       'https://drive.google.com/drive/folders/1MPGBSIM_Pusat_Sumber_2026_Storage_Link';
     if (typeof window !== 'undefined') {
-      window.open(driveLink, '_blank', 'noopener,noreferrer');
+      const a = document.createElement('a');
+      a.href = driveLink;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.click();
     }
   };
 

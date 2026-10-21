@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberApplication } from '../../types';
+import { maskIcNumber } from '../../utils/birthdayUtils';
 
 interface AdminApplicationManagementProps {
   onNavigateToSchools?: () => void;
@@ -569,8 +570,8 @@ export const AdminApplicationManagement: React.FC<AdminApplicationManagementProp
                       <strong className="text-slate-900">{selectedApp.designation}</strong>
                     </div>
                     <div>
-                      <span className="block text-slate-500 text-[11px]">No. Kad Pengenalan:</span>
-                      <span className="text-slate-900 font-mono">{selectedApp.icNumber || '-'}</span>
+                      <span className="block text-slate-500 text-[11px]">No. Kad Pengenalan (Dilindungi):</span>
+                      <span className="text-slate-900 font-mono">{selectedApp.icNumber ? maskIcNumber(selectedApp.icNumber) : '-'}</span>
                     </div>
                     <div>
                       <span className="block text-slate-500 text-[11px]">Tahun Menjadi PGB:</span>

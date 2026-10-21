@@ -26,9 +26,13 @@ import {
   Megaphone,
   Database,
   CalendarDays,
+  Activity,
+  Cake,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { AdminDashboardOverview } from './admin/AdminDashboardOverview';
+import { AdminActivePortalUsersDashboard } from './admin/AdminActivePortalUsersDashboard';
+import { AdminBirthdayManagement } from './admin/AdminBirthdayManagement';
 import { AdminNewsManagement } from './admin/AdminNewsManagement';
 import { AdminEventManagement } from './admin/AdminEventManagement';
 import { AdminBestPracticeManagement } from './admin/AdminBestPracticeManagement';
@@ -137,6 +141,13 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           count: undefined,
         },
         {
+          id: 'pengguna-aktif-portal',
+          label: 'Pengguna Aktif & Log Masuk Portal',
+          icon: Activity,
+          count: 'Live',
+          isHighlight: true,
+        },
+        {
           id: 'permohonan-keahlian',
           label: 'Permohonan Keahlian',
           icon: UserCheck,
@@ -154,6 +165,13 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           label: 'Alumni PGB MPGBSIM',
           icon: GraduationCap,
           count: siteData.alumni?.length || 0,
+        },
+        {
+          id: 'ucapan-hari-lahir',
+          label: 'Ucapan Hari Lahir',
+          icon: Cake,
+          count: siteData.birthdaySettings?.enabled === false ? 'Off' : 'Auto',
+          isHighlight: true,
         },
       ],
     },
@@ -436,6 +454,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           {/* Right Content Panel */}
           <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50">
             {activeTab === 'dashboard' && <AdminDashboardOverview onNavigateTab={setActiveTab} />}
+            {activeTab === 'pengguna-aktif-portal' && <AdminActivePortalUsersDashboard />}
             {activeTab === 'permohonan-keahlian' && (
               <AdminApplicationManagement onNavigateToSchools={() => setActiveTab('sekolah-ahli')} />
             )}
@@ -450,6 +469,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
                 onToggleFeature={toggleFeatureAlumniRecord}
               />
             )}
+            {activeTab === 'ucapan-hari-lahir' && <AdminBirthdayManagement />}
             {activeTab === 'hero' && <CMSHero />}
             {activeTab === 'visi-misi' && <CMSVisionMission />}
             {activeTab === 'fokus-strategik' && <CMSStrategicFocus />}

@@ -32,12 +32,15 @@ import {
   CreditCard,
   Receipt,
   MessageSquare,
+  Activity,
+  Cake,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { BestPracticeItem, MemberSchool } from '../../types';
 import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
 import { OfficialSchoolCertificateModal } from './OfficialSchoolCertificateModal';
+import { PortalBirthdaySection } from './PortalBirthdaySection';
 
 interface PortalDashboardHomeProps {
   onOpenAnnouncementModal?: (ann: any) => void;
@@ -57,6 +60,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
     announcements,
     documents,
     bestPractices,
+    auditLogs,
     registeredProgramIds,
     totalUnreadChatCount,
     unreadPersonalChatCount,
@@ -266,6 +270,20 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
       icon: Share2,
       color: 'from-cyan-600 to-cyan-700',
     },
+    {
+      id: 'hari-lahir',
+      title: 'Hari Lahir Ahli',
+      sub: 'Sambutan hari ini & 7 hari akan datang',
+      icon: Cake,
+      color: 'from-amber-500 via-amber-600 to-teal-800',
+    },
+    {
+      id: 'log-keaktifan',
+      title: 'Log Keaktifan Ahli',
+      sub: 'Rekod tarikh log masuk & aktiviti PGB',
+      icon: Activity,
+      color: 'from-emerald-700 via-teal-800 to-slate-900',
+    },
   ];
 
   const recentAnnouncements = React.useMemo(() => {
@@ -401,6 +419,15 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
 
               <button
                 type="button"
+                onClick={() => setPortalTab('log-keaktifan')}
+                className="px-4 py-2.5 rounded-xl bg-emerald-900/90 hover:bg-emerald-800 text-emerald-200 font-extrabold text-xs flex items-center gap-2 border border-emerald-500/40 shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              >
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <span>Log Keaktifan Ahli</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setPortalTab('peperiksaan')}
                 className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-extrabold text-xs flex items-center gap-2 border border-amber-400/30 transition cursor-pointer"
               >
@@ -493,6 +520,9 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Seksyen Sambutan Hari Lahir Ahli PGB (Hari Ini & 7 Hari Akan Datang) */}
+      <PortalBirthdaySection compact={true} />
 
       {/* Saluran Siaran Langsung Berita Kejayaan Sekolah PGB */}
       <div className="rounded-3xl bg-gradient-to-r from-amber-500 via-amber-600 to-teal-700 p-1 shadow-lg">
@@ -666,7 +696,9 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
               <strong className="text-xs font-bold text-amber-700 font-mono mt-0.5 block truncate">
                 {isSecondaryMusleh ? 'MPGB-2026-JAIM/SAS(M)130' : (currentUser?.membershipNo?.replace('MIA1009', 'JAIM/SAS(M)130') || (currentSchoolData?.code ? `MPGB-2026-${currentSchoolData.code}` : 'MPGB-2026-MJAC011'))}
               </strong>
-              <span className="text-[10px] text-emerald-600 font-semibold">Tahun: {currentSchoolData?.joinYear || (isSecondaryMusleh ? 2023 : 2026)}</span>
+              <span className="text-[10px] text-emerald-600 font-semibold">
+                Tahun: {isPrimaryMusleh ? (currentSchoolData?.joinYear && Number(currentSchoolData.joinYear) !== 2026 ? Number(currentSchoolData.joinYear) : 2011) : (currentSchoolData?.joinYear || (isSecondaryMusleh ? 2023 : 2024))}
+              </span>
             </div>
 
             <div className="col-span-2 p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
@@ -823,6 +855,71 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           })}
         </div>
       </div>
+
+      {/* Live Preview Widget: Log Keaktifan Ahli (Pemantauan Rekod Keahlian Aktif) */}
+      <section className="bg-white rounded-3xl p-6 sm:p-7 border border-emerald-200/80 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-900 text-amber-300 flex items-center justify-center shrink-0 shadow-xs">
+              <Activity className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                Pemantauan Rekod Keahlian Aktif
+              </div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900">
+                Modul Log Keaktifan Ahli (Pengetua & Guru Besar)
+              </h2>
+              <p className="text-xs text-slate-500">
+                Rekod automatik tarikh dan masa setiap kali PGB melog masuk serta aktiviti utama (muat turun sijil, kad digital, kemas kini profil & dokumen).
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setPortalTab('log-keaktifan')}
+            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-2 shrink-0 shadow-xs transition-colors cursor-pointer"
+          >
+            <Activity className="w-4 h-4 text-amber-400" />
+            <span>Buka Log Keaktifan Penuh ({auditLogs.length}) →</span>
+          </button>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {auditLogs.slice(0, 3).map((log) => (
+            <div
+              key={log.id}
+              onClick={() => setPortalTab('log-keaktifan')}
+              className="p-4 rounded-2xl bg-slate-50 hover:bg-emerald-50/50 border border-slate-200 hover:border-emerald-300 transition-colors cursor-pointer flex flex-col justify-between gap-2"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 text-[10px]">
+                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold">
+                    {log.action}
+                  </span>
+                  <span className="font-mono text-slate-500 font-semibold flex items-center gap-1 shrink-0">
+                    <Clock className="w-3 h-3 text-teal-700" />
+                    {log.timestamp}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 font-medium mt-2 line-clamp-2">
+                  {log.content}
+                </p>
+              </div>
+              <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-[10px] text-slate-500">
+                <span className="font-bold text-slate-800 truncate">{log.user}</span>
+                {log.schoolCode && (
+                  <span className="font-mono font-bold text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200">
+                    {log.schoolCode}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* SECTION 1: Pengumuman Terkini */}
       <section className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs">

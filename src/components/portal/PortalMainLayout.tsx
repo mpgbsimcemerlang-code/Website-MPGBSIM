@@ -14,6 +14,8 @@ import { PortalResources } from './PortalResources';
 import { PortalSubmitPractice } from './PortalSubmitPractice';
 import { PortalSchoolNewsSubmit } from './PortalSchoolNewsSubmit';
 import { PortalProfile } from './PortalProfile';
+import { PortalActivityLog } from './PortalActivityLog';
+import { PortalBirthdaySection } from './PortalBirthdaySection';
 import { PortalFeePayment } from './PortalFeePayment';
 import { PortalAdminDashboard } from './PortalAdminDashboard';
 import { PortalGlobalSearchModal } from './PortalGlobalSearchModal';
@@ -84,6 +86,10 @@ export const PortalMainLayout: React.FC = () => {
         return <PortalSchoolNewsSubmit />;
       case 'profil':
         return <PortalProfile />;
+      case 'log-keaktifan':
+        return <PortalActivityLog />;
+      case 'hari-lahir':
+        return <PortalBirthdaySection />;
       case 'admin-hub':
       case 'ajk-admin':
         // Protected route check
