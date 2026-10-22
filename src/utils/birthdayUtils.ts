@@ -635,6 +635,8 @@ export interface PublicSafeBirthdayMember {
   schoolName: string;
   state: string;
   photoUrl: string;
+  phone?: string;
+  pgbPhone?: string;
   birthMonth: number;
   birthDay: number;
   monthDayKey: string; // MM-DD
@@ -649,6 +651,29 @@ export interface PublicSafeBirthdayMember {
   source: 'VERIFIED_DATE' | 'IC_NUMBER' | 'CACHED_MONTH_DAY';
   centuryConfidence: CenturyConfidence;
   needsCenturyConfirmation: boolean;
+}
+
+/**
+ * Menyelaras format nombor telefon Malaysia bagi pautan WhatsApp (wa.me)
+ * Contoh:
+ *   "+60 19-665 4321" -> "60196654321"
+ *   "019-665 4321"    -> "60196654321"
+ *   "03-4251 6157"    -> "60342516157"
+ */
+export function formatMalaysianWhatsAppNumber(rawPhone?: string): string {
+  if (!rawPhone) return '';
+  const digits = rawPhone.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('60')) {
+    return digits;
+  }
+  if (digits.startsWith('0')) {
+    return '60' + digits.slice(1);
+  }
+  if (digits.startsWith('1')) {
+    return '60' + digits;
+  }
+  return digits;
 }
 
 /**
@@ -804,6 +829,15 @@ export function buildSafeBirthdayRoster(params: {
       showSchoolName: settings.showSchoolName,
     });
 
+    const rawPersonalPhone =
+      sch.pgbPhone ||
+      sch.phone ||
+      matchedApp?.pgbPhone ||
+      matchedApp?.phoneNumber ||
+      matchedApp?.schoolPhone ||
+      (sch as any).schoolPhone ||
+      '';
+
     const safeMember: PublicSafeBirthdayMember = {
       memberKey,
       schoolId: sch.id,
@@ -813,6 +847,8 @@ export function buildSafeBirthdayRoster(params: {
       schoolName: sch.name,
       state: sch.state || 'Malaysia',
       photoUrl: displayPhoto,
+      phone: rawPersonalPhone,
+      pgbPhone: rawPersonalPhone,
       birthMonth: parsed.birthMonth,
       birthDay: parsed.birthDay,
       monthDayKey: parsed.monthDayKey || `${String(parsed.birthMonth).padStart(2, '0')}-${String(parsed.birthDay).padStart(2, '0')}`,
@@ -1085,6 +1121,9 @@ export function runBirthdayAcceptanceTests(): {
         code: 'SRIC003',
         type: 'Sekolah Rendah',
         state: 'Johor',
+        district: 'Johor Bahru',
+        studentCount: 350,
+        joinYear: 2018,
         principal: 'Ustaz Kamal',
         icNumber: '820101-01-5222',
       },

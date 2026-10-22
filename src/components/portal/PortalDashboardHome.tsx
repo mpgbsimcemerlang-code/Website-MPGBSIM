@@ -759,7 +759,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
               {unreadPersonalSenders.length > 0
-                ? `Mesej peribadi baharu daripada ${unreadPersonalSenders[0].senderName} (${unreadPersonalSenders[0].senderSchool}): "${unreadPersonalSenders[0].lastMessageText}"`
+                ? `Mesej peribadi baharu daripada ${unreadPersonalSenders[0].senderName} (${unreadPersonalSenders[0].senderSchool}): "${unreadPersonalSenders[0].latestText}"`
                 : 'Berinteraksi secara langsung bersama rakan Pengetua & Guru Besar seluruh Malaysia mengikut saluran topik atau mesej terus (1-ke-1).'}
             </p>
           </div>
@@ -769,8 +769,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
           onClick={() => {
             if (unreadPersonalSenders.length > 0) {
               openDirectChatWithSchool(
-                unreadPersonalSenders[0].senderSchoolCode,
-                unreadPersonalSenders[0].channelId
+                unreadPersonalSenders[0].channelId || unreadPersonalSenders[0].senderSchoolCode
               );
             } else {
               setPortalTab('sembang-live');
@@ -807,8 +806,7 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
                 onClick={() => {
                   if (isLiveChatCard && unreadPersonalSenders.length > 0) {
                     openDirectChatWithSchool(
-                      unreadPersonalSenders[0].senderSchoolCode,
-                      unreadPersonalSenders[0].channelId
+                      unreadPersonalSenders[0].channelId || unreadPersonalSenders[0].senderSchoolCode
                     );
                   } else {
                     if (card.subTab) {

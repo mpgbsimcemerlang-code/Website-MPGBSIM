@@ -289,64 +289,66 @@ const DEFAULT_BRANDING: BrandingData = {
   orgName: 'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
   shortName: 'MPGBSIM',
   motto: 'Memperkasa Kepimpinan Pendidikan, Membina Generasi Rabbani',
-  subMotto: 'Jaringan kepimpinan Pengetua dan Guru Besar Sekolah-Sekolah Islam Malaysia.',
+  subMotto: 'Wadah musyawarah kepimpinan Pengetua dan Guru Besar Sekolah-Sekolah Islam Malaysia.',
   secondaryContext:
-    'Menyatukan aspirasi kepimpinan SMKA, SABK, Sekolah Islam Swasta dan Institusi Tahfiz ke arah kecemerlangan modal insan bersepadu.',
-  establishedYear: '1988',
+    'Pertubuhan kebangsaan berdaftar (No. Pendaftaran ROS: PPM-002-10-23041996) di bawah Akta Pertubuhan 1966 yang menyatukan Pengetua dan Guru Besar institusi pendidikan Islam seluruh Malaysia.',
+  establishedYear: '1996',
+  registrationNumber: 'PPM-002-10-23041996',
 };
 
 const DEFAULT_HERO: HeroData = {
-  badge: 'Badan Kepimpinan Pengetua & Guru Besar Sekolah Islam Kebangsaan',
-  btnKenaliText: 'Kenali MPGBSIM',
-  btnProgramText: 'Lihat Program',
+  badge: 'Badan Kepimpinan Pengetua & Guru Besar Sekolah Islam Kebangsaan (PPM-002-10-23041996)',
+  btnKenaliText: 'Kenali Perlembagaan MPGBSIM',
+  btnProgramText: 'Lihat Program & Takwim',
   btnPortalText: 'Portal Ahli PGB',
   trustPillars: [
     {
-      title: 'Jaringan Nasional',
-      value: '14 Negeri & Wilayah',
-      desc: 'Merangkumi seluruh Malaysia',
+      title: 'Pendaftaran Rasmi',
+      value: 'PPM-002-10-23041996',
+      desc: 'Berdaftar di bawah Akta Pertubuhan 1966',
     },
     {
-      title: 'Sekolah Ahli',
-      value: '250+ Institusi',
-      desc: 'SMKA, SABK, Swasta & Tahfiz',
+      title: 'Keahlian Perlembagaan',
+      value: 'Fasal 4 (Biasa & Bersekutu)',
+      desc: 'SRI, SMI, SABK, SMKA, SMAN & Tahfiz',
     },
     {
       title: 'Pemimpin Pendidikan',
       value: '1,500+ PGB & SLT',
-      desc: 'Pengetua & Guru Besar',
+      desc: 'Pengetua, Guru Besar & Mudir',
     },
     {
-      title: 'Generasi Pelajar',
-      value: '120,000+ Murid',
-      desc: 'Menerima impak kurikulum holistik',
+      title: 'Liputan Kebangsaan',
+      value: '14 Negeri & Wilayah',
+      desc: 'Penyelarasan kurikulum & kepimpinan',
     },
   ],
 };
 
 const DEFAULT_VISION_MISSION: VisionMissionData = {
-  strategicPlanTitle: 'Rangka Tindakan Strategik Kepimpinan Sekolah Islam Malaysia (2025–2030)',
+  strategicPlanTitle: 'Pelan Strategik Kepimpinan Pendidikan Islam MPGBSIM (2025–2030)',
   vision: 'Peneraju Kecemerlangan Kepimpinan Pendidikan Islam Bertaraf Antarabangsa',
   visionSub:
     'Menjadikan institusi pendidikan Islam sebagai model pembinaan modal insan unggul yang mengintegrasikan ilmu naqli dan aqli berteraskan nilai ketuhanan.',
   missions: [
-    'Membangunkan kapasiti kepimpinan berprestasi tinggi dalam kalangan Pengetua dan Guru Besar secara berterusan.',
-    'Menyelaras dan memperkasakan standard kurikulum akademik, tahfiz, dan pembinaan sahsiah bertaraf kebangsaan serta global.',
-    'Memperkukuhkan jaringan strategik, perkongsian pintar, dan penyelidikan amalan terbaik antara institusi pendidikan Islam.',
-    'Mendaulatkan kebajikan, profesionalisme, serta hak institusi sekolah Islam melalui advokasi dasar yang berkesan.',
+    'Menyatukan Pengetua dan Guru Besar Sekolah-Sekolah Islam Malaysia dalam satu ikatan ukhuwah dan permuafakatan rasmi (Fasal 3(1)).',
+    'Meningkatkan mutu pendidikan Islam bersepadu merangkumi akademik, kurikulum diniyah, dan pengajian tahfiz (Fasal 3(2)).',
+    'Menganjurkan program latihan kepimpinan ikhtisas, kursus kompetensi PGB, dan konvensyen pendidikan kebangsaan (Fasal 3(3)).',
+    'Menyelaras kurikulum, kokurikulum dan pentaksiran bersama institusi sekolah Islam ahli demi kemenjadian murid (Fasal 3(4)).',
+    'Memelihara kebajikan ahli dan bertindak sebagai badan advokasi rasmi bersama KPM, JAKIM, dan JAIN/MAIN (Fasal 3(6) & 3(7)).',
   ],
   introParagraph1:
-    'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM) merupakan badan penaung dan kepimpinan tertinggi yang menghimpunkan para pentadbir sekolah Islam dari seluruh pelusuk tanah air.',
+    'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM) merupakan pertubuhan rasmi peringkat kebangsaan yang berdaftar di bawah Jabatan Pendaftaran Pertubuhan Malaysia (No. Pendaftaran: PPM-002-10-23041996) pada 23 April 1996 mengikut peruntukan Akta Pertubuhan 1966.',
   introParagraph2:
-    'Didorong oleh iltizam melahirkan generasi Rabbani yang teguh aqidah dan cemerlang intelek, MPGBSIM bertindak sebagai jambatan strategik antara institusi sekolah, kementerian, agensi agama negeri, serta komuniti masyarakat.',
+    'Berpaksikan Fasal 3 Perlembagaan Pertubuhan, MPGBSIM berfungsi sebagai wadah penaung dan musyawarah kepimpinan tertinggi yang menghimpunkan para Pengetua, Guru Besar, dan Mudir dari seluruh pelusuk tanah air untuk memperkasakan profesionalisme pentadbiran, penyelarasan kurikulum bersama, serta kebajikan institusi pendidikan Islam.',
   introParagraph3:
-    'Dengan pendekatan kepimpinan transformasional, kami komited memastikan setiap sekolah ahli dipacu dengan tata kelola profesional, kurikulum futuristik, dan pengurusan wakaf pendidikan yang mampan.',
-  pillar1Title: 'Pembangunan Kepimpinan & Governan',
+    'Mengikut Fasal 4 Perlembagaan, keahlian terbuka kepada dua kategori utama iaitu Ahli Biasa (Fasal 4(2) bagi institusi rangkaian IKRAM Musleh) dan Ahli Bersekutu (Fasal 4(3) bagi Rakan Musleh, SABK, SMKA, SMAN, SRAI, SAR dan Maahad Tahfiz) dengan moto keramat “Memperkasa Kepimpinan Pendidikan, Membina Generasi Rabbani”.',
+  pillar1Title: 'Tujuan & Matlamat Rasmi (Fasal 3)',
   pillar1Desc:
-    'Memantapkan kompetensi manajerial, kepimpinan instruksional, dan pematuhan tadbir urus berwibawa bagi semua pentadbir sekolah ahli.',
-  pillar2Title: 'Integrasi Kurikulum & Ekosistem Rabbani',
+    'Memantapkan kompetensi instruksional, penyelarasan kurikulum diniyah dan akademik, serta advokasi dasar bersama agensi kerajaan.',
+  pillar2Title: 'Keahlian Berpelembagaan (Fasal 4)',
   pillar2Desc:
-    'Mengharmonikan sukatan KPM dengan kurikulum diniyah serta pengajian tahfiz berpiawaian tinggi bagi membentuk sahsiah terpuji.',
+    'Penyatuan inklusif Ahli Biasa (Fasal 4(2)) dan Ahli Bersekutu (Fasal 4(3)) demi melahirkan generasi Rabbani seimbang.',
 };
 
 const DEFAULT_QUOTE: QuoteData = {
@@ -3551,8 +3553,37 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       ? await compressDataUrl(updated.logoUrl, 260, 260, 0.75)
       : updated.logoUrl;
 
+    // Resolve phone & email updates explicitly - NEVER equate personal phone with office phone
+    const resolvedPgbPhone =
+      updated.pgbPhone !== undefined ? updated.pgbPhone.trim() : undefined;
+
+    const resolvedSchoolPhone =
+      updated.schoolPhone !== undefined
+        ? updated.schoolPhone.trim()
+        : updated.phone !== undefined
+        ? updated.phone.trim()
+        : undefined;
+
+    const resolvedPgbEmail =
+      updated.pgbEmail !== undefined ? updated.pgbEmail.trim() : undefined;
+
+    const resolvedSchoolEmail =
+      updated.schoolEmail !== undefined
+        ? updated.schoolEmail.trim()
+        : updated.email !== undefined
+        ? updated.email.trim()
+        : undefined;
+
     const safeUpdated: Partial<MemberSchool> = {
       ...updated,
+      ...(resolvedPgbPhone !== undefined ? { pgbPhone: resolvedPgbPhone } : {}),
+      ...(resolvedSchoolPhone !== undefined
+        ? { schoolPhone: resolvedSchoolPhone, phone: resolvedSchoolPhone }
+        : {}),
+      ...(resolvedPgbEmail !== undefined ? { pgbEmail: resolvedPgbEmail } : {}),
+      ...(resolvedSchoolEmail !== undefined
+        ? { schoolEmail: resolvedSchoolEmail, email: resolvedSchoolEmail }
+        : {}),
       ...(safeSchoolPhotoUrl !== undefined ? { schoolPhotoUrl: safeSchoolPhotoUrl } : {}),
       ...(safePrincipalPhotoUrl !== undefined ? { principalPhotoUrl: safePrincipalPhotoUrl } : {}),
       ...(safeLogoUrl !== undefined ? { logoUrl: safeLogoUrl } : {}),
@@ -3624,10 +3655,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           parsed.memberSchools = parsed.memberSchools.map((s: MemberSchool) => {
             const isMatch =
               s.id === id ||
-              (updated.code && s.code && s.code.toLowerCase().trim() === updated.code.toLowerCase().trim()) ||
+              (safeUpdated.code && s.code && s.code.toLowerCase().trim() === safeUpdated.code.toLowerCase().trim()) ||
               (id === 'sch-musleh-1' && (s.code === 'MJAC011' || s.id === 'sch-musleh-1')) ||
-              (updated.name && s.name && s.name.toLowerCase().trim() === updated.name.toLowerCase().trim());
-            return isMatch ? { ...s, ...updated, updatedAt: new Date().toISOString() } : s;
+              (safeUpdated.name && s.name && s.name.toLowerCase().trim() === safeUpdated.name.toLowerCase().trim());
+            return isMatch ? { ...s, ...safeUpdated, updatedAt: new Date().toISOString() } : s;
           });
           safeLocalStorageSet(key, JSON.stringify(parsed));
         }
@@ -3642,14 +3673,14 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (portalUserRaw) {
         const portalUser = JSON.parse(portalUserRaw);
         const matchPrimaryMusleh =
-          (id === 'sch-musleh-1' || updated.code === 'MJAC011') &&
+          (id === 'sch-musleh-1' || safeUpdated.code === 'MJAC011') &&
           (portalUser.email === 'abdulqayyumyaakop@imuslehmelaka.edu.my' ||
             portalUser.email?.includes('imuslehmelaka') ||
             portalUser.membershipNo?.includes('MJAC011') ||
             (portalUser.school?.toLowerCase().includes('musleh') && (portalUser.school?.toLowerCase().includes('rendah') || portalUser.school?.toLowerCase().includes('sri'))));
 
         const matchSecondaryMusleh =
-          (id === 'school-musleh-menengah-1' || id === 'sch-musleh-menengah-1' || id === 'school-1792309529681-bv4d' || updated.code === 'JAIM/SAS(M)130' || updated.code === 'MIA1009') &&
+          (id === 'school-musleh-menengah-1' || id === 'sch-musleh-menengah-1' || id === 'school-1792309529681-bv4d' || safeUpdated.code === 'JAIM/SAS(M)130' || safeUpdated.code === 'MIA1009') &&
           (portalUser.email === 'smimmelaka@gmail.com' ||
             portalUser.membershipNo?.includes('JAIM/SAS') ||
             portalUser.membershipNo?.includes('MIA1009') ||
@@ -3660,50 +3691,61 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           portalUser.uid === `sch-user-${id}` ||
           portalUser.uid === id;
         const matchCode =
-          (portalUser.schoolCode && updated.code && portalUser.schoolCode.toUpperCase() === updated.code.toUpperCase()) ||
-          (portalUser.membershipNo && updated.code && portalUser.membershipNo.toUpperCase().includes(updated.code.toUpperCase())) ||
+          (portalUser.schoolCode && safeUpdated.code && portalUser.schoolCode.toUpperCase() === safeUpdated.code.toUpperCase()) ||
+          (portalUser.membershipNo && safeUpdated.code && portalUser.membershipNo.toUpperCase().includes(safeUpdated.code.toUpperCase())) ||
           (portalUser.membershipNo && updatedSchoolObj && (updatedSchoolObj as MemberSchool).code && portalUser.membershipNo.toUpperCase().includes((updatedSchoolObj as MemberSchool).code!.toUpperCase()));
         const matchSchoolName =
-          (portalUser.school && updated.name && portalUser.school.toLowerCase().trim() === updated.name.toLowerCase().trim()) ||
+          (portalUser.school && safeUpdated.name && portalUser.school.toLowerCase().trim() === safeUpdated.name.toLowerCase().trim()) ||
           (portalUser.school && updatedSchoolObj && (updatedSchoolObj as MemberSchool).name && portalUser.school.toLowerCase().trim() === (updatedSchoolObj as MemberSchool).name.toLowerCase().trim());
         const matchPgbEmail =
-          (portalUser.pgbEmail && updated.pgbEmail && portalUser.pgbEmail.toLowerCase().trim() === updated.pgbEmail.toLowerCase().trim()) ||
+          (portalUser.pgbEmail && safeUpdated.pgbEmail && portalUser.pgbEmail.toLowerCase().trim() === safeUpdated.pgbEmail.toLowerCase().trim()) ||
           (portalUser.pgbEmail && updatedSchoolObj && (updatedSchoolObj as MemberSchool).pgbEmail && portalUser.pgbEmail.toLowerCase().trim() === (updatedSchoolObj as MemberSchool).pgbEmail?.toLowerCase().trim());
 
         if (matchPrimaryMusleh || matchSecondaryMusleh || matchId || matchCode || matchSchoolName || matchPgbEmail) {
-          if (updated.principal) {
-            portalUser.fullName = updated.principal;
+          if (safeUpdated.principal) {
+            portalUser.fullName = safeUpdated.principal;
           }
-          if (updated.name) {
-            portalUser.school = updated.name;
+          if (safeUpdated.name) {
+            portalUser.school = safeUpdated.name;
           }
-          if (updated.state) {
-            portalUser.state = updated.state;
+          if (safeUpdated.state) {
+            portalUser.state = safeUpdated.state;
           }
-          if (updated.phone) {
-            portalUser.phone = updated.phone;
+          if (resolvedPgbPhone !== undefined) {
+            portalUser.phone = resolvedPgbPhone;
+            portalUser.pgbPhone = resolvedPgbPhone;
           }
-          if (updated.principalPhotoUrl) {
-            portalUser.photoURL = updated.principalPhotoUrl;
+          if (resolvedSchoolPhone !== undefined) {
+            portalUser.schoolPhone = resolvedSchoolPhone;
           }
-          if (updated.schoolPhotoUrl) {
-            portalUser.schoolPhotoUrl = updated.schoolPhotoUrl;
+          if (resolvedPgbEmail !== undefined) {
+            portalUser.email = resolvedPgbEmail;
+            portalUser.pgbEmail = resolvedPgbEmail;
           }
-          if (updated.logoUrl) {
-            portalUser.logoUrl = updated.logoUrl;
+          if (resolvedSchoolEmail !== undefined) {
+            portalUser.schoolEmail = resolvedSchoolEmail;
           }
-          if (updated.joinYear) {
-            portalUser.joinYear = Number(updated.joinYear);
+          if (safeUpdated.principalPhotoUrl) {
+            portalUser.photoURL = safeUpdated.principalPhotoUrl;
           }
-          if (updated.serviceStartYear) {
-            portalUser.serviceStartYear = updated.serviceStartYear;
-            portalUser.pgbStartYear = updated.serviceStartYear;
+          if (safeUpdated.schoolPhotoUrl) {
+            portalUser.schoolPhotoUrl = safeUpdated.schoolPhotoUrl;
           }
-          if (updated.icNumber) {
-            portalUser.icNumber = updated.icNumber;
+          if (safeUpdated.logoUrl) {
+            portalUser.logoUrl = safeUpdated.logoUrl;
           }
-          if (updated.membershipType) {
-            portalUser.membershipType = updated.membershipType;
+          if (safeUpdated.joinYear) {
+            portalUser.joinYear = Number(safeUpdated.joinYear);
+          }
+          if (safeUpdated.serviceStartYear) {
+            portalUser.serviceStartYear = safeUpdated.serviceStartYear;
+            portalUser.pgbStartYear = safeUpdated.serviceStartYear;
+          }
+          if (safeUpdated.icNumber) {
+            portalUser.icNumber = safeUpdated.icNumber;
+          }
+          if (safeUpdated.membershipType) {
+            portalUser.membershipType = safeUpdated.membershipType;
           }
           portalUser.updatedAt = new Date().toISOString();
           safeLocalStorageSet('mpgbsim_portal_user_v1', JSON.stringify(portalUser));
@@ -3719,8 +3761,8 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     window.dispatchEvent(new CustomEvent('mpgbsim_school_updated', {
       detail: {
         id,
-        updated,
-        school: updatedSchoolObj || updated,
+        updated: safeUpdated,
+        school: updatedSchoolObj || safeUpdated,
       }
     }));
     window.dispatchEvent(new Event('mpgbsim_content_updated'));

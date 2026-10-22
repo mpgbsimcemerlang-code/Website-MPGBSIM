@@ -549,12 +549,12 @@ export const PortalProfile: React.FC = () => {
           state: state || matchedSchool.state,
           district: district ? district.trim() : matchedSchool.district,
           address: address ? address.trim() : matchedSchool.address,
-          phone: schoolPhone ? schoolPhone.trim() : (phone ? phone.trim() : matchedSchool.phone),
-          email: schoolEmail ? schoolEmail.trim() : matchedSchool.email,
-          schoolEmail: schoolEmail ? schoolEmail.trim() : matchedSchool.schoolEmail,
-          schoolPhone: schoolPhone ? schoolPhone.trim() : matchedSchool.schoolPhone,
-          pgbEmail: pgbEmail ? pgbEmail.trim() : matchedSchool.pgbEmail,
-          pgbPhone: phone ? phone.trim() : matchedSchool.pgbPhone,
+          phone: schoolPhone ? schoolPhone.trim() : (matchedSchool.schoolPhone || (matchedSchool.phone !== matchedSchool.pgbPhone ? matchedSchool.phone : '') || ''),
+          schoolPhone: schoolPhone ? schoolPhone.trim() : (matchedSchool.schoolPhone || (matchedSchool.phone !== matchedSchool.pgbPhone ? matchedSchool.phone : '') || ''),
+          email: schoolEmail ? schoolEmail.trim() : (matchedSchool.schoolEmail || matchedSchool.email || ''),
+          schoolEmail: schoolEmail ? schoolEmail.trim() : (matchedSchool.schoolEmail || matchedSchool.email || ''),
+          pgbEmail: pgbEmail ? pgbEmail.trim() : (matchedSchool.pgbEmail || ''),
+          pgbPhone: phone ? phone.trim() : '',
           studentCount: Number(studentCount) || matchedSchool.studentCount,
           teacherCount: Number(teacherCount) || matchedSchool.teacherCount,
           website: website ? website.trim() : matchedSchool.website,
@@ -1088,18 +1088,25 @@ export const PortalProfile: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-teal-700" />
-                      <span>No. Telefon PGB</span>
+                    <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-emerald-800">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>No. Telefon Peribadi PGB</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        Dalaman Portal Sahaja
+                      </span>
                     </label>
                     <input
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="012-3456789"
-                      className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-900 focus:ring-2 focus:ring-teal-700 focus:outline-none"
+                      placeholder="cth: 013-2695286"
+                      className="w-full p-3 rounded-xl bg-white border border-emerald-300 text-xs font-mono text-slate-900 focus:ring-2 focus:ring-emerald-700 focus:outline-none"
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">No. telefon bimbit / WhatsApp PGB</span>
+                    <span className="text-[10px] text-emerald-800 mt-1 block">
+                      No. peribadi ini <strong>hanya boleh dilihat di kalangan rakan-rakan ahli PGB di dalam portal</strong> (Spotlight, Ucapan Hari Lahir & Direktori Ahli). Ia tidak dipaparkan di direktori laman web awam.
+                    </span>
                   </div>
                 </div>
 
@@ -1384,9 +1391,14 @@ export const PortalProfile: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-teal-700" />
-                      <span>No Telefon Sekolah</span>
+                    <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-slate-800">
+                        <Phone className="w-3.5 h-3.5 text-teal-700" />
+                        <span>No. Telefon Pejabat Sekolah</span>
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                        Direktori Awam
+                      </span>
                     </label>
                     <input
                       type="tel"
@@ -1395,7 +1407,7 @@ export const PortalProfile: React.FC = () => {
                       placeholder="cth: 06-9521234 atau 03-88881234"
                       className="w-full p-3 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-900 focus:ring-2 focus:ring-teal-700 focus:outline-none"
                     />
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">No. telefon pejabat / talian tetap sekolah</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Talian rasmi pejabat am sekolah (Hanya nombor pejabat ini dipaparkan di Direktori Laman Web).</span>
                   </div>
                 </div>
 

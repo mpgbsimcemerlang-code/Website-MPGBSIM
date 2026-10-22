@@ -19,6 +19,7 @@ import {
   GraduationCap,
   ShieldCheck,
   BarChart3,
+  MessageSquare,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -26,6 +27,7 @@ import { MemberSchool } from '../../types';
 import { SchoolNetworkCharts, resolveSchoolMembershipType } from '../SchoolNetworkCharts';
 import { SchoolNetworkMap } from '../SchoolNetworkMap';
 import { OfficialSchoolCertificateModal } from './OfficialSchoolCertificateModal';
+import { formatMalaysianWhatsAppNumber } from '../../utils/birthdayUtils';
 
 export const PortalDirectory: React.FC = () => {
   const { portalSubTab, setPortalSubTab, currentUser, registeredSchools } = useMemberPortal();
@@ -120,7 +122,10 @@ export const PortalDirectory: React.FC = () => {
       'Pembangunan Sahsiah',
     ],
     photoUrl: sch.principalPhotoUrl || sch.logoUrl,
-    schoolEmail: sch.email || 'info@sekolah.edu.my',
+    pgbPhone: sch.pgbPhone || '',
+    schoolPhone: sch.schoolPhone || (sch.phone !== sch.pgbPhone ? sch.phone : '') || '',
+    pgbEmail: sch.pgbEmail || '',
+    schoolEmail: sch.schoolEmail || sch.email || 'info@sekolah.edu.my',
     schoolWebsite: sch.website,
     schoolPhotoUrl: sch.schoolPhotoUrl,
     serviceStartYear: sch.serviceStartYear || (sch as any).pgbStartYear,
@@ -512,6 +517,32 @@ export const PortalDirectory: React.FC = () => {
                       {pgb.schoolCode}
                     </span>
                   </div>
+                  {pgb.pgbPhone ? (
+                    <div className="pt-1.5 mt-1.5 border-t border-slate-200/70 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="font-mono font-bold text-slate-800 truncate" title="No. Telefon Peribadi PGB (Dalaman Portal Sahaja)">
+                          {pgb.pgbPhone}
+                        </span>
+                      </div>
+                      <a
+                        href={`https://wa.me/${formatMalaysianWhatsAppNumber(pgb.pgbPhone)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold transition-colors shrink-0"
+                        title="Hubungi PGB melalui WhatsApp"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        WhatsApp
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="pt-1.5 mt-1.5 border-t border-slate-200/70 flex items-center gap-1.5 text-[11px] text-slate-400 italic">
+                      <Phone className="w-3 h-3 shrink-0" />
+                      <span>No. peribadi PGB belum dikemas kini</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Expertise tags */}
@@ -729,15 +760,51 @@ export const PortalDirectory: React.FC = () => {
                   <span className="text-teal-900 font-bold">{activePGB.serviceStartYear}</span>
                 </div>
               )}
-              <div>
-                <span className="text-slate-400 font-semibold block">Hubungan Emel Sekolah:</span>
-                <span className="text-slate-800 font-mono">{activePGB.schoolEmail}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 font-semibold block">Status Privasi Hubungan:</span>
-                <span className="text-emerald-700 font-medium flex items-center gap-1 mt-0.5">
-                  <Lock className="w-3.5 h-3.5" /> Nombor peribadi dilindungi secara rasmi
+              <div className="pt-2 border-t border-slate-200">
+                <span className="text-indigo-900 font-black uppercase tracking-wider text-[10px] flex items-center gap-1.5 mb-2">
+                  <Lock className="w-3.5 h-3.5 text-indigo-600" />
+                  Maklumat Hubungan Peribadi PGB (Dalaman Ahli Portal Sahaja)
                 </span>
+                <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <span className="text-[10px] text-indigo-700 font-semibold block">No. Telefon Bimbit / WhatsApp Peribadi PGB:</span>
+                      <span className="text-slate-900 font-mono font-bold text-sm">
+                        {activePGB.pgbPhone || 'Belum dikemas kini'}
+                      </span>
+                    </div>
+                    {activePGB.pgbPhone && (
+                      <a
+                        href={`https://wa.me/${formatMalaysianWhatsAppNumber(activePGB.pgbPhone)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        WhatsApp PGB
+                      </a>
+                    )}
+                  </div>
+                  {activePGB.pgbEmail && (
+                    <div>
+                      <span className="text-[10px] text-indigo-700 font-semibold block">E-mel Peribadi PGB:</span>
+                      <span className="text-slate-800 font-mono text-xs">{activePGB.pgbEmail}</span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-indigo-700/80 leading-relaxed">
+                    * Nombor peribadi ini hanya dipaparkan sesama ahli PGB di dalam Portal Ahli dan tidak dipaparkan di laman web direktori awam.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <span className="text-slate-400 font-semibold block">No. Telefon Pejabat Sekolah:</span>
+                  <span className="text-slate-800 font-mono font-bold">{activePGB.schoolPhone || 'Tiada rekod'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-semibold block">Emel Rasmi Sekolah:</span>
+                  <span className="text-slate-800 font-mono break-all">{activePGB.schoolEmail || 'Tiada rekod'}</span>
+                </div>
               </div>
             </div>
 
@@ -847,6 +914,80 @@ export const PortalDirectory: React.FC = () => {
                   <span>{activeSchool.address}</span>
                 </div>
               )}
+            </div>
+
+            {/* Maklumat Perhubungan Kepimpinan PGB & Sekolah (Dalaman Ahli Portal) */}
+            <div className="mt-4 p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-slate-50 to-teal-50/40 border border-emerald-200 shadow-2xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Maklumat Hubungan Kepimpinan PGB</span>
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Dalaman Ahli Portal Sahaja
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                {/* No Telefon Peribadi / WhatsApp PGB */}
+                {activeSchool.pgbPhone && (
+                  <div className="p-2.5 rounded-xl bg-white border border-emerald-300 shadow-2xs flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-semibold text-emerald-800 block">No. Peribadi PGB (Dalaman):</span>
+                      <span className="font-bold text-slate-900 font-mono text-sm">{activeSchool.pgbPhone}</span>
+                    </div>
+                    <a
+                      href={`https://wa.me/${formatMalaysianWhatsAppNumber(activeSchool.pgbPhone)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-colors shrink-0"
+                      title="Hubungi WhatsApp PGB secara langsung"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
+                )}
+
+                {/* No Telefon Pejabat Sekolah */}
+                {(activeSchool.schoolPhone || activeSchool.phone) && (
+                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-medium text-slate-500 block">No. Telefon Pejabat Sekolah:</span>
+                    <a
+                      href={`tel:${activeSchool.schoolPhone || activeSchool.phone}`}
+                      className="font-bold text-slate-800 hover:text-teal-700 font-mono text-sm block"
+                    >
+                      {activeSchool.schoolPhone || activeSchool.phone}
+                    </a>
+                  </div>
+                )}
+
+                {/* Emel Peribadi PGB */}
+                {activeSchool.pgbEmail && (
+                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-medium text-slate-500 block">Emel Peribadi PGB:</span>
+                    <a
+                      href={`mailto:${activeSchool.pgbEmail}`}
+                      className="font-bold text-teal-800 hover:underline break-all text-xs"
+                    >
+                      {activeSchool.pgbEmail}
+                    </a>
+                  </div>
+                )}
+
+                {/* Emel Rasmi Pejabat Sekolah */}
+                {(activeSchool.schoolEmail || activeSchool.email) && (
+                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                    <span className="text-[10px] font-medium text-slate-500 block">Emel Rasmi Pejabat Sekolah:</span>
+                    <a
+                      href={`mailto:${activeSchool.schoolEmail || activeSchool.email}`}
+                      className="font-bold text-teal-800 hover:underline break-all text-xs"
+                    >
+                      {activeSchool.schoolEmail || activeSchool.email}
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
 
             {activeSchool.description && (

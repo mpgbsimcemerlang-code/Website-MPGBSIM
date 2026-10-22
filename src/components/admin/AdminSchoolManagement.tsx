@@ -24,6 +24,9 @@ import {
   RefreshCw,
   Wrench,
   Check,
+  Phone,
+  Mail,
+  Key,
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool } from '../../types';
@@ -122,7 +125,11 @@ export const AdminSchoolManagement: React.FC = () => {
     teacherCount: 45,
     address: '',
     phone: '',
+    pgbPhone: '',
+    schoolPhone: '',
     email: '',
+    pgbEmail: '',
+    schoolEmail: '',
     password: '',
   };
 
@@ -173,8 +180,12 @@ export const AdminSchoolManagement: React.FC = () => {
       serviceStartYear: school.serviceStartYear || (school as any).pgbStartYear || 2020,
       teacherCount: school.teacherCount || 0,
       address: school.address || '',
-      phone: school.phone || '',
-      email: school.email || '',
+      phone: school.schoolPhone || school.phone || '',
+      pgbPhone: school.pgbPhone || '',
+      schoolPhone: school.schoolPhone || school.phone || '',
+      email: school.schoolEmail || school.email || '',
+      pgbEmail: school.pgbEmail || '',
+      schoolEmail: school.schoolEmail || school.email || '',
       password: school.password || '',
     });
     setEditingId(school.id);
@@ -232,13 +243,28 @@ export const AdminSchoolManagement: React.FC = () => {
 
     setIsSaving(true);
     try {
+      const resolvedPgbPhone = (formData.pgbPhone || '').trim();
+      const resolvedSchoolPhone = (formData.schoolPhone || formData.phone || '').trim();
+      const resolvedPgbEmail = (formData.pgbEmail || '').trim();
+      const resolvedSchoolEmail = (formData.schoolEmail || formData.email || '').trim();
+
+      const payload = {
+        ...formData,
+        pgbPhone: resolvedPgbPhone, // ONLY PGB personal phone (for Portal)
+        schoolPhone: resolvedSchoolPhone, // ONLY school office phone (for Website Directory)
+        phone: resolvedSchoolPhone, // ONLY school office phone (for Website Directory)
+        pgbEmail: resolvedPgbEmail,
+        schoolEmail: resolvedSchoolEmail,
+        email: resolvedSchoolEmail,
+      };
+
       if (editingId) {
-        await updateMemberSchool(editingId, formData);
-        setSaveSuccessMsg(`Perubahan maklumat institusi "${formData.name}" & Pengetua/Guru Besar berjaya disimpan dan disegerakkan ke Portal Ahli!`);
+        await updateMemberSchool(editingId, payload);
+        setSaveSuccessMsg(`Perubahan maklumat institusi "${formData.name}" berjaya disimpan (No. Peribadi PGB disimpan untuk Portal, No. Pejabat untuk Direktori Web)!`);
       } else {
         const newId = `sch-${Date.now()}`;
         await addMemberSchool({
-          ...formData,
+          ...payload,
           id: newId,
         });
         setSaveSuccessMsg(`Institusi sekolah "${formData.name}" berjaya didaftarkan ke dalam direktori!`);
@@ -455,7 +481,7 @@ export const AdminSchoolManagement: React.FC = () => {
                       </a>
                     )}
 
-                    {/* Foto Institusi / Gambar Sekolah Status */}
+                    {/* Foto Institusi / Gambar Sekolah Status & Info Telefon PGB */}
                     <div className="flex flex-wrap items-center gap-2 mt-1.5">
                       {school.schoolPhotoUrl ? (
                         <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-semibold">
@@ -472,6 +498,26 @@ export const AdminSchoolManagement: React.FC = () => {
                           <Building2 className="w-3 h-3 text-amber-700" />
                           <span>+ Upload Foto Institusi</span>
                         </button>
+                      )}
+
+                      {(school.pgbPhone || school.phone) && (
+                        <div
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900 text-[10px] font-medium"
+                          title="Nombor telefon peribadi / WhatsApp PGB"
+                        >
+                          <Phone className="w-3 h-3 text-emerald-600" />
+                          <span>WhatsApp PGB: <strong>{school.pgbPhone || school.phone}</strong></span>
+                        </div>
+                      )}
+
+                      {school.schoolPhone && school.schoolPhone !== (school.pgbPhone || school.phone) && (
+                        <div
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 text-[10px]"
+                          title="Nombor telefon pejabat sekolah"
+                        >
+                          <Phone className="w-3 h-3 text-slate-400" />
+                          <span>Pejabat: {school.schoolPhone}</span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -684,44 +730,134 @@ export const AdminSchoolManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Emel Rasmi Sekolah / PGB
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.email || ''}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="pengetua@sekolah.edu.my"
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
-                  />
+              {/* Maklumat Hubungan & Komunikasi PGB & Pejabat Sekolah */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                    <Phone className="w-4 h-4 text-emerald-700" />
+                    Maklumat Perhubungan (PGB & Pejabat Sekolah)
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    Diselaraskan ke PGB Spotlight & Hari Lahir
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    No. Telefon Pejabat / PGB
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.phone || ''}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="cth: 03-8888 1234"
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* No Telefon Bimbit / WhatsApp PGB */}
+                  <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200">
+                    <label className="block font-bold text-emerald-950 uppercase tracking-wider mb-1 text-[11px] flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        No. Telefon Peribadi / WhatsApp PGB
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-emerald-600 text-white px-1.5 py-0.5 rounded-sm">
+                        Spotlight
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.pgbPhone || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          pgbPhone: val,
+                        }));
+                      }}
+                      placeholder="cth: 013-2695286 / 019-6654321"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-emerald-300 focus:outline-hidden focus:ring-2 focus:ring-emerald-600 bg-white font-medium text-slate-900"
+                    />
+                    <p className="text-[10px] text-emerald-800 mt-1">
+                      No. peribadi ini <strong>HANYA boleh dilihat oleh ahli PGB dalam Portal</strong> (PGB Spotlight & Hari Lahir). <strong>TIDAK</strong> dipaparkan di direktori web awam.
+                    </p>
+                  </div>
+
+                  {/* No Telefon Pejabat Sekolah */}
+                  <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[11px] flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5 text-slate-500" />
+                        No. Telefon Pejabat Sekolah
+                      </span>
+                      <span className="text-[9px] font-bold uppercase bg-slate-100 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded-sm">
+                        Direktori Awam
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.schoolPhone || formData.phone || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          schoolPhone: val,
+                          phone: val,
+                        }));
+                      }}
+                      placeholder="cth: 06-234 9405 / 03-8888 1234"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Talian rasmi pejabat sekolah (<strong>Hanya nombor pejabat ini dipaparkan di direktori web awam</strong>).
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Kata Laluan Akaun PGB
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.password || ''}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder={formData.code ? `cth: PGB#${formData.code.toUpperCase()}` : 'cth: PGB#2026!'}
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white font-mono"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[11px] flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5 text-slate-500" />
+                      Emel Rasmi Pejabat (Web Awam)
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.schoolEmail || formData.email || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          schoolEmail: val,
+                          email: val,
+                        }));
+                      }}
+                      placeholder="admin@sekolah.edu.my"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[11px] flex items-center gap-1">
+                      <Mail className="w-3.5 h-3.5 text-emerald-600" />
+                      Emel Peribadi PGB (Dalaman)
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.pgbEmail || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          pgbEmail: val,
+                        }));
+                      }}
+                      placeholder="pengetua@imuslehmelaka.edu.my"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[11px] flex items-center gap-1">
+                      <Key className="w-3.5 h-3.5 text-slate-500" />
+                      Kata Laluan Akaun PGB
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.password || ''}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                      placeholder={formData.code ? `cth: PGB#${formData.code.toUpperCase()}` : 'cth: PGB#2026!'}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 

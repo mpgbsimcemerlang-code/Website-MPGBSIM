@@ -811,7 +811,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             ...(detail.updated.principal ? { fullName: detail.updated.principal } : {}),
             ...(detail.updated.name ? { school: detail.updated.name } : {}),
             ...(detail.updated.state ? { state: detail.updated.state } : {}),
-            ...(detail.updated.phone ? { phone: detail.updated.phone } : {}),
+            ...(detail.updated.pgbPhone !== undefined
+              ? { pgbPhone: detail.updated.pgbPhone, phone: detail.updated.pgbPhone }
+              : {}),
+            ...(detail.updated.schoolPhone !== undefined ? { schoolPhone: detail.updated.schoolPhone } : {}),
+            ...(detail.updated.pgbEmail !== undefined
+              ? { pgbEmail: detail.updated.pgbEmail, email: detail.updated.pgbEmail }
+              : {}),
+            ...(detail.updated.schoolEmail !== undefined ? { schoolEmail: detail.updated.schoolEmail } : {}),
             ...(detail.updated.icNumber ? { icNumber: detail.updated.icNumber } : {}),
             ...(detail.updated.joinYear ? { joinYear: Number(detail.updated.joinYear) } : {}),
             ...(detail.updated.serviceStartYear
@@ -1146,6 +1153,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             prev.serviceStartYear ||
             prev.pgbStartYear;
 
+          const resolvedSchoolPgbPhone = matched.pgbPhone;
+          const resolvedSchoolOfficePhone = matched.schoolPhone || matched.phone;
+          const resolvedSchoolPgbEmail = matched.pgbEmail;
+          const resolvedSchoolOfficeEmail = matched.schoolEmail || matched.email;
+
           const needsUpdate =
             (targetCode && targetCode !== prev.schoolCode) ||
             (targetMemNo && targetMemNo !== prev.membershipNo) ||
@@ -1155,7 +1167,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             (matched.principal && matched.principal !== prev.fullName) ||
             (matched.name && matched.name !== prev.school) ||
             (matched.state && matched.state !== prev.state) ||
-            (matched.phone && matched.phone !== prev.phone) ||
+            (resolvedSchoolPgbPhone && (resolvedSchoolPgbPhone !== prev.pgbPhone || resolvedSchoolPgbPhone !== prev.phone)) ||
+            (resolvedSchoolOfficePhone && resolvedSchoolOfficePhone !== prev.schoolPhone) ||
+            (resolvedSchoolPgbEmail && (resolvedSchoolPgbEmail !== prev.pgbEmail || resolvedSchoolPgbEmail !== prev.email)) ||
+            (resolvedSchoolOfficeEmail && resolvedSchoolOfficeEmail !== prev.schoolEmail) ||
             (matched.principalPhotoUrl && matched.principalPhotoUrl !== prev.photoURL) ||
             (matched.schoolPhotoUrl && matched.schoolPhotoUrl !== prev.schoolPhotoUrl) ||
             (matched.logoUrl && matched.logoUrl !== prev.logoUrl) ||
@@ -1175,7 +1190,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             ...(matched.principal ? { fullName: matched.principal } : {}),
             ...(matched.name ? { school: matched.name } : {}),
             ...(matched.state ? { state: matched.state } : {}),
-            ...(matched.phone ? { phone: matched.phone } : {}),
+            ...(resolvedSchoolPgbPhone ? { phone: resolvedSchoolPgbPhone, pgbPhone: resolvedSchoolPgbPhone } : {}),
+            ...(resolvedSchoolOfficePhone ? { schoolPhone: resolvedSchoolOfficePhone } : {}),
+            ...(resolvedSchoolPgbEmail ? { email: resolvedSchoolPgbEmail, pgbEmail: resolvedSchoolPgbEmail } : {}),
+            ...(resolvedSchoolOfficeEmail ? { schoolEmail: resolvedSchoolOfficeEmail } : {}),
             ...(matched.principalPhotoUrl ? { photoURL: matched.principalPhotoUrl } : {}),
             ...(matched.schoolPhotoUrl ? { schoolPhotoUrl: matched.schoolPhotoUrl } : {}),
             ...(matched.logoUrl ? { logoUrl: matched.logoUrl } : {}),
@@ -2587,9 +2605,37 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       safeUpdates.logoUrl = await compressDataUrl(safeUpdates.logoUrl, 260, 260, 0.75);
     }
 
+    const resolvedPgbPhone =
+      safeUpdates.pgbPhone !== undefined
+        ? safeUpdates.pgbPhone
+        : safeUpdates.phone !== undefined
+        ? safeUpdates.phone
+        : undefined;
+
+    const resolvedSchoolPhone =
+      safeUpdates.schoolPhone !== undefined
+        ? safeUpdates.schoolPhone
+        : undefined;
+
+    const resolvedPgbEmail =
+      safeUpdates.pgbEmail !== undefined
+        ? safeUpdates.pgbEmail
+        : safeUpdates.email !== undefined
+        ? safeUpdates.email
+        : undefined;
+
+    const resolvedSchoolEmail =
+      safeUpdates.schoolEmail !== undefined
+        ? safeUpdates.schoolEmail
+        : undefined;
+
     const updated: UserProfile = {
       ...baseUser,
       ...safeUpdates,
+      ...(resolvedPgbPhone !== undefined ? { phone: resolvedPgbPhone, pgbPhone: resolvedPgbPhone } : {}),
+      ...(resolvedSchoolPhone !== undefined ? { schoolPhone: resolvedSchoolPhone } : {}),
+      ...(resolvedPgbEmail !== undefined ? { email: resolvedPgbEmail, pgbEmail: resolvedPgbEmail } : {}),
+      ...(resolvedSchoolEmail !== undefined ? { schoolEmail: resolvedSchoolEmail } : {}),
       updatedAt: new Date().toISOString(),
     };
 
@@ -2612,7 +2658,18 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     );
 
     try {
-      await setDoc(doc(db, 'users', updated.uid), safeUpdates, { merge: true });
+      await setDoc(
+        doc(db, 'users', updated.uid),
+        {
+          ...safeUpdates,
+          ...(resolvedPgbPhone !== undefined ? { phone: resolvedPgbPhone, pgbPhone: resolvedPgbPhone } : {}),
+          ...(resolvedSchoolPhone !== undefined ? { schoolPhone: resolvedSchoolPhone } : {}),
+          ...(resolvedPgbEmail !== undefined ? { email: resolvedPgbEmail, pgbEmail: resolvedPgbEmail } : {}),
+          ...(resolvedSchoolEmail !== undefined ? { schoolEmail: resolvedSchoolEmail } : {}),
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     } catch (e) {
       // local updated
     }
@@ -2671,10 +2728,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
               ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
               ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
-              ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone, schoolPhone: safeUpdates.schoolPhone } : {}),
-              ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail, schoolEmail: safeUpdates.schoolEmail } : {}),
-              ...(safeUpdates.phone ? { pgbPhone: safeUpdates.phone } : {}),
-              ...(safeUpdates.pgbEmail ? { pgbEmail: safeUpdates.pgbEmail } : {}),
+              ...(resolvedPgbPhone !== undefined ? { pgbPhone: resolvedPgbPhone } : {}),
+              ...(resolvedSchoolPhone !== undefined
+                ? { schoolPhone: resolvedSchoolPhone, phone: resolvedSchoolPhone }
+                : {}),
+              ...(resolvedPgbEmail !== undefined ? { pgbEmail: resolvedPgbEmail } : {}),
+              ...(resolvedSchoolEmail !== undefined
+                ? { schoolEmail: resolvedSchoolEmail, email: resolvedSchoolEmail }
+                : {}),
               ...(safeUpdates.studentCount !== undefined ? { studentCount: safeUpdates.studentCount } : {}),
               ...(safeUpdates.teacherCount !== undefined ? { teacherCount: safeUpdates.teacherCount } : {}),
               ...(safeUpdates.website ? { website: safeUpdates.website } : {}),
@@ -2745,10 +2806,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
                 ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
                 ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
                 ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
-                ...(safeUpdates.schoolPhone ? { phone: safeUpdates.schoolPhone, schoolPhone: safeUpdates.schoolPhone } : {}),
-                ...(safeUpdates.schoolEmail ? { email: safeUpdates.schoolEmail, schoolEmail: safeUpdates.schoolEmail } : {}),
-                ...(safeUpdates.phone ? { pgbPhone: safeUpdates.phone } : {}),
-                ...(safeUpdates.pgbEmail ? { pgbEmail: safeUpdates.pgbEmail } : {}),
+                ...(resolvedPgbPhone !== undefined ? { pgbPhone: resolvedPgbPhone } : {}),
+                ...(resolvedSchoolPhone !== undefined
+                  ? { schoolPhone: resolvedSchoolPhone, phone: resolvedSchoolPhone }
+                  : {}),
+                ...(resolvedPgbEmail !== undefined ? { pgbEmail: resolvedPgbEmail } : {}),
+                ...(resolvedSchoolEmail !== undefined
+                  ? { schoolEmail: resolvedSchoolEmail, email: resolvedSchoolEmail }
+                  : {}),
                 ...(safeUpdates.studentCount !== undefined ? { studentCount: safeUpdates.studentCount } : {}),
                 ...(safeUpdates.teacherCount !== undefined ? { teacherCount: safeUpdates.teacherCount } : {}),
                 ...(safeUpdates.website ? { website: safeUpdates.website } : {}),
@@ -2765,6 +2830,21 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
       safeLocalStorageRemove('mpgbsim_cms_content');
       window.dispatchEvent(new Event('mpgbsim_content_updated'));
+      window.dispatchEvent(
+        new CustomEvent('mpgbsim_school_updated', {
+          detail: {
+            updated: {
+              ...safeUpdates,
+              pgbPhone: resolvedPgbPhone,
+              phone: resolvedSchoolPhone,
+              schoolPhone: resolvedSchoolPhone,
+              pgbEmail: resolvedPgbEmail,
+              email: resolvedSchoolEmail,
+              schoolEmail: resolvedSchoolEmail,
+            },
+          },
+        })
+      );
     } catch (e) {}
   };
 

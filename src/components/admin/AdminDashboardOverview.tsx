@@ -115,7 +115,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
         const sCode = (s.code || '').toLowerCase().trim();
         const sName = (s.name || '').toLowerCase().trim();
         const sEmail = (s.email || '').toLowerCase().trim();
-        const sPgb = (s.principalName || '').toLowerCase().trim();
+        const sPgb = (s.principal || '').toLowerCase().trim();
         if (code && sCode && (sCode === code || (code === 'mia1009' && sCode === 'jaim/sas(m)130'))) return true;
         if (name && sName && (sName === name || sName.includes(name) || name.includes(sName))) return true;
         if (email && email !== 'mpgbsim.cemerlang@gmail.com' && sEmail === email) return true;

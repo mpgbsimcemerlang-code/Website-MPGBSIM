@@ -23,6 +23,7 @@ import {
   getKualaLumpurDateParts,
   MALAY_MONTH_NAMES,
   PublicSafeBirthdayMember,
+  formatMalaysianWhatsAppNumber,
 } from '../../utils/birthdayUtils';
 
 interface PortalBirthdaySectionProps {
@@ -31,7 +32,7 @@ interface PortalBirthdaySectionProps {
 
 export const PortalBirthdaySection: React.FC<PortalBirthdaySectionProps> = ({ compact = false }) => {
   const { siteData } = useAdminContent();
-  const { setPortalTab, recordPortalActivity } = useMemberPortal();
+  const { setPortalTab, recordAuditLog } = useMemberPortal();
   const settings = siteData.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS;
 
   const [horizonFilter, setHorizonFilter] = useState<'7days' | '30days' | 'all'>('7days');
@@ -102,8 +103,7 @@ export const PortalBirthdaySection: React.FC<PortalBirthdaySectionProps> = ({ co
     setCopiedId(entry.memberKey);
     setTimeout(() => setCopiedId(null), 2500);
     try {
-      recordPortalActivity(
-        'PROFILE_UPDATE',
+      recordAuditLog(
         'Salin Ucapan Hari Lahir PGB',
         `Menyalin teks ucapan hari lahir untuk ${entry.memberName} (${entry.schoolName})`
       );
@@ -112,7 +112,18 @@ export const PortalBirthdaySection: React.FC<PortalBirthdaySectionProps> = ({ co
 
   const handleShareWhatsApp = (entry: PublicSafeBirthdayMember) => {
     const text = getActiveGreeting(entry);
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const targetPhone = formatMalaysianWhatsAppNumber(entry.pgbPhone || entry.phone);
+    const whatsappUrl = targetPhone
+      ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+    try {
+      recordAuditLog?.(
+        'WhatsApp Ucapan Hari Lahir PGB',
+        `Kirim ucapan hari lahir melalui WhatsApp terus ke nombor peribadi ${entry.memberName} (${targetPhone || 'umum'})`
+      );
+    } catch {}
+
     window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -243,10 +254,11 @@ export const PortalBirthdaySection: React.FC<PortalBirthdaySectionProps> = ({ co
                         <button
                           type="button"
                           onClick={() => handleShareWhatsApp(entry)}
+                          title={`Kirim ucapan terus ke WhatsApp peribadi ${entry.memberName}`}
                           className="text-[11px] font-bold bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
                         >
                           <Share2 className="w-3.5 h-3.5" />
-                          <span>Kongsi</span>
+                          <span>WhatsApp PGB</span>
                         </button>
                       </div>
                     </div>
@@ -475,10 +487,11 @@ export const PortalBirthdaySection: React.FC<PortalBirthdaySectionProps> = ({ co
                       <button
                         type="button"
                         onClick={() => handleShareWhatsApp(entry)}
+                        title={`Kirim ucapan terus ke WhatsApp peribadi ${entry.memberName}`}
                         className="text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer"
                       >
                         <Share2 className="w-3.5 h-3.5" />
-                        <span>Kongsi WhatsApp</span>
+                        <span>WhatsApp PGB</span>
                       </button>
                     </div>
                   </div>
@@ -636,10 +649,11 @@ export const PortalBirthdaySection: React.FC<PortalBirthdaySectionProps> = ({ co
                       <button
                         type="button"
                         onClick={() => handleShareWhatsApp(entry)}
+                        title={`Kirim ucapan terus ke WhatsApp peribadi ${entry.memberName}`}
                         className="text-[11px] font-bold bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
                       >
                         <Share2 className="w-3 h-3" />
-                        <span>Kongsi</span>
+                        <span>WhatsApp PGB</span>
                       </button>
                     </div>
                   </div>

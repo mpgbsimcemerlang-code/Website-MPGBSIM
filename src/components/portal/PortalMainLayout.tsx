@@ -21,6 +21,7 @@ import { PortalAdminDashboard } from './PortalAdminDashboard';
 import { PortalGlobalSearchModal } from './PortalGlobalSearchModal';
 import { PortalNotificationModal } from './PortalNotificationModal';
 import { PortalLoginView } from './PortalLoginView';
+import { PortalPGBSpotlight } from './PortalPGBSpotlight';
 import { ShieldAlert, MessageSquare, Bell } from 'lucide-react';
 
 export const PortalMainLayout: React.FC = () => {
@@ -160,6 +161,11 @@ export const PortalMainLayout: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* PGB Spotlight Widget (Tokoh Kepimpinan Ahli MPGBSIM) */}
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <PortalPGBSpotlight />
+      </div>
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">

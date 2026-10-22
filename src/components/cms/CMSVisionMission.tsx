@@ -9,28 +9,29 @@ export const CMSVisionMission: React.FC = () => {
 
   const [form, setForm] = useState<VisionMissionData>(
     siteData.visionMission || {
-      strategicPlanTitle: 'Rangka Tindakan Strategik Kepimpinan Sekolah Islam Malaysia (2025–2030)',
+      strategicPlanTitle: 'Pelan Strategik Kepimpinan Pendidikan Islam MPGBSIM (2025–2030)',
       vision: 'Peneraju Kecemerlangan Kepimpinan Pendidikan Islam Bertaraf Antarabangsa',
       visionSub:
         'Menjadikan institusi pendidikan Islam sebagai model pembinaan modal insan unggul yang mengintegrasikan ilmu naqli dan aqli berteraskan nilai ketuhanan.',
       missions: [
-        'Membangunkan kapasiti kepimpinan berprestasi tinggi dalam kalangan Pengetua dan Guru Besar secara berterusan.',
-        'Menyelaras dan memperkasakan standard kurikulum akademik, tahfiz, dan pembinaan sahsiah bertaraf kebangsaan serta global.',
-        'Memperkukuhkan jaringan strategik, perkongsian pintar, dan penyelidikan amalan terbaik antara institusi pendidikan Islam.',
-        'Mendaulatkan kebajikan, profesionalisme, serta hak institusi sekolah Islam melalui advokasi dasar yang berkesan.',
+        'Menyatukan Pengetua dan Guru Besar Sekolah-Sekolah Islam Malaysia dalam satu ikatan ukhuwah dan permuafakatan rasmi (Fasal 3(1)).',
+        'Meningkatkan mutu pendidikan Islam bersepadu merangkumi akademik, kurikulum diniyah, dan pengajian tahfiz (Fasal 3(2)).',
+        'Menganjurkan program latihan kepimpinan ikhtisas, kursus kompetensi PGB, dan konvensyen pendidikan kebangsaan (Fasal 3(3)).',
+        'Menyelaras kurikulum, kokurikulum dan pentaksiran bersama institusi sekolah Islam ahli demi kemenjadian murid (Fasal 3(4)).',
+        'Memelihara kebajikan ahli dan bertindak sebagai badan advokasi rasmi bersama KPM, JAKIM, dan JAIN/MAIN (Fasal 3(6) & 3(7)).',
       ],
       introParagraph1:
-        'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM) merupakan badan penaung dan kepimpinan tertinggi yang menghimpunkan para pentadbir sekolah Islam dari seluruh pelusuk tanah air.',
+        'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM) merupakan pertubuhan rasmi peringkat kebangsaan yang berdaftar di bawah Jabatan Pendaftaran Pertubuhan Malaysia (No. Pendaftaran: PPM-002-10-23041996) pada 23 April 1996 mengikut peruntukan Akta Pertubuhan 1966.',
       introParagraph2:
-        'Didorong oleh iltizam melahirkan generasi Rabbani yang teguh aqidah dan cemerlang intelek, MPGBSIM bertindak sebagai jambatan strategik antara institusi sekolah, kementerian, agensi agama negeri, serta komuniti masyarakat.',
+        'Berpaksikan Fasal 3 Perlembagaan Pertubuhan, MPGBSIM berfungsi sebagai wadah penaung dan musyawarah kepimpinan tertinggi yang menghimpunkan para Pengetua, Guru Besar, dan Mudir dari seluruh pelusuk tanah air untuk memperkasakan profesionalisme pentadbiran, penyelarasan kurikulum bersama, serta kebajikan institusi pendidikan Islam.',
       introParagraph3:
-        'Dengan pendekatan kepimpinan transformasional, kami komited memastikan setiap sekolah ahli dipacu dengan tata kelola profesional, kurikulum futuristik, dan pengurusan wakaf pendidikan yang mampan.',
-      pillar1Title: 'Pembangunan Kepimpinan & Governan',
+        'Mengikut Fasal 4 Perlembagaan, keahlian terbuka kepada dua kategori utama iaitu Ahli Biasa (Fasal 4(2) bagi institusi rangkaian IKRAM Musleh) dan Ahli Bersekutu (Fasal 4(3) bagi Rakan Musleh, SABK, SMKA, SMAN, SRAI, SAR dan Maahad Tahfiz) dengan moto keramat “Memperkasa Kepimpinan Pendidikan, Membina Generasi Rabbani”.',
+      pillar1Title: 'Tujuan & Matlamat Rasmi (Fasal 3)',
       pillar1Desc:
-        'Memantapkan kompetensi manajerial, kepimpinan instruksional, dan pematuhan tadbir urus berwibawa bagi semua pentadbir sekolah ahli.',
-      pillar2Title: 'Integrasi Kurikulum & Ekosistem Rabbani',
+        'Memantapkan kompetensi instruksional, penyelarasan kurikulum diniyah dan akademik, serta advokasi dasar bersama agensi kerajaan.',
+      pillar2Title: 'Keahlian Berpelembagaan (Fasal 4)',
       pillar2Desc:
-        'Mengharmonikan sukatan KPM dengan kurikulum diniyah serta pengajian tahfiz berpiawaian tinggi bagi membentuk sahsiah terpuji.',
+        'Penyatuan inklusif Ahli Biasa (Fasal 4(2)) dan Ahli Bersekutu (Fasal 4(3)) demi melahirkan generasi Rabbani seimbang.',
     }
   );
 

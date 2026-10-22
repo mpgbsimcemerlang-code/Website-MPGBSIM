@@ -1060,35 +1060,49 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
                     </div>
                   )}
 
-                  {activeSchool.email && (
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5">
-                      <Mail className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="block text-[11px] text-slate-400 font-medium">Emel Rasmi Pejabat:</span>
-                        <a
-                          href={`mailto:${activeSchool.email}`}
-                          className="text-teal-700 hover:underline font-semibold break-all"
-                        >
-                          {activeSchool.email}
-                        </a>
+                  {/* Emel Rasmi Pejabat Sekolah */}
+                  {(() => {
+                    const officeEmail =
+                      activeSchool.schoolEmail ||
+                      (activeSchool.email && activeSchool.email !== activeSchool.pgbEmail ? activeSchool.email : activeSchool.email);
+                    if (!officeEmail) return null;
+                    return (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5">
+                        <Mail className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="block text-[11px] text-slate-400 font-medium">Emel Rasmi Pejabat:</span>
+                          <a
+                            href={`mailto:${officeEmail}`}
+                            className="text-teal-700 hover:underline font-semibold break-all"
+                          >
+                            {officeEmail}
+                          </a>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
-                  {activeSchool.phone && (
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5">
-                      <Phone className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="block text-[11px] text-slate-400 font-medium">Talian Pejabat Am Sekolah:</span>
-                        <a
-                          href={`tel:${activeSchool.phone}`}
-                          className="text-teal-700 hover:underline font-semibold"
-                        >
-                          {activeSchool.phone}
-                        </a>
+                  {/* Website Direktori Awam: HANYA Talian Pejabat Am Sekolah (No. Peribadi PGB tidak dipaparkan di sini) */}
+                  {(() => {
+                    const officePhone =
+                      activeSchool.schoolPhone ||
+                      (activeSchool.phone && activeSchool.phone !== activeSchool.pgbPhone ? activeSchool.phone : '');
+                    if (!officePhone) return null;
+                    return (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5">
+                        <Phone className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="block text-[11px] text-slate-400 font-medium">Talian Pejabat Am Sekolah:</span>
+                          <a
+                            href={`tel:${officePhone}`}
+                            className="text-teal-700 hover:underline font-semibold"
+                          >
+                            {officePhone}
+                          </a>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {activeSchool.website && (
                     <div className="sm:col-span-2 p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2.5">
