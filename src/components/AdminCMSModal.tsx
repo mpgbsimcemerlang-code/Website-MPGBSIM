@@ -36,6 +36,7 @@ import { AdminActivePortalUsersDashboard } from './admin/AdminActivePortalUsersD
 import { AdminBirthdayManagement } from './admin/AdminBirthdayManagement';
 import { AdminNewsManagement } from './admin/AdminNewsManagement';
 import { AdminEventManagement } from './admin/AdminEventManagement';
+import { AdminProgramAttendanceManagement } from './admin/AdminProgramAttendanceManagement';
 import { AdminBestPracticeManagement } from './admin/AdminBestPracticeManagement';
 import { AdminSchoolManagement } from './admin/AdminSchoolManagement';
 import { AdminApplicationManagement } from './admin/AdminApplicationManagement';
@@ -266,9 +267,16 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
         },
         {
           id: 'program',
-          label: 'Pengurusan Acara',
+          label: 'Pengurusan Acara & Takwim',
           icon: Calendar,
           count: siteData.programs?.length || 0,
+        },
+        {
+          id: 'kehadiran-sijil-program',
+          label: 'Kehadiran & Sijil Program PGB',
+          icon: Award,
+          count: 'Sijil',
+          isHighlight: true,
         },
         {
           id: 'amalan',
@@ -510,6 +518,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
             {activeTab === 'pengumuman-portal' && <AdminAnnouncementsManagement />}
             {activeTab === 'peperiksaan' && <AdminExamManagement />}
             {activeTab === 'program' && <AdminEventManagement />}
+            {activeTab === 'kehadiran-sijil-program' && <AdminProgramAttendanceManagement />}
             {activeTab === 'amalan' && <AdminBestPracticeManagement />}
             {activeTab === 'galeri' && <AdminMediaManagement />}
             {activeTab === 'amanat-cta' && <CMSAmanatCta />}

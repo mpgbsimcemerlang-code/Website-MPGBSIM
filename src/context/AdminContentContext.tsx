@@ -17,6 +17,7 @@ import {
   AnnouncementItem,
   ExamCalendarItem,
   BirthdaySettingsConfig,
+  ProgramCertificateConfig,
 } from '../types';
 import { DEFAULT_BIRTHDAY_SETTINGS } from '../utils/birthdayUtils';
 
@@ -163,6 +164,7 @@ export interface SiteContentState {
   announcements?: AnnouncementItem[];
   examCalendar?: ExamCalendarItem[];
   birthdaySettings?: BirthdaySettingsConfig;
+  programCertificateConfig?: ProgramCertificateConfig;
 }
 
 export interface AdminUser {
@@ -268,6 +270,33 @@ interface AdminContentContextType {
   ) => Promise<{ success: boolean; message: string; registrationId?: string }>;
   updateEventRegistrationStatus: (regId: string, status: 'confirmed' | 'attended' | 'cancelled') => Promise<void>;
   deleteEventRegistration: (regId: string, eventId: string) => Promise<void>;
+  // Program Attendance & Certificate Issuance (PGB & CMS)
+  updateProgramCertificateConfig: (data: Partial<ProgramCertificateConfig>) => Promise<void>;
+  recordPgbProgramAttendance: (
+    eventId: string,
+    school: MemberSchool,
+    attended: boolean,
+    autoIssueCert?: boolean
+  ) => Promise<void>;
+  bulkRecordPgbProgramAttendance: (
+    eventId: string,
+    schools: MemberSchool[],
+    attended: boolean,
+    autoIssueCert?: boolean
+  ) => Promise<void>;
+  toggleProgramCertificateIssued: (
+    regId: string,
+    issued: boolean,
+    certificateTitleOverride?: string
+  ) => Promise<void>;
+  bulkIssueProgramCertificates: (
+    eventId: string,
+    certificateTitleOverride?: string
+  ) => Promise<number>;
+  updateEventRegistrationDetails: (
+    regId: string,
+    patch: Partial<EventRegistration>
+  ) => Promise<void>;
   // Alumni PGB Management
   addAlumniRecord: (item: Omit<AlumniRecord, 'id' | 'submittedAt'> | AlumniRecord) => Promise<string>;
   updateAlumniRecord: (id: string, item: Partial<AlumniRecord>) => Promise<void>;
@@ -409,6 +438,23 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
   adminMemo: 'Tugasan Utama: 1) Kemas kini takwim Konvensyen Nasional 2026. 2) Semak pendaftaran Sekolah Rendah Islam I Musleh & rakan Musleh.',
   adminMemoAuthor: 'Urus Setia Kebangsaan',
   adminMemoDate: '23 September 2026',
+};
+
+export const DEFAULT_PROGRAM_CERTIFICATE_CONFIG: ProgramCertificateConfig = {
+  certificateTitle: 'SIJIL PENYERTAAN PROGRAM',
+  certificateSubtitle: 'MAJLIS PENGETUA GURU BESAR SEKOLAH-SEKOLAH ISLAM MALAYSIA (MPGBSIM)',
+  introText: 'Dengan sukacitanya diperakui dan disahkan bahawa',
+  participationText: 'telah menghadiri dan menyertai dengan jayanya program:',
+  recognitionClause:
+    'Penyertaan dan komitmen tuan/puan dalam menjayakan program pembangunan profesionalisme kepimpinan pendidikan Islam kebangsaan ini amatlah dihargai dan disanjung tinggi.',
+  chairmanName: 'USTAZ MOHAMAD FAIZ BIN AZIZAN',
+  chairmanRole: 'Pengerusi Kebangsaan MPGBSIM',
+  chairmanOrg: 'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
+  chairmanSignatureImageUrl: '',
+  chairmanSignatureText: 'Mohamad Faiz Azizan',
+  secondarySignatoryName: 'SETIAUSAHA AGUNG & URUS SETIA',
+  secondarySignatoryRole: 'Sekretariat Kebangsaan MPGBSIM',
+  secondarySignatureText: 'Urus Setia Pusat',
 };
 
 const DUMMY_MOCK_SCHOOL_IDS = new Set(['sch-1', 'sch-2', 'sch-3', 'sch-4', 'sch-5', 'sch-6', 'sch-7', 'sch-8']);
@@ -1731,6 +1777,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         initialSync?.birthdaySettings ||
         prev?.birthdaySettings ||
         DEFAULT_BIRTHDAY_SETTINGS,
+      programCertificateConfig:
+        cachedCms?.programCertificateConfig ||
+        initialSync?.programCertificateConfig ||
+        prev?.programCertificateConfig ||
+        DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
     };
   };
 
@@ -1941,6 +1992,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               birthdaySettings: cached.birthdaySettings
                 ? { ...DEFAULT_BIRTHDAY_SETTINGS, ...cached.birthdaySettings }
                 : prev.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
+              programCertificateConfig: cached.programCertificateConfig
+                ? { ...DEFAULT_PROGRAM_CERTIFICATE_CONFIG, ...cached.programCertificateConfig }
+                : prev.programCertificateConfig || DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
             };
           });
         }
@@ -2157,6 +2211,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               birthdaySettings: d.birthdaySettings
                 ? { ...DEFAULT_BIRTHDAY_SETTINGS, ...prev.birthdaySettings, ...d.birthdaySettings }
                 : prev.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
+              programCertificateConfig: d.programCertificateConfig
+                ? { ...DEFAULT_PROGRAM_CERTIFICATE_CONFIG, ...prev.programCertificateConfig, ...d.programCertificateConfig }
+                : prev.programCertificateConfig || DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
             }));
             clearFirestoreQuotaBreaker();
             setIsReadOnlyMode(false);
@@ -2171,6 +2228,30 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       unsubscribes.push(unsubCmsContent);
     } catch (e) {
       console.warn('CMS Content listener setup error:', e);
+    }
+
+    // 0a. Dedicated Program Certificate Config listener (includes Chairman's Digital Signature)
+    try {
+      const unsubProgramCert = onSnapshot(
+        doc(db, 'siteSettings', 'programCertificate'),
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const d = docSnap.data() as Partial<ProgramCertificateConfig>;
+            setSiteData((prev) => ({
+              ...prev,
+              programCertificateConfig: {
+                ...DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
+                ...(prev.programCertificateConfig || {}),
+                ...d,
+              },
+            }));
+          }
+        },
+        (err) => handleListenerError('ProgramCertificateConfig', err)
+      );
+      unsubscribes.push(unsubProgramCert);
+    } catch (e) {
+      console.warn('ProgramCertificateConfig listener setup error:', e);
     }
 
     // 0b. Leadership listener (Authoritative Barisan Kepimpinan Tertinggi MPGBSIM collection)
@@ -2882,11 +2963,24 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           contactInfo: siteData.contactInfo,
           dashboardConfig: siteData.dashboardConfig,
           birthdaySettings: siteData.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
+          programCertificateConfig: siteData.programCertificateConfig || DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
       );
       count++;
+
+      if (siteData.programCertificateConfig) {
+        await setDoc(
+          doc(db, 'siteSettings', 'programCertificate'),
+          {
+            ...siteData.programCertificateConfig,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        count++;
+      }
 
       // 1b. Sync Individual Leadership Documents to collection(db, 'leadership')
       for (const leader of siteData.leadership) {
@@ -3319,6 +3413,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       eventId,
       eventTitle,
       eventDate,
+      eventVenue: targetEvent?.venue || participantData.eventVenue || '',
+      eventMode: targetEvent?.mode || participantData.eventMode || 'Fizikal',
+      schoolId: participantData.schoolId || '',
+      schoolCode: participantData.schoolCode || '',
+      icNumber: participantData.icNumber || '',
       participantName: participantData.participantName.trim(),
       participantEmail: participantData.participantEmail.trim().toLowerCase(),
       participantPhone: participantData.participantPhone?.trim() || '',
@@ -3516,6 +3615,380 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           { spotsFilled: newSpotsFilled, registrationOpen: true, updatedAt: new Date().toISOString() },
           { merge: true }
         ).catch(() => {});
+      }
+    }
+  };
+
+  // Program Certificate & Attendance Management
+  const updateProgramCertificateConfig = async (
+    data: Partial<ProgramCertificateConfig>
+  ): Promise<void> => {
+    let safeSigUrl = data.chairmanSignatureImageUrl;
+    if (safeSigUrl && safeSigUrl.startsWith('data:') && safeSigUrl.length > 150000) {
+      safeSigUrl = await compressDataUrl(safeSigUrl, 600, 260, 0.85);
+    }
+
+    const nextConfig: ProgramCertificateConfig = {
+      ...(siteData.programCertificateConfig || DEFAULT_PROGRAM_CERTIFICATE_CONFIG),
+      ...data,
+      ...(safeSigUrl !== undefined ? { chairmanSignatureImageUrl: safeSigUrl } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setSiteData((prev) => {
+      const nextState = {
+        ...prev,
+        programCertificateConfig: nextConfig,
+      };
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
+
+    await saveCmsContentToFirestore({ programCertificateConfig: nextConfig });
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      await setDoc(
+        doc(db, 'siteSettings', 'programCertificate'),
+        nextConfig,
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore updateProgramCertificateConfig notice:', e);
+    }
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    } catch {}
+  };
+
+  const cleanPrincipalNameFromSchool = (school: MemberSchool): string => {
+    const raw = (school.principal || 'Pengetua / Guru Besar').trim();
+    return raw.replace(/\s*\((Pengetua|Guru Besar|Mudir)\)\s*$/i, '').trim() || raw;
+  };
+
+  const findExistingSchoolRegistration = (
+    regs: EventRegistration[],
+    eventId: string,
+    school: MemberSchool
+  ): EventRegistration | undefined => {
+    const normCode = (school.code || '').trim().toUpperCase();
+    const normName = (school.name || '').trim().toLowerCase();
+    const normPgbEmail = (school.pgbEmail || school.email || '').trim().toLowerCase();
+
+    return regs.find((r) => {
+      if (r.eventId !== eventId) return false;
+      if (r.schoolId && school.id && r.schoolId === school.id) return true;
+      if (normCode && r.schoolCode && r.schoolCode.trim().toUpperCase() === normCode) return true;
+      if (normName && r.schoolName && r.schoolName.trim().toLowerCase() === normName) return true;
+      if (normPgbEmail && r.participantEmail && r.participantEmail.trim().toLowerCase() === normPgbEmail) return true;
+      return false;
+    });
+  };
+
+  const buildCertificateNo = (eventId: string, codeOrRegId: string): string => {
+    const cleanCode = (codeOrRegId || 'PGB').replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 10) || 'PGB';
+    const cleanEvt = (eventId || 'PROG').replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(-4) || '2026';
+    return `MPGBSIM/SIJIL/2026/${cleanEvt}/${cleanCode}`;
+  };
+
+  const recordPgbProgramAttendance = async (
+    eventId: string,
+    school: MemberSchool,
+    attended: boolean,
+    autoIssueCert = false
+  ): Promise<void> => {
+    const targetEvent = siteData.programs?.find((p) => p.id === eventId);
+    const eventTitle = targetEvent?.title || 'Program Rasmi MPGBSIM';
+    const eventDate = targetEvent?.date || new Date().toISOString().split('T')[0];
+    const eventVenue = targetEvent?.venue || 'Kompleks Pendidikan Islam';
+    const eventMode = targetEvent?.mode || 'Fizikal';
+    const nowIso = new Date().toISOString();
+
+    const pgbName = cleanPrincipalNameFromSchool(school);
+    const pgbPosition =
+      school.designation ||
+      (school.type?.toLowerCase().includes('rendah') ? 'Guru Besar' : 'Pengetua');
+    const pgbEmail = (school.pgbEmail || school.email || `${(school.code || 'ahli').toLowerCase()}@mpgbsim.org`).trim().toLowerCase();
+    const pgbPhone = (school.pgbPhone || school.phone || '').trim();
+
+    const existing = findExistingSchoolRegistration(eventRegistrations, eventId, school);
+
+    if (existing) {
+      const certNo =
+        existing.certificateNo ||
+        buildCertificateNo(eventId, school.code || existing.attendanceCode || existing.id);
+      const nextCertIssued = attended
+        ? autoIssueCert
+          ? true
+          : Boolean(existing.certificateIssued)
+        : false;
+
+      const updatedReg: EventRegistration = {
+        ...existing,
+        eventTitle,
+        eventDate,
+        eventVenue,
+        eventMode,
+        schoolId: school.id,
+        schoolCode: school.code,
+        icNumber: school.icNumber || existing.icNumber || '',
+        participantName: pgbName || existing.participantName,
+        participantEmail: pgbEmail || existing.participantEmail,
+        participantPhone: pgbPhone || existing.participantPhone,
+        schoolName: school.name || existing.schoolName,
+        position: pgbPosition || existing.position,
+        state: school.state || existing.state,
+        status: attended ? 'attended' : 'confirmed',
+        attendedAt: attended ? existing.attendedAt || nowIso : undefined,
+        certificateIssued: nextCertIssued,
+        certificateNo: nextCertIssued ? certNo : existing.certificateNo,
+        certificateIssuedAt: nextCertIssued ? existing.certificateIssuedAt || nowIso : undefined,
+        updatedAt: nowIso,
+      };
+
+      setEventRegistrations((prev) =>
+        prev.map((r) => (r.id === existing.id ? updatedReg : r))
+      );
+
+      try {
+        await ensureFirebaseAuth().catch(() => null);
+        await setDoc(doc(db, 'eventRegistrations', existing.id), sanitizeForFirestore(updatedReg), {
+          merge: true,
+        });
+      } catch (e) {
+        console.warn('Firestore recordPgbProgramAttendance update notice:', e);
+      }
+      return;
+    }
+
+    if (!attended) {
+      return;
+    }
+
+    const safeCodeSlug = (school.code || school.id || `${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '');
+    const regId = `reg-${eventId}-${safeCodeSlug}`;
+    const attCode = `MPGB-${(school.code || 'PGB').replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(-6)}`;
+    const certNo = buildCertificateNo(eventId, school.code || attCode);
+
+    const newReg: EventRegistration = {
+      id: regId,
+      eventId,
+      eventTitle,
+      eventDate,
+      eventVenue,
+      eventMode,
+      schoolId: school.id,
+      schoolCode: school.code,
+      icNumber: school.icNumber || '',
+      participantName: pgbName,
+      participantEmail: pgbEmail,
+      participantPhone: pgbPhone,
+      schoolName: school.name,
+      position: pgbPosition,
+      state: school.state || 'Malaysia',
+      registeredAt: nowIso,
+      attendedAt: nowIso,
+      status: 'attended',
+      attendanceCode: attCode,
+      certificateIssued: autoIssueCert,
+      certificateNo: certNo,
+      certificateIssuedAt: autoIssueCert ? nowIso : undefined,
+      notes: 'Rekod kehadiran disahkan oleh Pentadbir CMS MPGBSIM',
+      updatedAt: nowIso,
+    };
+
+    setEventRegistrations((prev) => [newReg, ...prev.filter((r) => r.id !== regId)]);
+
+    if (targetEvent) {
+      const nextFilled = (targetEvent.spotsFilled || 0) + 1;
+      setSiteData((prev) => ({
+        ...prev,
+        programs: (prev.programs || []).map((p) =>
+          p.id === eventId ? { ...p, spotsFilled: nextFilled } : p
+        ),
+      }));
+      setDoc(
+        doc(db, 'events', eventId),
+        { spotsFilled: nextFilled, updatedAt: nowIso },
+        { merge: true }
+      ).catch(() => {});
+    }
+
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      await setDoc(doc(db, 'eventRegistrations', regId), sanitizeForFirestore(newReg), {
+        merge: true,
+      });
+    } catch (e) {
+      console.warn('Firestore recordPgbProgramAttendance create notice:', e);
+    }
+  };
+
+  const bulkRecordPgbProgramAttendance = async (
+    eventId: string,
+    schools: MemberSchool[],
+    attended: boolean,
+    autoIssueCert = false
+  ): Promise<void> => {
+    for (const school of schools) {
+      await recordPgbProgramAttendance(eventId, school, attended, autoIssueCert);
+    }
+  };
+
+  const toggleProgramCertificateIssued = async (
+    regId: string,
+    issued: boolean,
+    certificateTitleOverride?: string
+  ): Promise<void> => {
+    const existing = eventRegistrations.find((r) => r.id === regId);
+    if (!existing) return;
+
+    const nowIso = new Date().toISOString();
+    const certNo =
+      existing.certificateNo ||
+      buildCertificateNo(
+        existing.eventId,
+        existing.schoolCode || existing.attendanceCode || existing.id
+      );
+
+    const updatedReg: EventRegistration = {
+      ...existing,
+      status: issued ? 'attended' : existing.status,
+      attendedAt: issued ? existing.attendedAt || nowIso : existing.attendedAt,
+      certificateIssued: issued,
+      certificateNo: certNo,
+      certificateIssuedAt: issued ? nowIso : undefined,
+      ...(certificateTitleOverride !== undefined
+        ? { certificateTitleOverride }
+        : {}),
+      updatedAt: nowIso,
+    };
+
+    setEventRegistrations((prev) =>
+      prev.map((r) => (r.id === regId ? updatedReg : r))
+    );
+
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      await setDoc(doc(db, 'eventRegistrations', regId), sanitizeForFirestore(updatedReg), {
+        merge: true,
+      });
+
+      if (issued) {
+        const notifId = `notif-cert-${regId}`;
+        await setDoc(
+          doc(db, 'notifications', notifId),
+          {
+            id: notifId,
+            userId: existing.schoolCode || existing.participantEmail || 'all',
+            title: `Sijil Penyertaan Dikeluarkan: ${existing.eventTitle}`,
+            message: `Tahniah ${existing.participantName}! Sijil Penyertaan Program bagi "${existing.eventTitle}" telah dikeluarkan dan sedia dimuat turun dalam Portal PGB anda.`,
+            type: 'program',
+            date: nowIso,
+            read: false,
+            linkTab: 'program',
+          },
+          { merge: true }
+        );
+      }
+    } catch (e) {
+      console.warn('Firestore toggleProgramCertificateIssued notice:', e);
+    }
+  };
+
+  const bulkIssueProgramCertificates = async (
+    eventId: string,
+    certificateTitleOverride?: string
+  ): Promise<number> => {
+    const targetRegs = eventRegistrations.filter(
+      (r) => r.eventId === eventId && r.status === 'attended'
+    );
+    if (targetRegs.length === 0) return 0;
+
+    const nowIso = new Date().toISOString();
+    const updatedMap = new Map<string, EventRegistration>();
+
+    for (const reg of targetRegs) {
+      const certNo =
+        reg.certificateNo ||
+        buildCertificateNo(
+          reg.eventId,
+          reg.schoolCode || reg.attendanceCode || reg.id
+        );
+      updatedMap.set(reg.id, {
+        ...reg,
+        certificateIssued: true,
+        certificateNo: certNo,
+        certificateIssuedAt: reg.certificateIssuedAt || nowIso,
+        ...(certificateTitleOverride !== undefined
+          ? { certificateTitleOverride }
+          : {}),
+        updatedAt: nowIso,
+      });
+    }
+
+    setEventRegistrations((prev) =>
+      prev.map((r) => updatedMap.get(r.id) || r)
+    );
+
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      for (const updatedReg of updatedMap.values()) {
+        await setDoc(
+          doc(db, 'eventRegistrations', updatedReg.id),
+          sanitizeForFirestore(updatedReg),
+          { merge: true }
+        );
+      }
+
+      const targetEvent = siteData.programs?.find((p) => p.id === eventId);
+      const notifId = `notif-cert-bulk-${eventId}`;
+      await setDoc(
+        doc(db, 'notifications', notifId),
+        {
+          id: notifId,
+          userId: 'all',
+          title: `Sijil Penyertaan Dikeluarkan: ${targetEvent?.title || 'Program MPGBSIM'}`,
+          message: `Sijil Penyertaan Program bagi "${targetEvent?.title || 'Program MPGBSIM'}" telah dikeluarkan oleh Urus Setia bagi semua PGB yang hadir. Sila muat turun di menu Program Portal PGB.`,
+          type: 'program',
+          date: nowIso,
+          read: false,
+          linkTab: 'program',
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore bulkIssueProgramCertificates notice:', e);
+    }
+
+    return updatedMap.size;
+  };
+
+  const updateEventRegistrationDetails = async (
+    regId: string,
+    patch: Partial<EventRegistration>
+  ): Promise<void> => {
+    const nowIso = new Date().toISOString();
+    let merged: EventRegistration | null = null;
+    setEventRegistrations((prev) =>
+      prev.map((r) => {
+        if (r.id === regId) {
+          merged = { ...r, ...patch, updatedAt: nowIso };
+          return merged;
+        }
+        return r;
+      })
+    );
+    if (merged) {
+      try {
+        await ensureFirebaseAuth().catch(() => null);
+        await setDoc(
+          doc(db, 'eventRegistrations', regId),
+          sanitizeForFirestore(merged),
+          { merge: true }
+        );
+      } catch (e) {
+        console.warn('Firestore updateEventRegistrationDetails notice:', e);
       }
     }
   };
@@ -4800,6 +5273,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         registerForEvent,
         updateEventRegistrationStatus,
         deleteEventRegistration,
+        updateProgramCertificateConfig,
+        recordPgbProgramAttendance,
+        bulkRecordPgbProgramAttendance,
+        toggleProgramCertificateIssued,
+        bulkIssueProgramCertificates,
+        updateEventRegistrationDetails,
         addAlumniRecord,
         updateAlumniRecord,
         deleteAlumniRecord,

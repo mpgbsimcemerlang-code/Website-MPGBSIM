@@ -222,8 +222,8 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
     },
     {
       id: 'program',
-      title: 'Program',
-      sub: 'Konvensyen & takwim kepimpinan',
+      title: 'Program & Sijil',
+      sub: 'Takwim, rekod kehadiran & sijil penyertaan PGB',
       icon: Calendar,
       color: 'from-teal-600 to-teal-700',
     },
@@ -415,6 +415,15 @@ export const PortalDashboardHome: React.FC<PortalDashboardHomeProps> = ({
               >
                 <Award className="w-4 h-4 text-amber-300" />
                 <span>Sijil Rasmi Keahlian Sekolah</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPortalTab('program')}
+                className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-extrabold text-xs flex items-center gap-2 border border-amber-400/50 shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              >
+                <Award className="w-4 h-4 text-amber-400" />
+                <span>Rekod Kehadiran & Sijil Program</span>
               </button>
 
               <button

@@ -81,19 +81,27 @@
         "description": { "type": "string" },
         "organiser": { "type": "string" },
         "registrationLink": { "type": "string" },
-        "status": { "type": "string", "enum": ["Upcoming", "Ongoing", "Completed"] },
-        "posterUrl": { "type": "string" }
+        "status": { "type": "string", "enum": ["Upcoming", "Ongoing", "Completed", "upcoming", "past", "cancelled"] },
+        "posterUrl": { "type": "string" },
+        "certificateTitleOverride": { "type": "string" },
+        "certificateProgramNameOverride": { "type": "string" },
+        "certificatesEnabled": { "type": "boolean" }
       },
       "required": ["title", "date", "status"]
     },
     "EventRegistration": {
       "title": "EventRegistration",
-      "description": "Pendaftaran rasmi peserta bagi program dan acara anjuran MPGBSIM",
+      "description": "Pendaftaran dan rekod kehadiran rasmi PGB serta pengeluaran sijil penyertaan program MPGBSIM",
       "type": "object",
       "properties": {
         "eventId": { "type": "string" },
         "eventTitle": { "type": "string" },
         "eventDate": { "type": "string" },
+        "eventVenue": { "type": "string" },
+        "eventMode": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "schoolCode": { "type": "string" },
+        "icNumber": { "type": "string" },
         "participantName": { "type": "string" },
         "participantEmail": { "type": "string" },
         "participantPhone": { "type": "string" },
@@ -101,7 +109,14 @@
         "position": { "type": "string" },
         "state": { "type": "string" },
         "registeredAt": { "type": "string" },
-        "status": { "type": "string", "enum": ["confirmed", "attended", "cancelled"] }
+        "attendedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["confirmed", "attended", "cancelled"] },
+        "attendanceCode": { "type": "string" },
+        "certificateIssued": { "type": "boolean" },
+        "certificateNo": { "type": "string" },
+        "certificateIssuedAt": { "type": "string" },
+        "certificateTitleOverride": { "type": "string" },
+        "notes": { "type": "string" }
       },
       "required": ["eventId", "eventTitle", "participantName", "participantEmail", "schoolName"]
     },

@@ -29,6 +29,51 @@ interface LatestNewsProps {
   onOpenPortal?: () => void;
 }
 
+const SCHOOL_ACHIEVEMENT_CATEGORIES = new Set([
+  'kejayaan sekolah',
+  'robotik, stem & digital',
+  'kejayaan akademik & tahfiz',
+  'kokurikulum & sukan',
+  'kepimpinan & tarbiah',
+  'anugerah khas & pengiktirafan',
+]);
+
+export const isSchoolAchievementNews = (n: NewsItem): boolean => {
+  const cat = (n.category || '').trim().toLowerCase();
+  const title = (n.title || '').trim().toLowerCase();
+
+  if (
+    SCHOOL_ACHIEVEMENT_CATEGORIES.has(cat) ||
+    cat.includes('kejayaan') ||
+    cat.includes('anugerah') ||
+    cat.includes('robotik') ||
+    cat.includes('kokurikulum')
+  ) {
+    return true;
+  }
+
+  if (
+    title.includes('kejayaan') ||
+    title.includes('raih') ||
+    title.includes('juara') ||
+    title.includes('johan') ||
+    title.includes('cemerlang')
+  ) {
+    return true;
+  }
+
+  if (
+    cat === 'aktiviti' ||
+    cat === 'pendidikan' ||
+    cat === 'pengurusan' ||
+    cat === 'kenyataan media'
+  ) {
+    return false;
+  }
+
+  return Boolean(n.isSchoolAchievement);
+};
+
 export const LatestNewsSection: React.FC<LatestNewsProps> = ({
   newsList,
   onSelectNews,
@@ -54,15 +99,10 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
 
     // Filter by Category or School Achievement
     if (selectedFilter === 'kejayaan') {
-      list = list.filter(
-        (n) =>
-          n.isSchoolAchievement ||
-          n.category?.toLowerCase().includes('kejayaan') ||
-          Boolean(n.schoolName)
-      );
+      list = list.filter((n) => isSchoolAchievementNews(n));
     } else if (selectedFilter !== 'semua') {
       list = list.filter(
-        (n) => n.category?.toLowerCase() === selectedFilter.toLowerCase()
+        (n) => (n.category || '').trim().toLowerCase() === selectedFilter.trim().toLowerCase()
       );
     }
 
@@ -85,9 +125,30 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
   }, [newsList, selectedFilter, searchQuery]);
 
   const schoolAchievementCount = useMemo(
+    () => newsList.filter((n) => isSchoolAchievementNews(n)).length,
+    [newsList]
+  );
+
+  const kenyataanMediaCount = useMemo(
     () =>
       newsList.filter(
-        (n) => n.isSchoolAchievement || n.schoolName || n.category?.includes('Kejayaan')
+        (n) => (n.category || '').trim().toLowerCase() === 'kenyataan media'
+      ).length,
+    [newsList]
+  );
+
+  const pendidikanCount = useMemo(
+    () =>
+      newsList.filter(
+        (n) => (n.category || '').trim().toLowerCase() === 'pendidikan'
+      ).length,
+    [newsList]
+  );
+
+  const aktivitiCount = useMemo(
+    () =>
+      newsList.filter(
+        (n) => (n.category || '').trim().toLowerCase() === 'aktiviti'
       ).length,
     [newsList]
   );
@@ -213,7 +274,7 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Kenyataan Media
+            Kenyataan Media ({kenyataanMediaCount})
           </button>
 
           <button
@@ -225,7 +286,7 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Pendidikan
+            Pendidikan ({pendidikanCount})
           </button>
 
           <button
@@ -237,7 +298,7 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Aktiviti
+            Aktiviti ({aktivitiCount})
           </button>
         </div>
 
@@ -319,7 +380,7 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                       </div>
 
                       {/* School Name Tag */}
-                      {(news.schoolName || news.isSchoolAchievement) && (
+                      {isSchoolAchievementNews(news) && (
                         <div className="absolute bottom-2.5 left-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/85 backdrop-blur-md border border-white/20 text-[11px] font-bold text-amber-300">
                           <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                           <span className="truncate">{news.schoolName || 'Sekolah Ahli MPGBSIM'}</span>
@@ -450,7 +511,7 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                     </div>
 
                     {/* School Badge Pill if school news */}
-                    {(featuredItem.schoolName || featuredItem.isSchoolAchievement) && (
+                    {isSchoolAchievementNews(featuredItem) && (
                       <div className="absolute bottom-3 left-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950/80 backdrop-blur-md border border-white/20 text-xs font-bold text-amber-300">
                         <Award className="w-4 h-4 text-amber-400 shrink-0" />
                         <span className="truncate">
@@ -564,7 +625,7 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                     <div className="flex-1 flex flex-col justify-between py-1">
                       <div>
                         {/* School Name Tag if present */}
-                        {(news.schoolName || news.isSchoolAchievement) && (
+                        {isSchoolAchievementNews(news) && (
                           <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 mb-1">
                             <Trophy className="w-3 h-3 text-amber-600 shrink-0" />
                             <span className="truncate">{news.schoolName || 'Sekolah Ahli MPGBSIM'}</span>

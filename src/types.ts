@@ -192,6 +192,9 @@ export interface ProgramEvent {
   status?: 'Upcoming' | 'Ongoing' | 'Completed' | 'upcoming' | 'past' | 'cancelled';
   registeredUserIds?: string[];
   order?: number;
+  certificateTitleOverride?: string;
+  certificateProgramNameOverride?: string;
+  certificatesEnabled?: boolean;
 }
 
 export interface EventRegistration {
@@ -199,6 +202,11 @@ export interface EventRegistration {
   eventId: string;
   eventTitle: string;
   eventDate?: string;
+  eventVenue?: string;
+  eventMode?: string;
+  schoolId?: string;
+  schoolCode?: string;
+  icNumber?: string;
   participantName: string;
   participantEmail: string;
   participantPhone?: string;
@@ -206,9 +214,15 @@ export interface EventRegistration {
   position?: string;
   state?: string;
   registeredAt: string;
+  attendedAt?: string;
   status: 'confirmed' | 'attended' | 'cancelled';
   attendanceCode?: string;
+  certificateIssued?: boolean;
+  certificateNo?: string;
+  certificateIssuedAt?: string;
+  certificateTitleOverride?: string;
   notes?: string;
+  updatedAt?: string;
 }
 
 export interface AnnouncementItem {
@@ -657,5 +671,19 @@ export interface BirthdaySettingsConfig {
   updatedAt?: string;
 }
 
-
-
+export interface ProgramCertificateConfig {
+  certificateTitle: string;
+  certificateSubtitle: string;
+  introText: string;
+  participationText: string;
+  recognitionClause: string;
+  chairmanName: string;
+  chairmanRole: string;
+  chairmanOrg: string;
+  chairmanSignatureImageUrl?: string;
+  chairmanSignatureText?: string;
+  secondarySignatoryName?: string;
+  secondarySignatoryRole?: string;
+  secondarySignatureText?: string;
+  updatedAt?: string;
+}

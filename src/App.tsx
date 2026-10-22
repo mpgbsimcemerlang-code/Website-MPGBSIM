@@ -158,7 +158,7 @@ function AppContent() {
         'bayar-yuran',
         'sekolah-ahli',
         'kepimpinan',
-        'sumber',
+        'alumni',
         'hubungi',
         'soalan-lazim',
       ];
@@ -199,7 +199,7 @@ function AppContent() {
       'bayar-yuran': 'Kadar Yuran Keahlian & Pembayaran | MPGBSIM',
       'sekolah-ahli': 'Direktori Sekolah-Sekolah Islam Ahli Biasa & Bersekutu | MPGBSIM',
       kepimpinan: 'Jawatankuasa Kepimpinan Pusat | MPGBSIM',
-      sumber: 'Pusat Sumber & Muat Turun Dokumen Rasmi | MPGBSIM',
+      alumni: 'Jejak Kepimpinan & Direktori Alumni PGB | MPGBSIM',
       hubungi: 'Hubungi Sekretariat Kebangsaan | MPGBSIM',
       'soalan-lazim': 'Soalan Lazim (FAQ) Keahlian & Portal PGB | MPGBSIM',
     };

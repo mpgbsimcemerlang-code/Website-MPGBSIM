@@ -33,14 +33,24 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection }) => {
     { label: 'Utama', href: '#utama' },
     { label: 'Tentang MPGBSIM', href: '#tentang' },
     { label: 'Berita', href: '#berita' },
-    { label: 'Kepimpinan', href: '#kepimpinan' },
-    { label: 'Sekolah Ahli', href: '#sekolah-ahli' },
-    { label: 'Alumni PGB', href: '#alumni' },
+    { label: 'Best Practice', href: '#best-practice' },
     { label: 'Program', href: '#program' },
     { label: 'Peperiksaan', href: '#peperiksaan' },
-    { label: 'Best Practice', href: '#best-practice' },
+    { label: 'Sekolah Ahli', href: '#sekolah-ahli' },
+    { label: 'Kepimpinan', href: '#kepimpinan' },
+    { label: 'Alumni PGB', href: '#alumni' },
     { label: 'Hubungi Kami', href: '#hubungi' },
   ];
+
+  // Map sub-sections on the page to their corresponding main navigation tab during scroll
+  const resolvedActiveTab =
+    activeSection === 'fokus-strategik'
+      ? 'tentang'
+      : activeSection === 'bayar-yuran'
+      ? 'peperiksaan'
+      : activeSection === 'soalan-lazim'
+      ? 'hubungi'
+      : activeSection;
 
   const currentDateFormatted = new Intl.DateTimeFormat('ms-MY', {
     weekday: 'long',
@@ -124,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection }) => {
           {/* Desktop Nav Links */}
           <div className="hidden xl:flex items-center gap-1.5 2xl:gap-2">
             {navLinks.map((link) => {
-              const isActive = activeSection === link.href.replace('#', '');
+              const isActive = resolvedActiveTab === link.href.replace('#', '');
               return (
                 <a
                   key={link.href}
@@ -172,20 +182,27 @@ export const Navbar: React.FC<NavbarProps> = ({ activeSection }) => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-              {navLinks.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleNavClick(link.href);
-                  }}
-                  className="flex items-center justify-between px-3 py-2.5 text-sm font-medium text-slate-200 hover:text-teal-300 hover:bg-slate-800/80 rounded-lg transition-colors"
-                >
-                  <span>{link.label}</span>
-                  <ChevronRight className="w-4 h-4 text-slate-500" />
-                </a>
-              ))}
+              {navLinks.map((link) => {
+                const isActive = resolvedActiveTab === link.href.replace('#', '');
+                return (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNavClick(link.href);
+                    }}
+                    className={`flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'text-white bg-teal-800/60 border border-teal-500/40 font-semibold'
+                        : 'text-slate-200 hover:text-teal-300 hover:bg-slate-800/80'
+                    }`}
+                  >
+                    <span>{link.label}</span>
+                    <ChevronRight className={`w-4 h-4 ${isActive ? 'text-teal-300' : 'text-slate-500'}`} />
+                  </a>
+                );
+              })}
             </div>
           </div>
         )}

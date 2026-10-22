@@ -134,13 +134,8 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
                 </a>
               </li>
               <li>
-                <a href="#kepimpinan" className="hover:text-teal-400 transition-colors">
-                  Saf Kepimpinan
-                </a>
-              </li>
-              <li>
-                <a href="#sekolah-ahli" className="hover:text-teal-400 transition-colors">
-                  Rangkaian Sekolah
+                <a href="#best-practice" className="hover:text-teal-400 transition-colors">
+                  Amalan Terbaik
                 </a>
               </li>
               <li>
@@ -149,13 +144,28 @@ export const Footer: React.FC<FooterProps> = ({ onOpenPrivacy, onOpenPortal }) =
                 </a>
               </li>
               <li>
+                <a href="#peperiksaan" className="hover:text-teal-400 transition-colors">
+                  Takwim Peperiksaan
+                </a>
+              </li>
+              <li>
                 <a href="#bayar-yuran" className="text-amber-300 hover:text-amber-200 font-semibold transition-colors">
                   Bayar Yuran PGB (HerePay)
                 </a>
               </li>
               <li>
-                <a href="#best-practice" className="hover:text-teal-400 transition-colors">
-                  Amalan Terbaik
+                <a href="#sekolah-ahli" className="hover:text-teal-400 transition-colors">
+                  Rangkaian Sekolah
+                </a>
+              </li>
+              <li>
+                <a href="#kepimpinan" className="hover:text-teal-400 transition-colors">
+                  Saf Kepimpinan
+                </a>
+              </li>
+              <li>
+                <a href="#alumni" className="hover:text-teal-400 transition-colors">
+                  Alumni PGB
                 </a>
               </li>
             </ul>

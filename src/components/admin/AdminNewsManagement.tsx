@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { NewsItem } from '../../types';
+import { isSchoolAchievementNews } from '../LatestNews';
 import { compressImageFile } from '../../utils/imageCompressor';
 import {
   sortNewsByPublishedDate,
@@ -244,7 +245,6 @@ export const AdminNewsManagement: React.FC = () => {
   // Fast Fill Template Generator matching Portal Ahli
   const applyTemplate = (type: 'robotik' | 'akademik' | 'sukan' | 'kenyataan_media') => {
     const defaultSchool = formData.schoolName || 'Sekolah Ahli MPGBSIM';
-    const defaultAuthor = formData.author || 'Urus Setia MPGBSIM';
 
     if (type === 'robotik') {
       setFormData((prev) => ({
@@ -288,6 +288,8 @@ export const AdminNewsManagement: React.FC = () => {
         title: `Kenyataan Media Rasmi MPGBSIM: Memperkasa Kurikulum Bersepadu & Kepimpinan Sekolah Islam Malaysia`,
         achievementLevel: 'Kebangsaan',
         category: 'Kenyataan Media',
+        schoolName: 'MPGBSIM',
+        schoolCode: 'MPGB',
         summary: `Majlis Pengetua Guru Besar Sekolah Islam Malaysia menegaskan komitmen berterusan dalam memperkasakan kualiti pengurusan institusi dan sahsiah murabbi.`,
         content: `KUALA LUMPUR — Majlis Pengetua Guru Besar Sekolah Islam Malaysia (MPGBSIM) mengeluarkan kenyataan rasmi berhubung hala tuju pemerkasaan pendidikan Islam di seluruh negara.\n\nInisiatif ini merangkumi pengukuhan kurikulum bersepadu, standard pensijilan tahfiz, serta pemantapan kompetensi digital bagi barisan pengetua dan guru besar.\n\nMPGBSIM menyeru semua institusi ahli untuk terus bersinergi dalam menjayakan agenda transformasi pendidikan ummah yang berteraskan kecemerlangan adab dan intelek.`,
         imageUrl: PRESET_NEWS_IMAGES[4].url,
@@ -307,7 +309,12 @@ export const AdminNewsManagement: React.FC = () => {
       item.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.schoolName && item.schoolName.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || itemStatus === filterStatus;
-    const matchesCategory = filterCategory === 'all' || item.category === filterCategory;
+    const matchesCategory =
+      filterCategory === 'all'
+        ? true
+        : filterCategory === 'kejayaan_group'
+        ? isSchoolAchievementNews(item)
+        : (item.category || '').trim().toLowerCase() === filterCategory.trim().toLowerCase();
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
@@ -323,6 +330,7 @@ export const AdminNewsManagement: React.FC = () => {
   };
 
   const handleOpenEdit = (item: NewsItem) => {
+    const resolvedIsAchievement = isSchoolAchievementNews(item);
     setFormData({
       title: item.title,
       slug: item.slug || item.title.toLowerCase().replace(/\s+/g, '-'),
@@ -330,8 +338,8 @@ export const AdminNewsManagement: React.FC = () => {
       content: item.content,
       category: item.category || 'Kejayaan Sekolah',
       achievementLevel: item.achievementLevel || 'Kebangsaan',
-      schoolName: item.schoolName || 'Sekolah Ahli MPGBSIM',
-      schoolCode: item.schoolCode || 'MPGB-AHLI',
+      schoolName: item.schoolName || (resolvedIsAchievement ? 'Sekolah Ahli MPGBSIM' : 'MPGBSIM'),
+      schoolCode: item.schoolCode || (resolvedIsAchievement ? 'MPGB-AHLI' : 'MPGB'),
       state: item.state || 'Selangor',
       date: item.date || formatToMalayDate(new Date()),
       author: item.author || 'Urus Setia MPGBSIM',
@@ -340,7 +348,7 @@ export const AdminNewsManagement: React.FC = () => {
       featured: !!item.featured,
       status: item.status || 'published',
       scheduleDate: item.scheduleDate || '',
-      isSchoolAchievement: item.isSchoolAchievement ?? true,
+      isSchoolAchievement: resolvedIsAchievement,
     });
     setEditingId(item.id);
     if (item.imageUrl?.startsWith('data:')) {
@@ -356,6 +364,14 @@ export const AdminNewsManagement: React.FC = () => {
     e.preventDefault();
     if (!formData.title.trim()) return;
 
+    const draftItem: NewsItem = {
+      ...formData,
+      id: editingId || 'temp',
+      title: formData.title.trim(),
+      category: formData.category || 'Kejayaan Sekolah',
+    };
+    const resolvedIsAchievement = isSchoolAchievementNews(draftItem);
+
     const submissionData = {
       ...formData,
       title: formData.title.trim(),
@@ -363,12 +379,16 @@ export const AdminNewsManagement: React.FC = () => {
       content: formData.content.trim(),
       category: formData.category || 'Kejayaan Sekolah',
       achievementLevel: formData.achievementLevel || 'Kebangsaan',
-      schoolName: formData.schoolName?.trim() || 'Sekolah Ahli MPGBSIM',
-      schoolCode: formData.schoolCode?.trim() || 'MPGB-AHLI',
+      schoolName:
+        formData.schoolName?.trim() ||
+        (resolvedIsAchievement ? 'Sekolah Ahli MPGBSIM' : 'MPGBSIM'),
+      schoolCode:
+        formData.schoolCode?.trim() ||
+        (resolvedIsAchievement ? 'MPGB-AHLI' : 'MPGB'),
       state: formData.state || 'Selangor',
       date: formData.date?.trim() || formatToMalayDate(new Date()),
       imageUrl: formData.imageUrl?.trim() || PRESET_NEWS_IMAGES[0].url,
-      isSchoolAchievement: formData.isSchoolAchievement ?? true,
+      isSchoolAchievement: resolvedIsAchievement,
       updatedAt: new Date().toISOString(),
     };
 
@@ -400,6 +420,17 @@ export const AdminNewsManagement: React.FC = () => {
     const nextStatus = currentStatus === 'published' ? 'draft' : 'published';
     updateNews(item.id, { status: nextStatus });
   };
+
+  const kejayaanTotal = newsList.filter((n) => isSchoolAchievementNews(n)).length;
+  const kenyataanMediaTotal = newsList.filter(
+    (n) => (n.category || '').trim().toLowerCase() === 'kenyataan media'
+  ).length;
+  const pendidikanTotal = newsList.filter(
+    (n) => (n.category || '').trim().toLowerCase() === 'pendidikan'
+  ).length;
+  const aktivitiTotal = newsList.filter(
+    (n) => (n.category || '').trim().toLowerCase() === 'aktiviti'
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -449,6 +480,65 @@ export const AdminNewsManagement: React.FC = () => {
         </button>
       </div>
 
+      {/* Category Summary Pills matching Website */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFilterCategory('all')}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+            filterCategory === 'all'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Semua Berita ({newsList.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterCategory('kejayaan_group')}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+            filterCategory === 'kejayaan_group'
+              ? 'bg-amber-500 text-slate-950'
+              : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+          }`}
+        >
+          🏆 Kejayaan Sekolah Ahli ({kejayaanTotal})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterCategory('Kenyataan Media')}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+            filterCategory === 'Kenyataan Media'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Kenyataan Media ({kenyataanMediaTotal})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterCategory('Pendidikan')}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+            filterCategory === 'Pendidikan'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Pendidikan ({pendidikanTotal})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterCategory('Aktiviti')}
+          className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+            filterCategory === 'Aktiviti'
+              ? 'bg-slate-900 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          Aktiviti ({aktivitiTotal})
+        </button>
+      </div>
+
       {/* Filter & Search Bar */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
         <div className="relative flex-1">
@@ -480,6 +570,7 @@ export const AdminNewsManagement: React.FC = () => {
             className="px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-600"
           >
             <option value="all">Semua Kategori</option>
+            <option value="kejayaan_group">🏆 Semua Kejayaan Sekolah Ahli ({kejayaanTotal})</option>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {c}

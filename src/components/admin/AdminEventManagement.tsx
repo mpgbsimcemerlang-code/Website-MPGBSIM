@@ -32,10 +32,12 @@ import {
   ArrowUp,
   ArrowDown,
   GripVertical,
+  Award,
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { ProgramEvent, EventRegistration } from '../../types';
 import { compressImageFile } from '../../utils/imageCompressor';
+import { AdminProgramAttendanceManagement } from './AdminProgramAttendanceManagement';
 
 export const AdminEventManagement: React.FC = () => {
   const {
@@ -50,8 +52,9 @@ export const AdminEventManagement: React.FC = () => {
     deleteEventRegistration,
   } = useAdminContent();
 
-  // Active top-level subtab: 'events' or 'registrations'
-  const [activeSubTab, setActiveSubTab] = useState<'events' | 'registrations'>('events');
+  // Active top-level subtab: 'events', 'registrations', or 'attendance-certs'
+  const [activeSubTab, setActiveSubTab] = useState<'events' | 'registrations' | 'attendance-certs'>('events');
+  const [attendanceTargetEventId, setAttendanceTargetEventId] = useState<string | undefined>(undefined);
 
   // Events list state
   const [searchTerm, setSearchTerm] = useState('');
@@ -305,6 +308,12 @@ export const AdminEventManagement: React.FC = () => {
     setActiveSubTab('registrations');
   };
 
+  // Switch to PGB Attendance & Certificate tab for a specific event
+  const handleOpenAttendanceAndCerts = (eventId: string) => {
+    setAttendanceTargetEventId(eventId);
+    setActiveSubTab('attendance-certs');
+  };
+
   // Confirm delete registration
   const handleConfirmDeleteReg = async () => {
     if (!regToDelete) return;
@@ -453,7 +462,7 @@ export const AdminEventManagement: React.FC = () => {
         </div>
 
         {/* Sub-tab Navigation Pill Switcher */}
-        <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-2xl w-fit border border-slate-200">
+        <div className="flex flex-wrap items-center gap-2 p-1 bg-slate-100 rounded-2xl w-fit border border-slate-200">
           <button
             type="button"
             onClick={() => setActiveSubTab('events')}
@@ -467,6 +476,22 @@ export const AdminEventManagement: React.FC = () => {
             <span>Takwim & Acara</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
               {programsList.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('attendance-certs')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              activeSubTab === 'attendance-certs'
+                ? 'bg-teal-900 text-white shadow-xs'
+                : 'text-teal-900 bg-amber-100/70 hover:bg-amber-200/80'
+            }`}
+          >
+            <Award className={`w-4 h-4 ${activeSubTab === 'attendance-certs' ? 'text-amber-300' : 'text-amber-700'}`} />
+            <span>Rekod Kehadiran PGB & Sijil Penyertaan</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-300 text-slate-950">
+              {attendedCount} Hadir
             </span>
           </button>
 
@@ -487,6 +512,13 @@ export const AdminEventManagement: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 3: REKOD KEHADIRAN PGB & SIJIL PENYERTAAN PROGRAM                    */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'attendance-certs' && (
+        <AdminProgramAttendanceManagement initialEventId={attendanceTargetEventId} />
+      )}
 
       {/* ========================================================================= */}
       {/* TAB 1: TAKWIM & SENARAI ACARA                                            */}
@@ -649,14 +681,25 @@ export const AdminEventManagement: React.FC = () => {
 
                       {/* Card Actions */}
                       <div className="flex flex-wrap lg:flex-col items-end justify-between lg:justify-center gap-2 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 shrink-0">
-                        {/* Prominent button to view participant registrations */}
-                        <button
-                          onClick={() => handleViewEventRegistrations(item.id)}
-                          className="px-3.5 py-1.5 rounded-xl bg-teal-50 border border-teal-200 hover:bg-teal-100 text-teal-900 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                        >
-                          <Users className="w-3.5 h-3.5 text-teal-700" />
-                          <span>Rekod Peserta ({spotsFilled})</span>
-                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {/* Prominent button to record PGB attendance & issue certificates */}
+                          <button
+                            onClick={() => handleOpenAttendanceAndCerts(item.id)}
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-50 border border-amber-300 hover:bg-amber-100 text-amber-950 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            <Award className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Kehadiran & Sijil PGB</span>
+                          </button>
+
+                          {/* Prominent button to view participant registrations */}
+                          <button
+                            onClick={() => handleViewEventRegistrations(item.id)}
+                            className="px-3.5 py-1.5 rounded-xl bg-teal-50 border border-teal-200 hover:bg-teal-100 text-teal-900 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            <Users className="w-3.5 h-3.5 text-teal-700" />
+                            <span>Rekod Peserta ({spotsFilled})</span>
+                          </button>
+                        </div>
 
                         <div className="flex items-center gap-1.5">
                           <button

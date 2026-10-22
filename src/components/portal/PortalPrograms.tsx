@@ -1,26 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
+  Award,
   Calendar,
-  Clock,
-  MapPin,
-  Users,
-  CheckCircle,
-  ExternalLink,
-  ChevronRight,
-  Filter,
-  Plus,
-  Share2,
-  X,
-  Sparkles,
-  Info,
   CalendarDays,
+  CheckCircle,
+  CheckCircle2,
+  Clock,
+  FileDown,
+  Info,
   List,
+  MapPin,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  UserCheck,
+  Users,
+  X,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
-import { ProgramEvent } from '../../types';
+import { EventRegistration, ProgramEvent } from '../../types';
 import { useRateLimiter } from '../../utils/rateLimiter';
-import { RateLimitNotice } from './RateLimitNotice';
+import { OfficialProgramCertificateModal } from './OfficialProgramCertificateModal';
 
 export const PortalPrograms: React.FC = () => {
   const {
@@ -28,17 +29,29 @@ export const PortalPrograms: React.FC = () => {
     currentRole,
     registeredProgramIds,
     registerForProgram,
+    recordAuditLog,
   } = useMemberPortal();
 
-  const { siteData, addProgram, registerForEvent } = useAdminContent();
+  const {
+    siteData,
+    addProgram,
+    eventRegistrations,
+    registerForEvent,
+  } = useAdminContent();
+
   const programs: ProgramEvent[] = siteData.programs || [];
 
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'attendance'>('list');
   const [filterMode, setFilterMode] = useState<string>('Semua');
   const [selectedProgram, setSelectedProgram] = useState<ProgramEvent | null>(null);
   const [isRegisterSuccess, setIsRegisterSuccess] = useState(false);
   const [registerSuccessMessage, setRegisterSuccessMessage] = useState<string>('');
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [registeringId, setRegisteringId] = useState<string | null>(null);
+
+  // Selected certificate registration for modal preview & PDF download
+  const [activeCertificateReg, setActiveCertificateReg] = useState<EventRegistration | null>(null);
+  const [activeCertificateProg, setActiveCertificateProg] = useState<ProgramEvent | null>(null);
 
   // Client-side rate-limiting for program registration
   const progRateLimiter = useRateLimiter('program_registration');
@@ -57,6 +70,77 @@ export const PortalPrograms: React.FC = () => {
 
   const canManage = currentRole === 'ADMIN' || currentRole === 'MEDIA_AJK';
 
+  // Match eventRegistrations belonging to the currently logged-in PGB member / school
+  const myRegistrationsByEventId = useMemo(() => {
+    const map = new Map<string, EventRegistration>();
+    if (!currentUser) return map;
+
+    const mySchoolId = (currentUser.schoolId || '').trim();
+    const mySchoolCode = (
+      currentUser.schoolCode ||
+      currentUser.membershipNo?.replace(/^MPGB-\d{4}-/i, '') ||
+      ''
+    )
+      .trim()
+      .toUpperCase();
+    const mySchoolName = (currentUser.school || '').trim().toLowerCase();
+    const myEmail = (currentUser.email || '').trim().toLowerCase();
+    const myPgbEmail = (currentUser.pgbEmail || '').trim().toLowerCase();
+    const myFullName = (currentUser.fullName || '')
+      .replace(/\s*\((Pengetua|Guru Besar|Mudir)\)\s*$/i, '')
+      .trim()
+      .toLowerCase();
+
+    for (const reg of eventRegistrations || []) {
+      if (reg.status === 'cancelled') continue;
+
+      const regCode = (reg.schoolCode || '').trim().toUpperCase();
+      const regSchool = (reg.schoolName || '').trim().toLowerCase();
+      const regEmail = (reg.participantEmail || '').trim().toLowerCase();
+      const regName = (reg.participantName || '')
+        .replace(/\s*\((Pengetua|Guru Besar|Mudir)\)\s*$/i, '')
+        .trim()
+        .toLowerCase();
+
+      const isMatch =
+        (mySchoolId && reg.schoolId && mySchoolId === reg.schoolId) ||
+        (mySchoolCode && regCode && mySchoolCode === regCode) ||
+        (mySchoolName && regSchool && mySchoolName === regSchool) ||
+        (myEmail && regEmail && myEmail !== 'ahli@mpgbsim.org' && myEmail === regEmail) ||
+        (myPgbEmail && regEmail && myPgbEmail === regEmail) ||
+        (myFullName && regName && myFullName.length > 4 && myFullName === regName);
+
+      if (isMatch) {
+        const existing = map.get(reg.eventId);
+        // Prefer 'attended' or 'certificateIssued' record if multiple exist
+        if (
+          !existing ||
+          (reg.status === 'attended' && existing.status !== 'attended') ||
+          (reg.certificateIssued && !existing.certificateIssued)
+        ) {
+          map.set(reg.eventId, reg);
+        }
+      }
+    }
+    return map;
+  }, [currentUser, eventRegistrations]);
+
+  const myAttendedRecords = useMemo(() => {
+    const list: { registration: EventRegistration; program?: ProgramEvent }[] = [];
+    myRegistrationsByEventId.forEach((reg, eventId) => {
+      if (reg.status === 'attended') {
+        const prog = programs.find((p) => p.id === eventId);
+        list.push({ registration: reg, program: prog });
+      }
+    });
+    return list;
+  }, [myRegistrationsByEventId, programs]);
+
+  const myCertificatesReadyCount = useMemo(
+    () => myAttendedRecords.filter((item) => item.registration.certificateIssued).length,
+    [myAttendedRecords]
+  );
+
   const parseEventTimestamp = (prog: ProgramEvent): number => {
     if (prog.closingDate && /^\d{4}-\d{2}-\d{2}$/.test(prog.closingDate)) {
       return new Date(prog.closingDate).getTime();
@@ -67,8 +151,18 @@ export const PortalPrograms: React.FC = () => {
       return new Date(matchIso[1]).getTime();
     }
     const malayMonths: Record<string, string> = {
-      januari: '01', februari: '02', mac: '03', april: '04', mei: '05', jun: '06',
-      julai: '07', ogos: '08', september: '09', oktober: '10', november: '11', disember: '12'
+      januari: '01',
+      februari: '02',
+      mac: '03',
+      april: '04',
+      mei: '05',
+      jun: '06',
+      julai: '07',
+      ogos: '08',
+      september: '09',
+      oktober: '10',
+      november: '11',
+      disember: '12',
     };
     const lowerStr = dateStr.toLowerCase();
     for (const [mName, mNum] of Object.entries(malayMonths)) {
@@ -86,8 +180,13 @@ export const PortalPrograms: React.FC = () => {
 
   const filteredPrograms = programs
     .filter((p) => {
+      const myReg = myRegistrationsByEventId.get(p.id);
+      const isReg = registeredProgramIds.includes(p.id) || Boolean(myReg);
+      const isAttended = myReg?.status === 'attended';
+
       if (filterMode === 'Semua') return true;
-      if (filterMode === 'Didaftar') return registeredProgramIds.includes(p.id);
+      if (filterMode === 'Hadir & Sijil') return isAttended;
+      if (filterMode === 'Didaftar') return isReg;
       if (filterMode === 'Fizikal') return p.mode === 'Fizikal';
       if (filterMode === 'Dalam Talian') return p.mode === 'Dalam Talian';
       if (filterMode === 'Hibrid') return p.mode === 'Hibrid';
@@ -106,24 +205,36 @@ export const PortalPrograms: React.FC = () => {
     const prog = programs.find((p) => p.id === progId);
     if (!prog) return;
 
+    setErrorBanner(null);
+
     if (!progRateLimiter.verifyCanSubmit()) {
-      alert(progRateLimiter.errorMessage || 'Sila tunggu sebelum mendaftar program seterusnya.');
+      setErrorBanner(
+        progRateLimiter.errorMessage || 'Sila tunggu sebelum mendaftar program seterusnya.'
+      );
       return;
     }
 
     const spotsTotal = prog.spotsTotal || 100;
     const spotsFilled = prog.spotsFilled || 0;
     if (spotsFilled >= spotsTotal || prog.registrationOpen === false) {
-      alert(`Maaf, kapasiti bagi program "${prog.title}" telah penuh.`);
+      setErrorBanner(`Maaf, kapasiti bagi program "${prog.title}" telah penuh.`);
       return;
     }
 
     setRegisteringId(progId);
     try {
       const res = await registerForEvent(progId, {
+        schoolId: currentUser?.schoolId || '',
+        schoolCode:
+          currentUser?.schoolCode ||
+          currentUser?.membershipNo?.replace(/^MPGB-\d{4}-/i, '') ||
+          '',
+        icNumber: currentUser?.icNumber || '',
+        eventVenue: prog.venue,
+        eventMode: prog.mode,
         participantName: currentUser?.fullName || 'Ahli PGB MPGBSIM',
-        participantEmail: currentUser?.email || 'ahli@mpgbsim.org',
-        participantPhone: currentUser?.phone || '',
+        participantEmail: currentUser?.pgbEmail || currentUser?.email || 'ahli@mpgbsim.org',
+        participantPhone: currentUser?.pgbPhone || currentUser?.phone || '',
         schoolName: currentUser?.school || 'Sekolah Ahli MPGBSIM',
         position: currentUser?.position || 'Pengetua / Guru Besar',
         state: currentUser?.state || 'Selangor',
@@ -139,11 +250,11 @@ export const PortalPrograms: React.FC = () => {
           setIsRegisterSuccess(false);
         }, 5000);
       } else {
-        alert(res.message);
+        setErrorBanner(res.message);
       }
     } catch (e: any) {
       console.error('Ralat mendaftar program:', e);
-      alert(e?.message || 'Ralat semasa mendaftar. Sila cuba lagi.');
+      setErrorBanner(e?.message || 'Ralat semasa mendaftar. Sila cuba lagi.');
     } finally {
       setRegisteringId(null);
     }
@@ -162,7 +273,8 @@ export const PortalPrograms: React.FC = () => {
       venue: newVenue,
       mode: newMode,
       targetAudience: 'Pengetua, Guru Besar dan Penolong Kanan',
-      description: newDesc || 'Program pembangunan profesional kepimpinan sekolah Islam anjuran MPGBSIM.',
+      description:
+        newDesc || 'Program pembangunan profesional kepimpinan sekolah Islam anjuran MPGBSIM.',
       spotsTotal: Number(newSpots) || 100,
       spotsFilled: 12,
       registrationOpen: true,
@@ -172,7 +284,13 @@ export const PortalPrograms: React.FC = () => {
     });
 
     setIsAddOpen(false);
-    alert('Program baharu berjaya didaftarkan ke dalam takwim.');
+    setRegisterSuccessMessage('Program baharu berjaya didaftarkan ke dalam takwim.');
+    setIsRegisterSuccess(true);
+  };
+
+  const handleOpenCertificateModal = (reg: EventRegistration, prog?: ProgramEvent) => {
+    setActiveCertificateReg(reg);
+    setActiveCertificateProg(prog || null);
   };
 
   return (
@@ -182,31 +300,57 @@ export const PortalPrograms: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-100 text-teal-900 text-xs font-bold uppercase tracking-wider mb-2">
             <Calendar className="w-3.5 h-3.5" />
-            Takwim Pembangunan Profesional
+            Takwim Pembangunan Profesional & Sijil Penyertaan
           </div>
-          <h1 className="text-2xl font-black text-slate-900">Program & Acara Kepimpinan MPGBSIM</h1>
+          <h1 className="text-2xl font-black text-slate-900">
+            Program, Kehadiran & Sijil Penyertaan PGB
+          </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Konvensyen tahunan, bengkel pemerkasaan AI, retreat kepimpinan dan siri wacana meja bulat.
+            Semak takwim program MPGBSIM, rekod kehadiran program anda, dan muat turun Sijil
+            Penyertaan rasmi mengikut program yang dihadiri.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* View Mode Toggle */}
           <div className="p-1 rounded-xl bg-slate-100 border border-slate-200 flex items-center">
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                viewMode === 'list' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                viewMode === 'list'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Paparan Senarai"
+              title="Paparan Senarai Takwim"
             >
-              <List className="w-4 h-4" />
-              <span className="hidden sm:inline">Senarai</span>
+              <List className="w-4 h-4 text-teal-700" />
+              <span>Senarai Takwim</span>
+            </button>
+            <button
+              onClick={() => setViewMode('attendance')}
+              className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                viewMode === 'attendance'
+                  ? 'bg-teal-900 text-white shadow-xs'
+                  : 'text-teal-900 hover:bg-amber-100/60'
+              }`}
+              title="Rekod Kehadiran & Sijil Penyertaan Saya"
+            >
+              <Award
+                className={`w-4 h-4 ${
+                  viewMode === 'attendance' ? 'text-amber-300' : 'text-amber-600'
+                }`}
+              />
+              <span>Kehadiran & Sijil Saya</span>
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">
+                {myAttendedRecords.length}
+              </span>
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-                viewMode === 'calendar' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                viewMode === 'calendar'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
               title="Paparan Kalendar"
             >
@@ -218,7 +362,7 @@ export const PortalPrograms: React.FC = () => {
           {canManage && (
             <button
               onClick={() => setIsAddOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               + Program Baharu
@@ -227,35 +371,276 @@ export const PortalPrograms: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-2 overflow-x-auto">
-        <div className="flex items-center gap-1.5">
-          {['Semua', 'Didaftar', 'Fizikal', 'Dalam Talian', 'Hibrid'].map((f) => (
+      {/* Prominent Summary Card: Rekod Kehadiran Program & Muat Turun Sijil Penyertaan */}
+      <div className="bg-gradient-to-r from-teal-950 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-md border border-teal-800/80">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10.5px] font-bold uppercase tracking-wider">
+              <UserCheck className="w-3.5 h-3.5" />
+              Rekod Kehadiran Program & Sijil Penyertaan PGB
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-white">
+              {currentUser?.fullName || 'Ahli PGB'} — {currentUser?.school || 'Sekolah Ahli MPGBSIM'}
+            </h2>
+            <p className="text-xs text-teal-100/80">
+              Setiap program takwim yang disahkan kehadiran anda oleh Urus Setia Admin akan
+              memaparkan pautan rasmi muat turun <strong>Sijil Penyertaan Program (PDF A4)</strong>{' '}
+              di bawah.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="px-4 py-2.5 rounded-2xl bg-white/10 border border-white/15 text-center">
+              <span className="text-[10px] uppercase tracking-wider text-teal-200 block font-bold">
+                Program Dihadir
+              </span>
+              <span className="text-xl font-black text-white tabular-nums">
+                {myAttendedRecords.length}
+              </span>
+            </div>
+            <div className="px-4 py-2.5 rounded-2xl bg-amber-400/20 border border-amber-400/40 text-center">
+              <span className="text-[10px] uppercase tracking-wider text-amber-200 block font-bold">
+                Sijil Sedia Dimuat Turun
+              </span>
+              <span className="text-xl font-black text-amber-300 tabular-nums">
+                {myCertificatesReadyCount}
+              </span>
+            </div>
             <button
-              key={f}
-              onClick={() => setFilterMode(f)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-                filterMode === f
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              }`}
+              type="button"
+              onClick={() =>
+                setViewMode(viewMode === 'attendance' ? 'list' : 'attendance')
+              }
+              className="px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-2 shadow-sm transition cursor-pointer"
             >
-              {f === 'Didaftar' ? `Program Didaftar (${registeredProgramIds.length})` : f}
+              <Award className="w-4 h-4" />
+              <span>
+                {viewMode === 'attendance'
+                  ? 'Lihat Semua Takwim Program'
+                  : 'Buka Rekod Kehadiran & Sijil Saya'}
+              </span>
             </button>
-          ))}
+          </div>
         </div>
-        <div className="text-xs text-slate-500 hidden md:block">
-          Jumlah: <strong>{filteredPrograms.length}</strong> program
-        </div>
+
+        {/* Quick list of attended programs if any exist */}
+        {myAttendedRecords.length > 0 && viewMode !== 'attendance' && (
+          <div className="mt-5 pt-4 border-t border-teal-800/80 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {myAttendedRecords.map(({ registration, program }) => (
+              <div
+                key={registration.id}
+                className="p-4 rounded-2xl bg-slate-900/75 border border-teal-700/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      HADIR PROGRAM
+                    </span>
+                    <span className="text-[10.5px] font-mono text-amber-300">
+                      {registration.certificateNo || registration.attendanceCode}
+                    </span>
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-bold text-white truncate">
+                    {program?.title || registration.eventTitle}
+                  </h4>
+                  <p className="text-[11px] text-teal-200/80">
+                    {program?.date || registration.eventDate} •{' '}
+                    {program?.venue || registration.eventVenue || 'Kompleks Pendidikan Islam'}
+                  </p>
+                </div>
+
+                <div className="shrink-0">
+                  {registration.certificateIssued ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCertificateModal(registration, program)}
+                      className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                      <span>Muat Turun Sijil</span>
+                    </button>
+                  ) : (
+                    <span className="inline-block px-3 py-1.5 rounded-xl bg-white/10 text-teal-200 text-[11px] font-semibold">
+                      Sijil Dalam Proses Admin
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {isRegisterSuccess && (
-        <div className="p-4 rounded-2xl bg-emerald-500 text-white text-xs font-semibold flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5" />
-            <span>Pendaftaran anda telah berjaya direkodkan! Butiran penuh telah dihantar ke emel ahli.</span>
+      {/* Dedicated View Mode: Rekod Kehadiran Program & Sijil Penyertaan Saya */}
+      {viewMode === 'attendance' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-5 animate-in fade-in duration-150">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-600" />
+                Rekod Kehadiran Program & Sijil Penyertaan Saya
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Senarai penuh program berdasarkan takwim MPGBSIM yang telah anda hadiri beserta
+                pautan muat turun Sijil Penyertaan Program.
+              </p>
+            </div>
+            <span className="px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200 text-teal-900 text-xs font-bold">
+              Jumlah Kehadiran: {myAttendedRecords.length} Program
+            </span>
           </div>
-          <button onClick={() => setIsRegisterSuccess(false)} className="text-white hover:text-emerald-100">
+
+          {myAttendedRecords.length === 0 ? (
+            <div className="p-12 text-center bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+              <Award className="w-12 h-12 text-slate-300 mx-auto" />
+              <h4 className="text-sm font-bold text-slate-800">
+                Belum Ada Rekod Kehadiran Program Yang Disahkan
+              </h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                Apabila anda menghadiri mana-mana program dalam Takwim MPGBSIM dan kehadiran anda
+                disahkan oleh Admin Urus Setia, rekod kehadiran serta butang muat turun{' '}
+                <strong>Sijil Penyertaan Program</strong> akan dipaparkan di sini secara automatik.
+              </p>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className="px-4 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition cursor-pointer"
+              >
+                Lihat Senarai Takwim Program
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {myAttendedRecords.map(({ registration, program }, idx) => (
+                <div
+                  key={registration.id}
+                  className="p-5 rounded-2xl bg-gradient-to-br from-emerald-50/40 via-white to-amber-50/30 border border-teal-200/90 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-5"
+                >
+                  <div className="space-y-2 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-white text-[10px] font-bold">
+                        #{idx + 1}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        HADIR DISAHKAN
+                      </span>
+                      {registration.certificateIssued && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold flex items-center gap-1">
+                          <Award className="w-3.5 h-3.5 text-amber-700" />
+                          SIJIL PENYERTAAN DIKELUARKAN
+                        </span>
+                      )}
+                      <span className="text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        {registration.certificateNo || registration.attendanceCode || 'MPGBSIM'}
+                      </span>
+                    </div>
+
+                    <h4 className="text-base font-black text-slate-900">
+                      {program?.title || registration.eventTitle}
+                    </h4>
+
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+                      <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+                        <Calendar className="w-3.5 h-3.5 text-teal-700" />
+                        {program?.date || registration.eventDate}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-teal-700" />
+                        {program?.venue || registration.eventVenue || 'Kompleks Pendidikan Islam'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-semibold">
+                        Mod: {program?.mode || registration.eventMode || 'Fizikal'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-200/70">
+                    {registration.certificateIssued ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCertificateModal(registration, program)}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+                      >
+                        <FileDown className="w-4 h-4" />
+                        <span>Lihat & Muat Turun Sijil Penyertaan (PDF A4)</span>
+                      </button>
+                    ) : (
+                      <div className="px-4 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Kehadiran Disahkan • Menunggu Pengeluaran Sijil Admin</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Filter Tabs (For List & Calendar Views) */}
+      {viewMode !== 'attendance' && (
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-2 overflow-x-auto">
+          <div className="flex items-center gap-1.5">
+            {['Semua', 'Hadir & Sijil', 'Didaftar', 'Fizikal', 'Dalam Talian', 'Hibrid'].map(
+              (f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilterMode(f)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                    filterMode === f
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {f === 'Hadir & Sijil'
+                    ? `Program Dihadir & Sijil (${myAttendedRecords.length})`
+                    : f === 'Didaftar'
+                    ? `Program Didaftar (${Math.max(
+                        registeredProgramIds.length,
+                        myRegistrationsByEventId.size
+                      )})`
+                    : f}
+                </button>
+              )
+            )}
+          </div>
+          <div className="text-xs text-slate-500 hidden md:block shrink-0">
+            Jumlah: <strong>{filteredPrograms.length}</strong> program
+          </div>
+        </div>
+      )}
+
+      {isRegisterSuccess && (
+        <div className="p-4 rounded-2xl bg-emerald-600 text-white text-xs font-semibold flex items-center justify-between shadow-md animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 shrink-0" />
+            <span>
+              {registerSuccessMessage ||
+                'Pendaftaran anda telah berjaya direkodkan! Butiran penuh telah dihantar ke rekod ahli.'}
+            </span>
+          </div>
+          <button
+            onClick={() => setIsRegisterSuccess(false)}
+            className="text-white hover:text-emerald-100 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {errorBanner && (
+        <div className="p-4 rounded-2xl bg-rose-600 text-white text-xs font-semibold flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2">
+            <Info className="w-5 h-5 shrink-0" />
+            <span>{errorBanner}</span>
+          </div>
+          <button
+            onClick={() => setErrorBanner(null)}
+            className="text-white hover:text-rose-100 cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -265,11 +650,17 @@ export const PortalPrograms: React.FC = () => {
       {viewMode === 'list' && (
         <div className="space-y-4">
           {filteredPrograms.map((prog) => {
-            const isRegistered = registeredProgramIds.includes(prog.id);
+            const myReg = myRegistrationsByEventId.get(prog.id);
+            const isRegistered = registeredProgramIds.includes(prog.id) || Boolean(myReg);
+            const isAttended = myReg?.status === 'attended';
+            const isCertIssued = Boolean(myReg?.certificateIssued);
+
             return (
               <div
                 key={prog.id}
-                className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs hover:shadow-md transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6"
+                className={`bg-white rounded-3xl p-6 border shadow-xs hover:shadow-md transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 ${
+                  isAttended ? 'border-teal-300 bg-gradient-to-r from-white to-teal-50/20' : 'border-slate-200'
+                }`}
               >
                 <div className="flex-1 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -279,16 +670,31 @@ export const PortalPrograms: React.FC = () => {
                     <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold">
                       {prog.theme || 'Program Kepimpinan'}
                     </span>
-                    {isRegistered && (
+                    {isAttended ? (
                       <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center gap-1">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                        Penyertaan Dikesahkan
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+                        Hadir Program Disahkan
+                      </span>
+                    ) : (
+                      isRegistered && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                          Penyertaan Dikesahkan
+                        </span>
+                      )
+                    )}
+                    {isCertIssued && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1">
+                        <Award className="w-3.5 h-3.5 text-amber-700" />
+                        Sijil Penyertaan Sedia Dimuat Turun
                       </span>
                     )}
                   </div>
 
                   <h3 className="font-extrabold text-lg text-slate-900">{prog.title}</h3>
-                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{prog.description}</p>
+                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                    {prog.description}
+                  </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-slate-600 pt-1">
                     <div className="flex items-center gap-2">
@@ -325,14 +731,22 @@ export const PortalPrograms: React.FC = () => {
                             <Users className="w-3 h-3 text-teal-700" />
                             Kapasiti Pendaftaran:
                           </span>
-                          <span className={`font-bold ${isFull ? 'text-rose-600' : 'text-teal-900'}`}>
+                          <span
+                            className={`font-bold ${
+                              isFull ? 'text-rose-600' : 'text-teal-900'
+                            }`}
+                          >
                             {spotsFilled} / {spotsTotal} Peserta ({fillPercent}%)
                           </span>
                         </div>
                         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-300 ${
-                              isFull ? 'bg-rose-500' : fillPercent >= 80 ? 'bg-amber-500' : 'bg-teal-600'
+                              isFull
+                                ? 'bg-rose-500'
+                                : fillPercent >= 80
+                                ? 'bg-amber-500'
+                                : 'bg-teal-600'
                             }`}
                             style={{ width: `${fillPercent}%` }}
                           />
@@ -344,18 +758,42 @@ export const PortalPrograms: React.FC = () => {
 
                 <div className="w-full lg:w-auto shrink-0 flex flex-col sm:flex-row lg:flex-col items-center justify-between gap-3 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                   <div className="text-center lg:text-right w-full sm:w-auto">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Status Yuran</span>
-                    <span className="text-sm font-bold text-teal-900">{prog.fees || 'Percuma Ahli'}</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      Status Yuran
+                    </span>
+                    <span className="text-sm font-bold text-teal-900">
+                      {prog.fees || 'Percuma Ahli'}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
+                    {isCertIssued && myReg && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCertificateModal(myReg, prog)}
+                        className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+                      >
+                        <Award className="w-4 h-4" />
+                        <span>Muat Turun Sijil</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => setSelectedProgram(prog)}
                       className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold cursor-pointer"
                     >
                       Butiran Penuh
                     </button>
-                    {isRegistered ? (
+
+                    {isAttended ? (
+                      <button
+                        disabled
+                        className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-bold border border-emerald-300 flex items-center justify-center gap-1"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        Hadir Disahkan
+                      </button>
+                    ) : isRegistered ? (
                       <button
                         disabled
                         className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 flex items-center justify-center gap-1"
@@ -363,7 +801,8 @@ export const PortalPrograms: React.FC = () => {
                         <CheckCircle className="w-3.5 h-3.5" />
                         Telah Daftar
                       </button>
-                    ) : (prog.spotsFilled || 0) >= (prog.spotsTotal || 100) || prog.registrationOpen === false ? (
+                    ) : (prog.spotsFilled || 0) >= (prog.spotsTotal || 100) ||
+                      prog.registrationOpen === false ? (
                       <button
                         disabled
                         className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-rose-100 text-rose-800 text-xs font-bold border border-rose-300 flex items-center justify-center gap-1 cursor-not-allowed"
@@ -392,17 +831,23 @@ export const PortalPrograms: React.FC = () => {
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <div>
-              <h3 className="font-bold text-base text-slate-900">Takwim Bulanan MPGBSIM Sesi 2026</h3>
+              <h3 className="font-bold text-base text-slate-900">
+                Takwim Bulanan MPGBSIM Sesi 2026
+              </h3>
               <p className="text-xs text-slate-500">Susunan tarikh program kebangsaan dan zon</p>
             </div>
             <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
-              Oktober - Disember 2026
+              Takwim Rasmi 2026
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPrograms.map((prog) => {
-              const isRegistered = registeredProgramIds.includes(prog.id);
+              const myReg = myRegistrationsByEventId.get(prog.id);
+              const isRegistered = registeredProgramIds.includes(prog.id) || Boolean(myReg);
+              const isAttended = myReg?.status === 'attended';
+              const isCertIssued = Boolean(myReg?.certificateIssued);
+
               return (
                 <div
                   key={prog.id}
@@ -427,16 +872,30 @@ export const PortalPrograms: React.FC = () => {
                     <p className="text-xs text-slate-500 mt-1 line-clamp-2">{prog.description}</p>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
-                    <span className="text-[11px] text-slate-500 truncate max-w-[120px]">{prog.venue}</span>
-                    {isRegistered ? (
+                  <div className="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs gap-2">
+                    <span className="text-[11px] text-slate-500 truncate max-w-[120px]">
+                      {prog.venue}
+                    </span>
+                    {isCertIssued && myReg ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCertificateModal(myReg, prog)}
+                        className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <Award className="w-3 h-3" /> Sijil
+                      </button>
+                    ) : isAttended ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1 text-[11px]">
+                        <UserCheck className="w-3.5 h-3.5" /> Hadir
+                      </span>
+                    ) : isRegistered ? (
                       <span className="text-emerald-700 font-bold flex items-center gap-1 text-[11px]">
                         <CheckCircle className="w-3.5 h-3.5" /> Didaftar
                       </span>
                     ) : (
                       <button
                         onClick={() => handleRegister(prog.id)}
-                        className="text-teal-800 font-bold hover:underline"
+                        className="text-teal-800 font-bold hover:underline cursor-pointer"
                       >
                         Daftar →
                       </button>
@@ -455,7 +914,7 @@ export const PortalPrograms: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setSelectedProgram(null)}
-              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-500"
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-500 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -464,36 +923,51 @@ export const PortalPrograms: React.FC = () => {
               Mod: {selectedProgram.mode}
             </span>
 
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">{selectedProgram.title}</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-2">
+              {selectedProgram.title}
+            </h2>
             <p className="text-xs font-bold text-amber-600 mt-1">{selectedProgram.theme}</p>
 
             <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs text-slate-700">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-teal-800" />
-                <span>Tarikh: <strong>{selectedProgram.date}</strong></span>
+                <span>
+                  Tarikh: <strong>{selectedProgram.date}</strong>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-teal-800" />
-                <span>Masa: <strong>{selectedProgram.time || '8:30 Pagi - 4:30 Petang'}</strong></span>
+                <span>
+                  Masa: <strong>{selectedProgram.time || '8:30 Pagi - 4:30 Petang'}</strong>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-teal-800" />
-                <span>Tempat: <strong>{selectedProgram.venue}</strong></span>
+                <span>
+                  Tempat: <strong>{selectedProgram.venue}</strong>
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4 text-teal-800" />
-                <span>Sasaran: {selectedProgram.targetAudience || 'Pengetua & Guru Besar'}</span>
+                <span>
+                  Sasaran: {selectedProgram.targetAudience || 'Pengetua & Guru Besar'}
+                </span>
               </div>
 
               {/* Live Capacity Bar */}
               <div className="pt-2 border-t border-slate-200">
                 <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="font-semibold text-slate-600">Status Kapasiti Pendaftaran:</span>
+                  <span className="font-semibold text-slate-600">
+                    Status Kapasiti Pendaftaran:
+                  </span>
                   <span className="font-bold text-teal-900">
-                    {selectedProgram.spotsFilled || 0} / {selectedProgram.spotsTotal || 100} Peserta (
+                    {selectedProgram.spotsFilled || 0} / {selectedProgram.spotsTotal || 100} Peserta
+                    (
                     {Math.min(
                       Math.round(
-                        ((selectedProgram.spotsFilled || 0) / (selectedProgram.spotsTotal || 100)) * 100
+                        ((selectedProgram.spotsFilled || 0) /
+                          (selectedProgram.spotsTotal || 100)) *
+                          100
                       ),
                       100
                     )}
@@ -506,7 +980,9 @@ export const PortalPrograms: React.FC = () => {
                     style={{
                       width: `${Math.min(
                         Math.round(
-                          ((selectedProgram.spotsFilled || 0) / (selectedProgram.spotsTotal || 100)) * 100
+                          ((selectedProgram.spotsFilled || 0) /
+                            (selectedProgram.spotsTotal || 100)) *
+                            100
                         ),
                         100
                       )}%`,
@@ -525,44 +1001,80 @@ export const PortalPrograms: React.FC = () => {
               </p>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <span className="text-[10px] text-slate-400 block font-bold uppercase">Yuran Pendaftaran</span>
-                <span className="text-sm font-bold text-teal-900">{selectedProgram.fees || 'Percuma'}</span>
+                <span className="text-[10px] text-slate-400 block font-bold uppercase">
+                  Yuran Pendaftaran
+                </span>
+                <span className="text-sm font-bold text-teal-900">
+                  {selectedProgram.fees || 'Percuma'}
+                </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setSelectedProgram(null)}
                   className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold cursor-pointer"
                 >
                   Tutup
                 </button>
-                {registeredProgramIds.includes(selectedProgram.id) ? (
-                  <button
-                    disabled
-                    className="px-5 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 flex items-center gap-1"
-                  >
-                    <CheckCircle className="w-4 h-4" /> Telah Mendaftar
-                  </button>
-                ) : (selectedProgram.spotsFilled || 0) >= (selectedProgram.spotsTotal || 100) || selectedProgram.registrationOpen === false ? (
-                  <button
-                    disabled
-                    className="px-5 py-2 rounded-xl bg-rose-100 text-rose-800 text-xs font-bold border border-rose-300 flex items-center gap-1 cursor-not-allowed"
-                  >
-                    Kapasiti Penuh
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      handleRegister(selectedProgram.id);
-                      setSelectedProgram(null);
-                    }}
-                    className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs cursor-pointer"
-                  >
-                    Sahkan Pendaftaran
-                  </button>
-                )}
+                {(() => {
+                  const myReg = myRegistrationsByEventId.get(selectedProgram.id);
+                  if (myReg?.certificateIssued) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const progRef = selectedProgram;
+                          setSelectedProgram(null);
+                          handleOpenCertificateModal(myReg, progRef);
+                        }}
+                        className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Award className="w-4 h-4" /> Muat Turun Sijil Penyertaan
+                      </button>
+                    );
+                  }
+                  if (
+                    registeredProgramIds.includes(selectedProgram.id) ||
+                    Boolean(myReg)
+                  ) {
+                    return (
+                      <button
+                        disabled
+                        className="px-5 py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 flex items-center gap-1"
+                      >
+                        <CheckCircle className="w-4 h-4" />{' '}
+                        {myReg?.status === 'attended' ? 'Telah Hadir' : 'Telah Mendaftar'}
+                      </button>
+                    );
+                  }
+                  if (
+                    (selectedProgram.spotsFilled || 0) >=
+                      (selectedProgram.spotsTotal || 100) ||
+                    selectedProgram.registrationOpen === false
+                  ) {
+                    return (
+                      <button
+                        disabled
+                        className="px-5 py-2 rounded-xl bg-rose-100 text-rose-800 text-xs font-bold border border-rose-300 flex items-center gap-1 cursor-not-allowed"
+                      >
+                        Kapasiti Penuh
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      onClick={() => {
+                        handleRegister(selectedProgram.id);
+                        setSelectedProgram(null);
+                      }}
+                      className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-xs cursor-pointer"
+                    >
+                      Sahkan Pendaftaran
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -575,12 +1087,14 @@ export const PortalPrograms: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsAddOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-500"
+              className="absolute top-5 right-5 p-2 rounded-full hover:bg-slate-100 text-slate-500 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h2 className="text-lg font-black text-slate-900 mb-4">+ Daftar Program / Acara Baharu</h2>
+            <h2 className="text-lg font-black text-slate-900 mb-4">
+              + Daftar Program / Acara Baharu
+            </h2>
 
             <form onSubmit={handleCreateProgram} className="space-y-4 text-xs">
               <div>
@@ -607,7 +1121,9 @@ export const PortalPrograms: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Mod Pelaksanaan *</label>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Mod Pelaksanaan *
+                  </label>
                   <select
                     value={newMode}
                     onChange={(e) => setNewMode(e.target.value as any)}
@@ -645,7 +1161,9 @@ export const PortalPrograms: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Tempat / Platform *</label>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Tempat / Platform *
+                </label>
                 <input
                   type="text"
                   required
@@ -693,13 +1211,13 @@ export const PortalPrograms: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-semibold text-slate-700"
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-semibold text-slate-700 cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 font-bold text-white shadow-xs"
+                  className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 font-bold text-white shadow-xs cursor-pointer"
                 >
                   Simpan Program
                 </button>
@@ -708,6 +1226,29 @@ export const PortalPrograms: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Official Program Participation Certificate Modal */}
+      <OfficialProgramCertificateModal
+        isOpen={Boolean(activeCertificateReg)}
+        onClose={() => {
+          setActiveCertificateReg(null);
+          setActiveCertificateProg(null);
+        }}
+        registration={activeCertificateReg}
+        programEvent={activeCertificateProg}
+        onAuditDownload={(certNo, eventTitle) => {
+          recordAuditLog(
+            'Muat Turun Sijil Penyertaan Program (PDF)',
+            `Memuat turun Sijil Penyertaan Program (${certNo}) bagi program "${eventTitle}".`,
+            {
+              schoolName: currentUser?.school,
+              schoolCode: currentUser?.schoolCode,
+              state: currentUser?.state,
+              category: 'SIJIL_KAD',
+            }
+          );
+        }}
+      />
     </div>
   );
 };
