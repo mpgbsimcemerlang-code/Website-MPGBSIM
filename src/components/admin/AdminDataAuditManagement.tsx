@@ -330,11 +330,12 @@ export const AdminDataAuditManagement: React.FC = () => {
           website: app.website || '',
           logoUrl: app.logoUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
           schoolPhotoUrl: app.schoolPhotoUrl || '',
-          description: app.schoolDescription || `Sekolah Ahli Berdaftar MPGBSIM di bawah kepimpinan ${app.fullName} (${app.designation}).`,
-          phone: app.schoolPhone || app.phoneNumber,
-          email: app.schoolEmail || app.email,
-          pgbPhone: app.phoneNumber || app.pgbPhone || '',
-          pgbEmail: app.email || app.pgbEmail || '',
+          phone: app.schoolPhone || '',
+          schoolPhone: app.schoolPhone || '',
+          email: app.schoolEmail || '',
+          schoolEmail: app.schoolEmail || '',
+          pgbPhone: app.pgbPhone || app.phoneNumber || '',
+          pgbEmail: app.pgbEmail || app.email || '',
           address: app.address || `${app.district}, ${app.state}`,
         };
 

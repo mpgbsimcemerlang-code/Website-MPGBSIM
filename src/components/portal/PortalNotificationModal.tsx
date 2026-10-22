@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ExternalLink,
   MessageSquare,
+  Megaphone,
 } from 'lucide-react';
 import { useMemberPortal, PortalTab } from '../../context/MemberPortalContext';
 
@@ -42,6 +43,8 @@ export const PortalNotificationModal: React.FC = () => {
     switch (type) {
       case 'chat':
         return <MessageSquare className="w-4 h-4 text-rose-600" />;
+      case 'pengumuman':
+        return <Megaphone className="w-4 h-4 text-amber-500" />;
       case 'program':
         return <Calendar className="w-4 h-4 text-teal-600" />;
       case 'dokumen':

@@ -22,6 +22,10 @@ import {
   Shield,
   Clock,
   FileText,
+  FileSpreadsheet,
+  FileUp,
+  Link2,
+  Eye,
   Download,
   ChevronUp,
   ChevronDown,
@@ -168,6 +172,7 @@ export const PortalLiveChat: React.FC = () => {
     clearTargetChatNavigation,
     markChatChannelAsRead,
     sendPortalChatNotification,
+    recordAuditLog,
   } = useMemberPortal();
   const { siteData } = useAdminContent();
 
@@ -240,13 +245,18 @@ export const PortalLiveChat: React.FC = () => {
   const [showAttachmentInput, setShowAttachmentInput] = useState(false);
   const [attachmentName, setAttachmentName] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [attachmentSize, setAttachmentSize] = useState('');
+  const [attachmentType, setAttachmentType] = useState('');
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [previewImageModal, setPreviewImageModal] = useState<{ url: string; title: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelsScrollRef = useRef<HTMLDivElement>(null);
   const directoryScrollRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const broadcastRef = useRef<BroadcastChannel | null>(null);
 
   const scrollPaneBy = (ref: React.RefObject<HTMLDivElement | null>, amount: number) => {
@@ -626,6 +636,12 @@ export const PortalLiveChat: React.FC = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, [activeChannelId, unreadChatByChannel, mobileShowChat, markChatChannelAsRead]);
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const handleUploadChatImage = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Sila pilih fail gambar yang sah (PNG, JPG, WebP).');
@@ -648,6 +664,55 @@ export const PortalLiveChat: React.FC = () => {
     }
   };
 
+  const handleUploadChatDoc = async (file: File) => {
+    // Had saiz fail langsung: 800 KB agar kekal selamat di bawah had 1MB dokumen Firestore
+    const MAX_SIZE = 800 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert(
+        `Saiz fail (${formatFileSize(file.size)}) melebihi had langsung 800 KB untuk ruang sembang.\n\nSila gunakan butang 'Pautan Cloud / Drive' untuk berkongsi fail bersaiz besar seperti Google Drive atau OneDrive agar penghantaran pantas dan lancar.`
+      );
+      return;
+    }
+
+    setIsUploadingDoc(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = (e.target?.result as string) || '';
+        setAttachmentUrl(result);
+        setAttachmentName(file.name);
+        setAttachmentSize(formatFileSize(file.size));
+        setAttachmentType(file.type || file.name.split('.').pop() || 'dokumen');
+      };
+      reader.onerror = () => {
+        alert('Ralat membaca fail dari peranti. Sila cuba lagi.');
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Doc upload error:', err);
+      alert('Gagal memproses fail yang dipilih.');
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
+  const handleDownloadFile = (url: string, filename: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename || 'dokumen_pgb';
+      link.setAttribute('download', filename || 'dokumen_pgb');
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Download error:', err);
+      window.open(url, '_blank');
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() && !uploadedImage && !attachmentUrl.trim()) return;
@@ -656,7 +721,12 @@ export const PortalLiveChat: React.FC = () => {
     const nowIso = new Date().toISOString();
     const msgId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const msgText =
-      inputText.trim() || (uploadedImage ? 'Berkongsi gambar / poster' : 'Berkongsi lampiran dokumen');
+      inputText.trim() ||
+      (uploadedImage
+        ? 'Berkongsi gambar / poster'
+        : attachmentName
+        ? `Berkongsi dokumen: ${attachmentName}`
+        : 'Berkongsi lampiran fail');
     const isDm = Boolean(selectedDmSchool || activeChannelId.startsWith('dm_'));
     const recipientCode = selectedDmSchool?.code || selectedDmSchool?.id || '';
 
@@ -693,6 +763,8 @@ export const PortalLiveChat: React.FC = () => {
       ...(uploadedImage ? { imageUrl: uploadedImage } : {}),
       ...(attachmentUrl.trim() ? { attachmentUrl: attachmentUrl.trim() } : {}),
       ...(attachmentName.trim() ? { attachmentName: attachmentName.trim() } : {}),
+      ...(attachmentSize ? { attachmentSize } : {}),
+      ...(attachmentType ? { attachmentType } : {}),
       ...(replyTarget
         ? {
             replyToId: replyTarget.id,
@@ -717,6 +789,8 @@ export const PortalLiveChat: React.FC = () => {
     setUploadedImageName(null);
     setAttachmentName('');
     setAttachmentUrl('');
+    setAttachmentSize('');
+    setAttachmentType('');
     setShowAttachmentInput(false);
 
     // If this is a personal 1-to-1 chat to another PGB, dispatch a portal notification to that PGB's portal
@@ -738,6 +812,25 @@ export const PortalLiveChat: React.FC = () => {
       };
       sendPortalChatNotification(dmNotif).catch(() => {});
     }
+
+    // Rekod log keaktifan supaya PGB mendapat mata keaktifan sembang live
+    try {
+      const channelObj = PUBLIC_CHANNELS.find((c) => c.id === activeChannelId);
+      const channelTitle = channelObj ? channelObj.name : (isDm ? `Mesej Peribadi (${selectedDmSchool?.name || recipientCode})` : 'Ruang Sembang');
+      recordAuditLog(
+        'Aktif Ruang Sembang PGB',
+        `PGB ${myIdentity.fullName} (${myIdentity.school}) aktif berkongsi idea dalam ${channelTitle}: "${msgText.slice(0, 90)}${msgText.length > 90 ? '...' : ''}"`,
+        {
+          user: myIdentity.fullName,
+          email: currentUser?.pgbEmail || currentUser?.email || 'ahli@mpgbsim.org',
+          schoolName: myIdentity.school,
+          schoolCode: myIdentity.schoolCode,
+          state: myIdentity.state,
+          position: myIdentity.position,
+          category: 'PROGRAM_AMALAN',
+        }
+      );
+    } catch (e) {}
 
     try {
       await setDoc(doc(db, 'pgbChatMessages', msgId), newMsg, { merge: true });
@@ -1519,12 +1612,54 @@ export const PortalLiveChat: React.FC = () => {
 
                         {/* Shared Image / Poster */}
                         {msg.imageUrl && (
-                          <div className="mb-2.5 rounded-xl overflow-hidden border border-black/10 bg-slate-950 max-w-sm">
+                          <div className="mb-2.5 rounded-xl overflow-hidden border border-black/10 bg-slate-950 max-w-sm group relative">
                             <img
                               src={msg.imageUrl}
                               alt="Lampiran Gambar Sembang"
-                              className="w-full max-h-72 object-contain"
+                              className="w-full max-h-72 object-contain cursor-pointer hover:opacity-95 transition"
+                              onClick={() =>
+                                setPreviewImageModal({
+                                  url: msg.imageUrl!,
+                                  title: msg.text || 'Gambar Sembang PGB',
+                                })
+                              }
                             />
+                            {/* Action bar for downloading & previewing */}
+                            <div className="p-2 bg-slate-900/90 backdrop-blur-xs border-t border-slate-800 flex items-center justify-between gap-2 text-xs">
+                              <span className="text-[11px] text-slate-300 font-medium truncate flex items-center gap-1">
+                                📷 Gambar Dikongsi
+                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewImageModal({
+                                      url: msg.imageUrl!,
+                                      title: msg.text || 'Gambar Sembang PGB',
+                                    })
+                                  }
+                                  className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-teal-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition"
+                                  title="Lihat Gambar Penuh"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>Lihat</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDownloadFile(
+                                      msg.imageUrl!,
+                                      `gambar_pgb_${msg.id.slice(-6)}.png`
+                                    )
+                                  }
+                                  className="px-2 py-1 rounded-md bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-xs transition"
+                                  title="Muat Turun Gambar ke Peranti"
+                                >
+                                  <Download className="w-3 h-3" />
+                                  <span>Muat Turun</span>
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
 
@@ -1533,30 +1668,77 @@ export const PortalLiveChat: React.FC = () => {
                           {msg.text}
                         </p>
 
-                        {/* Shared Document Link */}
+                        {/* Shared Document Attachment / Link */}
                         {msg.attachmentUrl && (
                           <div
-                            className={`mt-2.5 p-2.5 rounded-xl border flex items-center justify-between gap-3 ${
+                            className={`mt-2.5 p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs ${
                               isMine
-                                ? 'bg-teal-950/70 border-teal-700 text-white'
-                                : 'bg-teal-50 border-teal-200 text-teal-950'
+                                ? 'bg-teal-950/80 border-teal-700 text-white'
+                                : 'bg-slate-50 border-teal-300 text-teal-950'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <FileText className="w-4 h-4 shrink-0 text-amber-400" />
-                              <span className="text-xs font-semibold truncate">
-                                {msg.attachmentName || 'Dokumen Dikongsi'}
-                              </span>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-teal-800 text-amber-400 flex items-center justify-center shrink-0 shadow-xs">
+                                {msg.attachmentName?.toLowerCase().endsWith('.xls') ||
+                                msg.attachmentName?.toLowerCase().endsWith('.xlsx') ||
+                                msg.attachmentName?.toLowerCase().endsWith('.csv') ? (
+                                  <FileSpreadsheet className="w-5 h-5 text-emerald-300" />
+                                ) : (
+                                  <FileText className="w-5 h-5" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <div
+                                  className={`text-xs font-bold truncate max-w-xs ${
+                                    isMine ? 'text-white' : 'text-slate-900'
+                                  }`}
+                                  title={msg.attachmentName || 'Dokumen Dikongsi'}
+                                >
+                                  {msg.attachmentName || 'Dokumen Dikongsi'}
+                                </div>
+                                <div className="text-[10px] text-teal-300/90 flex items-center gap-2 mt-0.5">
+                                  {msg.attachmentSize && (
+                                    <span className="font-medium bg-teal-900/60 text-teal-200 px-1.5 py-0.2 rounded text-[10px]">
+                                      {msg.attachmentSize}
+                                    </span>
+                                  )}
+                                  <span className={isMine ? 'text-teal-200' : 'text-slate-500'}>
+                                    {msg.attachmentUrl.startsWith('data:')
+                                      ? 'Fail Peranti (Langsung)'
+                                      : 'Pautan Cloud / Drive'}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <a
-                              href={msg.attachmentUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-bold flex items-center gap-1 shrink-0"
-                            >
-                              <Download className="w-3 h-3" />
-                              <span>Buka</span>
-                            </a>
+                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                              {msg.attachmentUrl.startsWith('data:') ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDownloadFile(
+                                      msg.attachmentUrl!,
+                                      msg.attachmentName || 'dokumen_pgb'
+                                    )
+                                  }
+                                  className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition"
+                                  title="Muat Turun Fail ke Komputer / Telefon"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Muat Turun</span>
+                                </button>
+                              ) : (
+                                <a
+                                  href={msg.attachmentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition"
+                                  title="Buka atau Muat Turun Fail dari Pautan Luar"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Buka / Muat Turun</span>
+                                </a>
+                              )}
+                            </div>
                           </div>
                         )}
 
@@ -1704,6 +1886,48 @@ export const PortalLiveChat: React.FC = () => {
               </div>
             )}
 
+            {/* Uploaded Document / Attachment Preview */}
+            {attachmentUrl && (
+              <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-lg bg-teal-800 text-amber-400 flex items-center justify-center shrink-0">
+                    {attachmentName?.toLowerCase().endsWith('.xls') ||
+                    attachmentName?.toLowerCase().endsWith('.xlsx') ||
+                    attachmentName?.toLowerCase().endsWith('.csv') ? (
+                      <FileSpreadsheet className="w-5 h-5 text-emerald-300" />
+                    ) : (
+                      <FileText className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-amber-400 truncate">
+                      {attachmentName || 'Dokumen sedia dihantar'}
+                    </div>
+                    <div className="text-[10px] text-slate-300 flex items-center gap-2">
+                      {attachmentSize && <span>Saiz: {attachmentSize}</span>}
+                      <span>
+                        {attachmentUrl.startsWith('data:')
+                          ? 'Fail Dokumen Peranti'
+                          : 'Pautan Cloud / Drive'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachmentUrl('');
+                    setAttachmentName('');
+                    setAttachmentSize('');
+                    setAttachmentType('');
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
+            )}
+
             {/* Optional Document Link Attachment Drawer */}
             {showAttachmentInput && (
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
@@ -1747,14 +1971,36 @@ export const PortalLiveChat: React.FC = () => {
                 }}
               />
 
+              <input
+                ref={docInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUploadChatDoc(file);
+                  if (e.target) e.target.value = '';
+                }}
+              />
+
               <button
                 type="button"
                 onClick={() => imageInputRef.current?.click()}
                 disabled={isUploadingImage}
                 className="p-2.5 rounded-xl bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 border border-slate-200 transition cursor-pointer shrink-0"
-                title="Muat Naik Gambar / Poster ke Sembang"
+                title="Muat Naik Gambar / Poster (PNG, JPG, WebP)"
               >
                 <ImageIcon className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => docInputRef.current?.click()}
+                disabled={isUploadingDoc}
+                className="p-2.5 rounded-xl bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 border border-slate-200 transition cursor-pointer shrink-0"
+                title="Muat Naik Dokumen / Fail (PDF, Word, Excel, PPTX)"
+              >
+                <FileUp className="w-4 h-4" />
               </button>
 
               <button
@@ -1765,9 +2011,9 @@ export const PortalLiveChat: React.FC = () => {
                     ? 'bg-teal-100 text-teal-900 border-teal-300'
                     : 'bg-slate-100 hover:bg-teal-50 text-slate-700 hover:text-teal-800 border-slate-200'
                 }`}
-                title="Lampirkan Pautan Dokumen / Google Drive"
+                title="Kongsi Pautan Dokumen / Google Drive"
               >
-                <Paperclip className="w-4 h-4" />
+                <Link2 className="w-4 h-4" />
               </button>
 
               <textarea
@@ -1800,6 +2046,59 @@ export const PortalLiveChat: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Fullscreen Image Preview & Download Modal */}
+      {previewImageModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-6"
+          onClick={() => setPreviewImageModal(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Bar */}
+            <div className="w-full flex items-center justify-between p-3.5 bg-slate-900 rounded-t-2xl border border-slate-700 text-white">
+              <div className="font-semibold text-xs sm:text-sm text-teal-300 truncate max-w-md">
+                {previewImageModal.title}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDownloadFile(
+                      previewImageModal.url,
+                      `gambar_pgb_${Date.now()}.png`
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition shadow-xs"
+                  title="Muat Turun Gambar ke Peranti"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Muat Turun Gambar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImageModal(null)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-white cursor-pointer transition"
+                  title="Tutup Pratonton"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Image View */}
+            <div className="w-full bg-slate-950 p-2 sm:p-4 rounded-b-2xl border-x border-b border-slate-800 flex items-center justify-center overflow-auto max-h-[80vh]">
+              <img
+                src={previewImageModal.url}
+                alt={previewImageModal.title}
+                className="max-h-[75vh] w-auto max-w-full object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

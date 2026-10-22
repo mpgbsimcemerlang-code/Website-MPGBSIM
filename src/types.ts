@@ -606,6 +606,8 @@ export interface PGBChatMessage {
   imageUrl?: string;
   attachmentUrl?: string;
   attachmentName?: string;
+  attachmentSize?: string;
+  attachmentType?: string;
   replyToId?: string;
   replyToSender?: string;
   replyToText?: string;

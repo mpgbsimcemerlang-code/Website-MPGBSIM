@@ -209,8 +209,10 @@ export const PortalActivityLog: React.FC = () => {
       return false;
     });
 
-    // Ensure at least the current active login session is visible if user is logged in
-    if (matched.length === 0) {
+    const isReset = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true';
+
+    // Ensure at least the current active login session is visible if user is logged in (unless logs were recently reset by admin)
+    if (matched.length === 0 && !isReset && enrichedLogs.length > 0) {
       const fallbackNow = new Date();
       return [
         {
@@ -318,16 +320,19 @@ export const PortalActivityLog: React.FC = () => {
         const certLogs = logsForSchool.filter((l) => l.category === 'SIJIL_KAD');
         const profileLogs = logsForSchool.filter((l) => l.category === 'PROFIL');
 
+        const isReset = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true';
         const isCurrentSchool =
-          Boolean(currentSchoolCodeClean && schCodeClean === currentSchoolCodeClean) ||
-          Boolean(currentUser?.school && sch.name?.toLowerCase().trim() === currentUser.school.toLowerCase().trim());
+          !isReset &&
+          enrichedLogs.length > 0 &&
+          (Boolean(currentSchoolCodeClean && schCodeClean === currentSchoolCodeClean) ||
+          Boolean(currentUser?.school && sch.name?.toLowerCase().trim() === currentUser.school.toLowerCase().trim()));
 
         const lastLogin =
           loginLogs[0]?.timestamp ||
-          (isCurrentSchool ? 'Sesi Semasa Aktif' : logsForSchool[0]?.timestamp || 'Rekod Sedia Ada');
+          (isCurrentSchool ? 'Sesi Semasa Aktif' : logsForSchool[0]?.timestamp || '-');
         const lastActivity =
           logsForSchool[0]?.action ||
-          (isCurrentSchool ? 'Log Masuk Portal Ahli' : 'Keahlian Berdaftar Sah');
+          (isCurrentSchool ? 'Log Masuk Portal Ahli' : 'Belum Log Masuk');
 
         return {
           school: sch,

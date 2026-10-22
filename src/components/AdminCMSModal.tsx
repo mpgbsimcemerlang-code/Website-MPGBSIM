@@ -30,6 +30,7 @@ import {
   Cake,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
+import { useMemberPortal } from '../context/MemberPortalContext';
 import { AdminDashboardOverview } from './admin/AdminDashboardOverview';
 import { AdminActivePortalUsersDashboard } from './admin/AdminActivePortalUsersDashboard';
 import { AdminBirthdayManagement } from './admin/AdminBirthdayManagement';
@@ -77,8 +78,10 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     toggleFeatureAlumniRecord,
     purgeMockData,
   } = useAdminContent();
+  const { resetAllPgbActivityLogs } = useMemberPortal();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isResettingLogs, setIsResettingLogs] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -111,6 +114,24 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     if (window.confirm('Adakah anda pasti mahu membuang semua data contoh (mock data)? Data yang anda masukkan sendiri tidak akan terjejas.')) {
       purgeMockData();
       alert('Semua data contoh telah berjaya dibuang! Portal & Laman Web kini hanya memaparkan data rasmi yang anda masukkan.');
+    }
+  };
+
+  const handleResetPgbLogs = async () => {
+    if (
+      window.confirm(
+        'AMARAN KESELAMATAN PENTADBIR:\n\nAdakah anda pasti mahu MEMADAM SEMUA REKOD LOG PGB dan MENGOSONGKAN SEMUA MATA/POIN (0 MATA)?\n\nTindakan ini akan:\n1. Memadam rekod audit log di Firestore secara kekal.\n2. Mengosongkan mata semua 54 PGB kepada 0 mata serta-merta.\n3. PGB akan mula mengumpul mata baharu apabila berkongsi berita kejayaan (+25m), menghantar amalan terbaik (+20m), mendaftar program (+15m), aktif ruang sembang (+5m), dan log masuk (+5m).'
+      )
+    ) {
+      setIsResettingLogs(true);
+      try {
+        const res = await resetAllPgbActivityLogs();
+        alert(`Semua rekod log PGB telah berjaya dipadam (${res.count} rekod dibersihkan). Semua mata/poin PGB kini telah dikosongkan (0 mata).`);
+      } catch (e: any) {
+        alert('Ralat semasa memadam log: ' + (e?.message || 'Sila cuba lagi.'));
+      } finally {
+        setIsResettingLogs(false);
+      }
     }
   };
 
@@ -330,6 +351,16 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
             >
               <Trash2 className="w-3.5 h-3.5 text-amber-600" />
               <span>Buang Data Contoh</span>
+            </button>
+
+            <button
+              onClick={handleResetPgbLogs}
+              disabled={isResettingLogs}
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-black transition border border-rose-200 cursor-pointer disabled:opacity-50"
+              title="Padam semua rekod log PGB supaya semua mata PGB menjadi kosong (0 mata)"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>{isResettingLogs ? 'Memadam...' : 'Padam Log PGB (Reset 0)'}</span>
             </button>
 
             <button

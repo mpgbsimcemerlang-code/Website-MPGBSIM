@@ -26,6 +26,8 @@ import {
   Medal,
   Crown,
   TrendingUp,
+  Trash2,
+  MessageSquare,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -62,6 +64,10 @@ export interface ActivePortalUserSummary {
   profileUpdateCount: number;
   docDownloadCount: number;
   feeActivityCount: number;
+  newsShareCount: number;
+  bestPracticeCount: number;
+  programRegCount: number;
+  chatActivityCount: number;
   otherActivityCount: number;
   totalActivityCount: number;
   activityScore: number;
@@ -229,12 +235,15 @@ function formatRelativeTime(isoOrDateStr: string): string {
 }
 
 export const AdminActivePortalUsersDashboard: React.FC = () => {
-  const { auditLogs, registeredSchools, currentUser } = useMemberPortal();
+  const { auditLogs, registeredSchools, currentUser, resetAllPgbActivityLogs } = useMemberPortal();
   const { siteData } = useAdminContent();
 
   const [remoteLogs, setRemoteLogs] = useState<AuditLogItem[]>([]);
   const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string>(() =>
     new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
@@ -410,6 +419,10 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
         profileUpdateCount: 0,
         docDownloadCount: 0,
         feeActivityCount: 0,
+        newsShareCount: 0,
+        bestPracticeCount: 0,
+        programRegCount: 0,
+        chatActivityCount: 0,
         otherActivityCount: 0,
         totalActivityCount: 0,
         activityScore: 0,
@@ -579,12 +592,43 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
       } else if (cat === 'YURAN') {
         entry.feeActivityCount += 1;
       } else {
-        entry.otherActivityCount += 1;
+        const actLower = (log.action || '').toLowerCase();
+        const cntLower = (log.content || '').toLowerCase();
+        if (
+          actLower.includes('berita') ||
+          actLower.includes('kejayaan') ||
+          cntLower.includes('berita kejayaan') ||
+          cntLower.includes('menerbitkan berita')
+        ) {
+          entry.newsShareCount += 1;
+        } else if (
+          actLower.includes('amalan') ||
+          actLower.includes('submisi bahan') ||
+          cntLower.includes('amalan terbaik')
+        ) {
+          entry.bestPracticeCount += 1;
+        } else if (
+          actLower.includes('program') ||
+          cntLower.includes('mendaftar untuk program') ||
+          cntLower.includes('pendaftaran program')
+        ) {
+          entry.programRegCount += 1;
+        } else if (
+          actLower.includes('sembang') ||
+          actLower.includes('chat') ||
+          cntLower.includes('ruang sembang') ||
+          cntLower.includes('saluran sembang')
+        ) {
+          entry.chatActivityCount += 1;
+        } else {
+          entry.otherActivityCount += 1;
+        }
       }
     });
 
     // If currently logged-in user in this browser belongs to one of the 53 directory schools, ensure their active session is reflected
-    if (currentUser && currentUser.role !== 'ADMIN') {
+    // NOTE: Only reflect if validLogs has entries so that when admin resets all logs, all 54 PGB points evaluate strictly to 0!
+    if (currentUser && currentUser.role !== 'ADMIN' && validLogs.length > 0) {
       const curCode = normalizeDirectorySchoolCode(
         currentUser.schoolCode ||
           (currentUser.membershipNo ? currentUser.membershipNo.replace(/^MPGB-\d{4}-/i, '') : '')
@@ -614,13 +658,18 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
           item.lastLoginMethod = 'Sesi Portal Aktif';
         }
         // Weighted Activity Score for Ranking:
-        // Log Masuk = 5 pts, Kemas Kini Profil = 10 pts, Muat Turun Sijil/Kad = 10 pts, Yuran = 10 pts, Dokumen = 8 pts, Lain = 5 pts
+        // Log Masuk = 5 pts, Kemas Kini Profil = 10 pts, Muat Turun Sijil/Kad = 10 pts, Yuran = 10 pts, Dokumen = 8 pts,
+        // Kongsi Kejayaan Sekolah / Berita = 25 pts, Submisi Amalan Terbaik = 20 pts, Pendaftaran Program = 15 pts, Aktif Ruang Sembang = 5 pts, Lain = 5 pts
         item.activityScore =
           item.loginCount * 5 +
           item.profileUpdateCount * 10 +
           item.certDownloadCount * 10 +
           item.feeActivityCount * 10 +
           item.docDownloadCount * 8 +
+          item.newsShareCount * 25 +
+          item.bestPracticeCount * 20 +
+          item.programRegCount * 15 +
+          item.chatActivityCount * 5 +
           item.otherActivityCount * 5;
 
         if (item.totalActivityCount >= 5 || item.activityScore >= 30) {
@@ -893,8 +942,42 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleResetLogs = async () => {
+    setIsResetting(true);
+    try {
+      const res = await resetAllPgbActivityLogs();
+      setRemoteLogs([]);
+      setShowResetModal(false);
+      setResetSuccessMessage(
+        `Semua rekod log aktiviti PGB telah berjaya dipadam (${res.count} rekod di Firestore dibersihkan). Semua mata/poin PGB kini telah dikosongkan (0 mata).`
+      );
+      setTimeout(() => setResetSuccessMessage(null), 8000);
+    } catch (e: any) {
+      alert('Ralat memadam log: ' + (e?.message || 'Sila cuba lagi.'));
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Reset Success Notice */}
+      {resetSuccessMessage && (
+        <div className="p-4 rounded-2xl bg-emerald-600 text-white shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2.5 text-xs sm:text-sm font-bold">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-200" />
+            <span>{resetSuccessMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setResetSuccessMessage(null)}
+            className="p-1 rounded-lg hover:bg-emerald-700 text-emerald-100 transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Top Executive Header Banner */}
       <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 text-white border border-teal-800/60 shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
@@ -907,7 +990,7 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
               Dashboard Pengguna Aktif & Ranking Keaktifan PGB Dalam Portal
             </h2>
             <p className="text-xs sm:text-sm text-teal-100/90 leading-relaxed">
-              Data diselaraskan tepat mengikut <strong>{kpiStats.totalRegistered} Sekolah Ahli Berdaftar</strong> dalam Direktori Ahli. Pantau kedudukan (ranking) Pengetua & Guru Besar yang paling kerap log masuk dan beraktiviti (kemas kini profil, muat turun sijil A4/kad QR, yuran & dokumen) serta senarai sekolah yang belum log masuk.
+              Data diselaraskan tepat mengikut <strong>{kpiStats.totalRegistered} Sekolah Ahli Berdaftar</strong> dalam Direktori Ahli. Pantau kedudukan (ranking) Pengetua & Guru Besar yang paling kerap log masuk dan beraktiviti (kemas kini profil, muat turun sijil/kad, kongsi berita kejayaan, hantar amalan terbaik, aktif sembang live & daftar program).
             </p>
           </div>
 
@@ -928,13 +1011,23 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
               className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Eksport Ranking & Laporan CSV</span>
+              <span>Eksport CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowResetModal(true)}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-rose-900/40 border border-rose-400/40 transition cursor-pointer"
+              title="Padam semua rekod log PGB supaya mata semua PGB kembali ke 0"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-200" />
+              <span>Padam Log PGB (Reset Poin 0)</span>
             </button>
 
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5 text-teal-300" />
               <span className="hidden sm:inline">Cetak</span>
@@ -950,7 +1043,7 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
             </span>
           </div>
           <span className="text-amber-300 font-bold">
-            Sistem Skor: Log Masuk (+5m) • Profil (+10m) • Sijil/Kad (+10m) • Yuran/Dokumen (+10m)
+            Sistem Skor: Log Masuk (+5m) • Profil (+10m) • Sijil/Kad (+10m) • Yuran (+10m) • Dokumen (+8m) • Kongsi Berita Kejayaan (+25m) • Amalan Terbaik (+20m) • Daftar Program (+15m) • Sembang Live (+5m)
           </span>
         </div>
       </div>
@@ -1484,6 +1577,26 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
                                 <span className="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold">
                                   {u.certDownloadCount} Sijil/Kad
                                 </span>
+                                {u.newsShareCount > 0 && (
+                                  <span className="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-900 border border-rose-200 text-[10px] font-bold">
+                                    {u.newsShareCount} Berita (+{u.newsShareCount * 25}m)
+                                  </span>
+                                )}
+                                {u.bestPracticeCount > 0 && (
+                                  <span className="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-900 border border-indigo-200 text-[10px] font-bold">
+                                    {u.bestPracticeCount} Amalan (+{u.bestPracticeCount * 20}m)
+                                  </span>
+                                )}
+                                {u.programRegCount > 0 && (
+                                  <span className="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 text-[10px] font-bold">
+                                    {u.programRegCount} Program (+{u.programRegCount * 15}m)
+                                  </span>
+                                )}
+                                {u.chatActivityCount > 0 && (
+                                  <span className="px-2 py-0.5 rounded-lg bg-cyan-50 text-cyan-900 border border-cyan-200 text-[10px] font-bold">
+                                    {u.chatActivityCount} Sembang (+{u.chatActivityCount * 5}m)
+                                  </span>
+                                )}
                                 {(u.feeActivityCount > 0 || u.docDownloadCount > 0 || u.otherActivityCount > 0) && (
                                   <span className="px-2 py-0.5 rounded-lg bg-purple-50 text-purple-900 border border-purple-200 text-[10px] font-bold">
                                     {u.feeActivityCount + u.docDownloadCount + u.otherActivityCount} Lain
@@ -1494,7 +1607,7 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-[11px] text-slate-400">Tiada aktiviti</span>
+                              <span className="text-[11px] text-slate-400">Tiada aktiviti (0 mata)</span>
                             )}
                           </td>
 
@@ -2086,6 +2199,42 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
                 </div>
               </div>
 
+              {/* Secondary Scoring Activities Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-2xl bg-rose-50/70 border border-rose-200">
+                  <span className="text-[10px] font-bold uppercase text-rose-800 block">
+                    Kongsi Kejayaan (+25m)
+                  </span>
+                  <strong className="text-lg font-black text-rose-950 mt-0.5 block">
+                    {selectedUserDetail.newsShareCount} Berita
+                  </strong>
+                </div>
+                <div className="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200">
+                  <span className="text-[10px] font-bold uppercase text-indigo-800 block">
+                    Amalan Terbaik (+20m)
+                  </span>
+                  <strong className="text-lg font-black text-indigo-950 mt-0.5 block">
+                    {selectedUserDetail.bestPracticeCount} Submisi
+                  </strong>
+                </div>
+                <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200">
+                  <span className="text-[10px] font-bold uppercase text-emerald-800 block">
+                    Daftar Program (+15m)
+                  </span>
+                  <strong className="text-lg font-black text-emerald-950 mt-0.5 block">
+                    {selectedUserDetail.programRegCount} Acara
+                  </strong>
+                </div>
+                <div className="p-3 rounded-2xl bg-cyan-50/70 border border-cyan-200">
+                  <span className="text-[10px] font-bold uppercase text-cyan-800 block">
+                    Sembang Live (+5m)
+                  </span>
+                  <strong className="text-lg font-black text-cyan-950 mt-0.5 block">
+                    {selectedUserDetail.chatActivityCount} Mesej
+                  </strong>
+                </div>
+              </div>
+
               {/* Metadata Box */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div>
@@ -2156,6 +2305,67 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
                 className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
               >
                 Tutup Paparan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENGESAHAN: RESET / PADAM SEMUA LOG PGB (POIN KOSONG) */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-rose-100 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-black text-slate-900">
+                Padam Semua Rekod Log & Kosongkan Poin PGB?
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Tindakan ini akan <strong>memadam semua rekod audit log keaktifan PGB</strong> di Firestore dan cache setempat secara kekal.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2 text-xs text-amber-900">
+              <div className="font-extrabold flex items-center gap-1.5 text-amber-950">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>Kesan Tindakan Ini:</span>
+              </div>
+              <ul className="list-disc pl-5 space-y-1 text-[11px] text-amber-900 leading-normal">
+                <li>Semua skor / mata PGB akan <strong>kembali ke 0 (Kosong)</strong> serta-merta.</li>
+                <li>Status ranking PGB akan diset semula ke tahap awal (Belum Log Masuk).</li>
+                <li>PGB akan mula mengumpul mata baharu secara adil apabila berkongsi berita kejayaan (+25m), menghantar amalan terbaik (+20m), mendaftar program (+15m), aktif ruang sembang (+5m), dan log masuk (+5m).</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                disabled={isResetting}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleResetLogs}
+                disabled={isResetting}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-rose-950/20 transition cursor-pointer disabled:opacity-50"
+              >
+                {isResetting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Memadam Rekod...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Ya, Padam Semua Log Sekarang (Reset ke 0 Poin)</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

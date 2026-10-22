@@ -22,7 +22,7 @@ import { PortalGlobalSearchModal } from './PortalGlobalSearchModal';
 import { PortalNotificationModal } from './PortalNotificationModal';
 import { PortalLoginView } from './PortalLoginView';
 import { PortalPGBSpotlight } from './PortalPGBSpotlight';
-import { ShieldAlert, MessageSquare, Bell } from 'lucide-react';
+import { ShieldAlert, MessageSquare, Bell, Megaphone, X } from 'lucide-react';
 
 export const PortalMainLayout: React.FC = () => {
   const {
@@ -31,6 +31,8 @@ export const PortalMainLayout: React.FC = () => {
     currentRole,
     setPortalTab,
     currentUser,
+    notifications,
+    markNotificationRead,
     unreadPersonalSenders,
     unreadPersonalChatCount,
     totalUnreadChatCount,
@@ -38,6 +40,10 @@ export const PortalMainLayout: React.FC = () => {
   } = useMemberPortal();
 
   const unreadChatBadgeCount = unreadPersonalChatCount > 0 ? unreadPersonalChatCount : totalUnreadChatCount;
+
+  const latestUnreadAnnouncementNotif = React.useMemo(() => {
+    return notifications.find((n) => !n.read && (n.type === 'pengumuman' || n.type === 'info'));
+  }, [notifications]);
 
   // Ensure clicking any module (e.g. from Pusat Akses Pantas) always positions the view at the very top
   React.useEffect(() => {
@@ -157,6 +163,55 @@ export const PortalMainLayout: React.FC = () => {
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>Buka & Baca Mesej</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real-Time Announcement / Admin Update Banner (Visible on any Portal page when Admin issues an announcement) */}
+      {portalTab !== 'pengumuman' && latestUnreadAnnouncementNotif && (
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-teal-800 p-0.5 rounded-2xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="bg-slate-900 text-white rounded-[14px] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0">
+                  <Megaphone className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                      Pengumuman Rasmi Baharu
+                    </span>
+                    <span className="text-xs font-bold text-white truncate">
+                      {latestUnreadAnnouncementNotif.title}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 truncate mt-0.5">
+                    {latestUnreadAnnouncementNotif.message}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    markNotificationRead(latestUnreadAnnouncementNotif.id);
+                    setPortalTab('pengumuman');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition"
+                >
+                  <Megaphone className="w-3.5 h-3.5" />
+                  <span>Buka & Baca Pengumuman</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => markNotificationRead(latestUnreadAnnouncementNotif.id)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs cursor-pointer transition"
+                  title="Tutup Notifikasi Ini"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

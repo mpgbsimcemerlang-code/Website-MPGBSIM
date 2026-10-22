@@ -1257,17 +1257,22 @@ const mergeSchoolsPreservingMedia = (
       sch.cachedBirthMonthDay ||
       prevMatch?.cachedBirthMonthDay ||
       '';
+    const rawPgbPhone = (sch.pgbPhone || '').trim();
+    const officePhone = (sch.schoolPhone || sch.phone || '').trim();
+    const isPgbOfficeConflated = rawPgbPhone && officePhone && rawPgbPhone === officePhone;
+    const appPersonalPhone = (appMatch?.phoneNumber || appMatch?.pgbPhone || '').trim();
+
+    const pgbPhone =
+      (!isPgbOfficeConflated && rawPgbPhone && rawPgbPhone !== '-')
+        ? rawPgbPhone
+        : appPersonalPhone && appPersonalPhone !== officePhone
+        ? appPersonalPhone
+        : rawPgbPhone || prevMatch?.pgbPhone || appPersonalPhone || '';
     const pgbEmail =
       sch.pgbEmail ||
       prevMatch?.pgbEmail ||
       appMatch?.pgbEmail ||
       appMatch?.email ||
-      '';
-    const pgbPhone =
-      sch.pgbPhone ||
-      prevMatch?.pgbPhone ||
-      appMatch?.pgbPhone ||
-      appMatch?.phoneNumber ||
       '';
     const membershipType =
       sch.membershipType ||
@@ -3219,6 +3224,23 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {
       console.warn('Firestore write event notice:', e);
     }
+
+    try {
+      const notifId = `notif-prog-${item.id}`;
+      const progNotif = {
+        id: notifId,
+        userId: 'all',
+        title: `Program Baharu: ${item.title}`,
+        message: item.description || `Program baharu MPGBSIM telah dibuka untuk pendaftaran (${item.date || 'Sila semak takwim'}).`,
+        type: 'program',
+        date: new Date().toISOString(),
+        read: false,
+        linkTab: 'program',
+      };
+      await setDoc(doc(db, 'notifications', notifId), progNotif, { merge: true });
+    } catch (e) {
+      console.warn('Firestore program notification notice:', e);
+    }
   };
 
   const updateProgram = async (id: string, updated: Partial<ProgramEvent>) => {
@@ -3363,6 +3385,36 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       },
       { merge: true }
     ).catch(() => {});
+
+    // 4. Record audit log for PGB activity score
+    try {
+      const nowAudit = new Date();
+      const auditDocId = `log-reg-${registrationId}`;
+      setDoc(
+        doc(db, 'auditLogs', auditDocId),
+        {
+          id: auditDocId,
+          user: newRegistration.participantName,
+          email: newRegistration.participantEmail,
+          action: 'Pendaftaran Program MPGBSIM',
+          content: `Peserta/PGB ${newRegistration.participantName} (${newRegistration.schoolName}) mendaftar untuk penyertaan program: "${eventTitle}".`,
+          timestamp: nowAudit.toLocaleString('ms-MY', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+          isoTimestamp: nowAudit.toISOString(),
+          schoolName: newRegistration.schoolName,
+          state: newRegistration.state || 'Malaysia',
+          position: newRegistration.position || 'Pengetua / Guru Besar',
+          category: 'PROGRAM_AMALAN',
+        },
+        { merge: true }
+      ).catch(() => {});
+    } catch (e) {}
 
     return {
       success: true,
@@ -3896,11 +3948,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       website: app.website || '',
       logoUrl: app.logoUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=200',
       schoolPhotoUrl: app.schoolPhotoUrl || '',
-      description: app.schoolDescription || `Sekolah Ahli Berdaftar MPGBSIM di bawah kepimpinan ${app.fullName} (${app.designation}).`,
-      phone: app.schoolPhone || app.phoneNumber,
-      email: app.schoolEmail || app.email,
-      pgbPhone: app.phoneNumber || app.pgbPhone || '',
-      pgbEmail: app.email || app.pgbEmail || '',
+      phone: app.schoolPhone || '',
+      schoolPhone: app.schoolPhone || '',
+      email: app.schoolEmail || '',
+      schoolEmail: app.schoolEmail || '',
+      pgbPhone: app.pgbPhone || app.phoneNumber || '',
+      pgbEmail: app.pgbEmail || app.email || '',
       address: app.address || `${app.district}, ${app.state}`,
     };
 
@@ -4277,6 +4330,28 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       );
     } catch (e) {
       console.warn('Dashboard config Firestore sync warning:', e);
+    }
+
+    if (data.showAnnouncement || data.announcementTitle || data.adminMemo) {
+      try {
+        const notifId = 'notif-admin-memo';
+        const notif = {
+          id: notifId,
+          userId: 'all',
+          title: `Hebahan Pentadbir: ${data.announcementTitle || updated.announcementTitle || 'Pemberitahuan Pimpinan'}`,
+          message:
+            data.announcementText ||
+            data.adminMemo ||
+            updated.announcementText ||
+            updated.adminMemo ||
+            'Pemberitahuan rasmi pimpinan kebangsaan MPGBSIM.',
+          type: 'info',
+          date: new Date().toISOString(),
+          read: false,
+          linkTab: 'dashboard',
+        };
+        await setDoc(doc(db, 'notifications', notifId), notif, { merge: true });
+      } catch (e) {}
     }
   };
 

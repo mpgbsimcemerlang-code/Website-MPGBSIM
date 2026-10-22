@@ -242,9 +242,29 @@ export const PortalHeader: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
                               <div className="font-semibold text-slate-900 truncate">{notif.title}</div>
-                              {!notif.read && notif.type === 'chat' && (
-                                <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black shrink-0">
-                                  Baharu
+                              {!notif.read && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${
+                                    notif.type === 'chat'
+                                      ? 'bg-rose-600 text-white'
+                                      : notif.type === 'pengumuman'
+                                      ? 'bg-amber-500 text-slate-950'
+                                      : notif.type === 'dokumen'
+                                      ? 'bg-blue-600 text-white'
+                                      : notif.type === 'program'
+                                      ? 'bg-teal-700 text-white'
+                                      : 'bg-emerald-600 text-white'
+                                  }`}
+                                >
+                                  {notif.type === 'chat'
+                                    ? 'Mesej'
+                                    : notif.type === 'pengumuman'
+                                    ? 'Pengumuman'
+                                    : notif.type === 'dokumen'
+                                    ? 'Dokumen'
+                                    : notif.type === 'program'
+                                    ? 'Program'
+                                    : 'Baharu'}
                                 </span>
                               )}
                             </div>

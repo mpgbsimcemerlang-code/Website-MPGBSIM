@@ -323,6 +323,9 @@ interface MemberPortalContextType {
   updateSchoolNews: (id: string, updates: Partial<NewsItem>) => Promise<void>;
   deleteSchoolNews: (id: string) => Promise<void>;
 
+  // Audit Logs & Activity Reset Action
+  resetAllPgbActivityLogs: () => Promise<{ success: boolean; count: number }>;
+
   // Global Search modal trigger
   isSearchOpen: boolean;
   setIsSearchOpen: (open: boolean) => void;
@@ -666,9 +669,28 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     return INITIAL_NOTIFICATIONS;
   });
 
+  const [readNotifIds, setReadNotifIds] = useState<string[]>(() => {
+    try {
+      const saved = safeLocalStorageGet('mpgbsim_user_read_notifications_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
     try {
+      const isReset = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true';
       const saved = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+      if (isReset) {
+        if (saved) {
+          const parsed: AuditLogItem[] = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+        return [];
+      }
       if (saved) {
         const parsed: AuditLogItem[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -696,7 +718,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     } catch (e) {
       // ignore
     }
-    return INITIAL_AUDIT_LOGS;
+    return typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true' ? [] : INITIAL_AUDIT_LOGS;
   });
 
   const [schoolNews, setSchoolNews] = useState<NewsItem[]>(() => {
@@ -1034,6 +1056,61 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       );
     }
   }, [siteData.announcements]);
+
+  // Synchronize published announcements to portal notifications so any announcement or admin update is immediately reflected in the member's notification center
+  useEffect(() => {
+    if (!Array.isArray(announcements) || announcements.length === 0) return;
+
+    setNotifications((prev) => {
+      let hasChanges = false;
+      const next = [...prev];
+
+      announcements.forEach((ann) => {
+        if (ann.status && ann.status !== 'published') return;
+        const notifId = `notif-ann-${ann.id}`;
+        const existingIdx = next.findIndex((n) => n.id === notifId);
+
+        const expectedNotif: PortalNotification = {
+          id: notifId,
+          userId: 'all',
+          title: `Pengumuman Rasmi: ${ann.title}`,
+          message: ann.summary || ann.content?.slice(0, 140) + '...',
+          type: 'pengumuman',
+          date: ann.date ? (ann.date.includes('T') ? ann.date : `${ann.date}T08:00:00Z`) : new Date().toISOString(),
+          read: false,
+          linkTab: 'pengumuman',
+        };
+
+        if (existingIdx === -1) {
+          next.push(expectedNotif);
+          hasChanges = true;
+          if (!isFirestoreQuotaExceeded()) {
+            setDoc(doc(db, 'notifications', notifId), expectedNotif, { merge: true }).catch(() => {});
+          }
+        } else {
+          const current = next[existingIdx];
+          if (
+            current.title !== expectedNotif.title ||
+            current.message !== expectedNotif.message
+          ) {
+            next[existingIdx] = {
+              ...current,
+              title: expectedNotif.title,
+              message: expectedNotif.message,
+            };
+            hasChanges = true;
+          }
+        }
+      });
+
+      if (hasChanges) {
+        next.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+        safeLocalStorageSet(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(next.slice(0, 150)));
+        return next;
+      }
+      return prev;
+    });
+  }, [announcements]);
 
   useEffect(() => {
     if (Array.isArray(siteData.practices) && siteData.practices.length > 0) {
@@ -1387,6 +1464,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               });
               return merged.slice(0, 500);
             });
+          } else {
+            if (typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true') {
+              setAuditLogs([]);
+            }
           }
         },
         (err) => handlePortalListenerError('auditLogs', err)
@@ -1532,10 +1613,16 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               return { ...m, readBy: [...existingReadBy, codeToAdd] };
             })
           );
-        } else if (data.type === 'NEW_CHAT_NOTIFICATION' && data.notification) {
+        } else if (
+          (data.type === 'NEW_CHAT_NOTIFICATION' || data.type === 'NEW_PORTAL_NOTIFICATION') &&
+          data.notification
+        ) {
           const incomingNotif = data.notification as PortalNotification;
           setNotifications((prev) => {
-            if (prev.some((n) => n.id === incomingNotif.id)) return prev;
+            const exists = prev.some((n) => n.id === incomingNotif.id);
+            if (exists) {
+              return prev.map((n) => (n.id === incomingNotif.id ? incomingNotif : n));
+            }
             return [incomingNotif, ...prev];
           });
         }
@@ -1701,6 +1788,19 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         );
       })
       .map((n) => {
+        // Check if user has explicitly read this notification locally or in Firestore readBy
+        const isLocallyRead = readNotifIds.includes(n.id);
+        const isReadByMe =
+          Array.isArray((n as any).readBy) &&
+          Boolean(
+            (myCleanSchoolCode && (n as any).readBy.some((r: string) => normalizeSchoolCode(r) === myCleanSchoolCode)) ||
+            (currentUser?.uid && (n as any).readBy.includes(currentUser.uid))
+          );
+
+        if (isLocallyRead || isReadByMe) {
+          return { ...n, read: true };
+        }
+
         // If this stored notification is for a chat channel that has already been opened and read, ensure it reflects read: true
         if (
           (n.type === 'chat' || n.chatChannelId) &&
@@ -1735,9 +1835,12 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       (n) => !(n.chatChannelId && unreadDmChannels.has(n.chatChannelId))
     );
 
-    return [...liveChatNotifs, ...nonDuplicateStored];
+    return [...liveChatNotifs, ...nonDuplicateStored].sort(
+      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+    );
   }, [
     notifications,
+    readNotifIds,
     unreadPersonalSenders,
     myCleanSchoolCode,
     mySchoolCodeRaw,
@@ -3013,15 +3116,52 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     });
     recordAuditLog('Cipta Pengumuman', `Mencipta pengumuman baharu: "${sanitizedAnn.title}"`);
 
+    // Create & dispatch real-time announcement notification for all PGB members
+    const notifId = `notif-ann-${id}`;
+    const notif: PortalNotification = {
+      id: notifId,
+      userId: 'all',
+      title: `Pengumuman Rasmi: ${sanitizedAnn.title}`,
+      message: sanitizedAnn.summary || sanitizedAnn.content?.slice(0, 140) + '...',
+      type: 'pengumuman',
+      date: new Date().toISOString(),
+      read: false,
+      linkTab: 'pengumuman',
+    };
+
+    setNotifications((prev) => [notif, ...prev.filter((n) => n.id !== notifId)].slice(0, 150));
+    safeLocalStorageSet(
+      STORAGE_KEYS.NOTIFICATIONS,
+      JSON.stringify([notif, ...notifications.filter((n) => n.id !== notifId)].slice(0, 150))
+    );
+
+    // Save both announcement and notification to Firestore
     try {
       await setDoc(doc(db, 'announcements', id), sanitizedAnn, { merge: true });
       localStorage.setItem('mpgbsim_announcements_seeded', 'true');
     } catch (e) {
       console.warn('Firestore createAnnouncement notice:', e);
     }
+
     try {
-      window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
-      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+      await setDoc(doc(db, 'notifications', notifId), notif, { merge: true });
+    } catch (e) {
+      console.warn('Firestore announcement notification notice:', e);
+    }
+
+    try {
+      if (typeof window !== 'undefined') {
+        if ('BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
+          bc.postMessage({ type: 'NEW_PORTAL_NOTIFICATION', notification: notif });
+          bc.close();
+        }
+        window.dispatchEvent(
+          new CustomEvent('mpgbsim_new_announcement_notif', { detail: notif })
+        );
+        window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
+        window.dispatchEvent(new Event('mpgbsim_content_updated'));
+      }
     } catch (e) {}
   };
 
@@ -3032,27 +3172,75 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     setAnnouncements((prev) => prev.map((a) => (a.id === id ? { ...a, ...sanitizedUpdates } : a)));
     recordAuditLog('Kemas Kini Pengumuman', `Mengemas kini pengumuman ID: ${id}`);
 
+    // Update corresponding notification so members see the update alert
+    const notifId = `notif-ann-${id}`;
+    const targetAnn = announcements.find((a) => a.id === id);
+    const updatedTitle = updates.title || targetAnn?.title || 'Pengumuman MPGBSIM';
+    const updatedSummary =
+      updates.summary || updates.content?.slice(0, 140) || targetAnn?.summary || 'Terdapat kemas kini baharu.';
+
+    const notif: PortalNotification = {
+      id: notifId,
+      userId: 'all',
+      title: `Kemas Kini Pengumuman: ${updatedTitle}`,
+      message: updatedSummary,
+      type: 'pengumuman',
+      date: new Date().toISOString(),
+      read: false,
+      linkTab: 'pengumuman',
+    };
+
+    // Remove from readNotifIds so all members get notified of the fresh update
+    setReadNotifIds((prev) => {
+      const next = prev.filter((nid) => nid !== notifId);
+      safeLocalStorageSet('mpgbsim_user_read_notifications_v1', JSON.stringify(next));
+      return next;
+    });
+
+    setNotifications((prev) => [notif, ...prev.filter((n) => n.id !== notifId)].slice(0, 150));
+
     try {
       await setDoc(doc(db, 'announcements', id), sanitizedUpdates, { merge: true });
       localStorage.setItem('mpgbsim_announcements_seeded', 'true');
     } catch (e) {
       console.warn('Firestore updateAnnouncement notice:', e);
     }
+
     try {
-      window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
-      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+      await setDoc(doc(db, 'notifications', notifId), notif, { merge: true });
+    } catch (e) {
+      console.warn('Firestore announcement notification notice:', e);
+    }
+
+    try {
+      if (typeof window !== 'undefined') {
+        if ('BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('mpgbsim_pgb_live_chat');
+          bc.postMessage({ type: 'NEW_PORTAL_NOTIFICATION', notification: notif });
+          bc.close();
+        }
+        window.dispatchEvent(
+          new CustomEvent('mpgbsim_new_announcement_notif', { detail: notif })
+        );
+        window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
+        window.dispatchEvent(new Event('mpgbsim_content_updated'));
+      }
     } catch (e) {}
   };
 
   const deleteAnnouncement = async (id: string) => {
     localStorage.setItem('mpgbsim_announcements_seeded', 'true');
     setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    setNotifications((prev) => prev.filter((n) => n.id !== `notif-ann-${id}`));
     recordAuditLog('Padam Pengumuman', `Memadam pengumuman ID: ${id}`);
     try {
       await deleteDoc(doc(db, 'announcements', id));
     } catch (e) {
       console.warn('Firestore deleteAnnouncement notice:', e);
     }
+    try {
+      await deleteDoc(doc(db, 'notifications', `notif-ann-${id}`));
+    } catch (e) {}
     try {
       window.dispatchEvent(new Event('mpgbsim_announcements_updated'));
       window.dispatchEvent(new Event('mpgbsim_content_updated'));
@@ -3062,7 +3250,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   const registerForProgram = (programId: string) => {
     if (!registeredProgramIds.includes(programId)) {
       setRegisteredProgramIds((prev) => [...prev, programId]);
-      recordAuditLog('Pendaftaran Program', `Mendaftar untuk program ID: ${programId}`);
+      recordAuditLog(
+        'Pendaftaran Program MPGBSIM',
+        `PGB ${currentUser?.fullName || 'Ahli PGB'} (${currentUser?.school || 'Sekolah Ahli'}) mendaftar untuk penyertaan program/acara MPGBSIM (ID: ${programId}).`,
+        {
+          category: 'PROGRAM_AMALAN',
+        }
+      );
 
       // Add positive notification
       const notif: PortalNotification = {
@@ -3090,7 +3284,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       status: practiceData.status || 'Submitted',
     };
     setBestPractices((prev) => [newPractice, ...prev]);
-    recordAuditLog('Submisi Amalan Terbaik', `Menghantar amalan terbaik: "${newPractice.title}"`);
+    recordAuditLog(
+      'Submisi Amalan Terbaik',
+      `Menghantar amalan terbaik: "${newPractice.title}"`,
+      {
+        category: 'PROGRAM_AMALAN',
+      }
+    );
 
     // Add submission notification
     const notif: PortalNotification = {
@@ -3197,16 +3397,37 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     setDocuments((prev) => [newDoc, ...prev]);
     recordAuditLog('Muat Naik Dokumen', `Memuat naik dokumen baharu: "${newDoc.title}"`);
 
+    const notifId = `notif-doc-${id}`;
+    const notif: PortalNotification = {
+      id: notifId,
+      userId: 'all',
+      title: `Pekeliling / Dokumen Baharu: ${newDoc.title}`,
+      message: newDoc.description || `Dokumen kategori ${newDoc.category} kini sedia dimuat turun di Pusat Dokumen.`,
+      type: 'dokumen',
+      date: new Date().toISOString(),
+      read: false,
+      linkTab: 'dokumen',
+    };
+    setNotifications((prev) => [notif, ...prev.filter((n) => n.id !== notifId)].slice(0, 150));
+
     try {
       await setDoc(doc(db, 'documents', id), newDoc);
+    } catch (e) {}
+
+    try {
+      await setDoc(doc(db, 'notifications', notifId), notif, { merge: true });
     } catch (e) {}
   };
 
   const deleteDocument = async (id: string) => {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
+    setNotifications((prev) => prev.filter((n) => n.id !== `notif-doc-${id}`));
     recordAuditLog('Padam Dokumen', `Memadam dokumen ID: ${id}`);
     try {
       await deleteDoc(doc(db, 'documents', id));
+    } catch (e) {}
+    try {
+      await deleteDoc(doc(db, 'notifications', `notif-doc-${id}`));
     } catch (e) {}
   };
 
@@ -3396,6 +3617,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       markChatChannelAsRead(chId);
     }
 
+    setReadNotifIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      safeLocalStorageSet('mpgbsim_user_read_notifications_v1', JSON.stringify(next));
+      return next;
+    });
+
     setNotifications((prev) =>
       prev.map((n) =>
         n.id === id || (target?.chatChannelId && n.chatChannelId === target.chatChannelId)
@@ -3403,9 +3631,20 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           : n
       )
     );
+
     if (!id.startsWith('live-dm-notif-')) {
       try {
-        updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
+        const code = myCleanSchoolCode || currentUser?.uid;
+        if (target && target.userId === 'all' && code) {
+          const currentReadBy = Array.isArray((target as any).readBy) ? (target as any).readBy : [];
+          if (!currentReadBy.includes(code)) {
+            updateDoc(doc(db, 'notifications', id), {
+              readBy: [...currentReadBy, code],
+            }).catch(() => {});
+          }
+        } else {
+          updateDoc(doc(db, 'notifications', id), { read: true }).catch(() => {});
+        }
       } catch (e) {}
     }
   };
@@ -3417,7 +3656,32 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         markChatChannelAsRead(chId);
       }
     });
+
+    const allIds = visibleNotifications.map((n) => n.id);
+    setReadNotifIds((prev) => {
+      const next = Array.from(new Set([...prev, ...allIds]));
+      safeLocalStorageSet('mpgbsim_user_read_notifications_v1', JSON.stringify(next));
+      return next;
+    });
+
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+    // Sync to Firestore for individual user notifications
+    visibleNotifications.forEach((n) => {
+      if (!n.id.startsWith('live-dm-notif-')) {
+        const code = myCleanSchoolCode || currentUser?.uid;
+        if (n.userId === 'all' && code) {
+          const currentReadBy = Array.isArray((n as any).readBy) ? (n as any).readBy : [];
+          if (!currentReadBy.includes(code)) {
+            updateDoc(doc(db, 'notifications', n.id), {
+              readBy: [...currentReadBy, code],
+            }).catch(() => {});
+          }
+        } else if (n.recipientSchoolCode || n.userId === currentUser?.uid) {
+          updateDoc(doc(db, 'notifications', n.id), { read: true }).catch(() => {});
+        }
+      }
+    });
   };
 
   const submitSchoolNews = async (newsInput: {
@@ -3506,7 +3770,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     // 4. Log audit and send portal notification
     recordAuditLog(
       'Siaran Berita Kejayaan PGB',
-      `PGB ${authorName} (${schoolName}) menerbitkan berita kejayaan "${newNewsItem.title}" secara langsung ke laman web MPGBSIM.`
+      `PGB ${authorName} (${schoolName}) menerbitkan berita kejayaan "${newNewsItem.title}" secara langsung ke laman web MPGBSIM.`,
+      {
+        user: authorName,
+        email: currentUser?.pgbEmail || currentUser?.email || 'ahli@mpgbsim.org',
+        schoolName,
+        schoolCode,
+        category: 'PROGRAM_AMALAN',
+      }
     );
 
     const newNotif: PortalNotification = {
@@ -3667,6 +3938,54 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     recordAuditLog('Padam Rekod Yuran', `Rekod pembayaran #${id} dipadam.`);
   };
 
+  const resetAllPgbActivityLogs = async (): Promise<{ success: boolean; count: number }> => {
+    let deletedCount = 0;
+    try {
+      await ensureFirebaseAuth();
+      if (!isFirestoreQuotaExceeded()) {
+        const snap = await getDocs(collection(db, 'auditLogs'));
+        const docs = snap.docs;
+        const batchSize = 100;
+        for (let i = 0; i < docs.length; i += batchSize) {
+          const slice = docs.slice(i, i + batchSize);
+          await Promise.all(slice.map((d) => deleteDoc(d.ref)));
+          deletedCount += slice.length;
+        }
+      }
+    } catch (e) {
+      console.warn('Ralat memadam koleksi auditLogs di Firestore:', e);
+    }
+
+    try {
+      localStorage.setItem('mpgbsim_audit_logs_reset', 'true');
+      safeLocalStorageSet(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
+    } catch (e) {}
+
+    setAuditLogs([]);
+
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mpgbsim_audit_logs_reset', { detail: { deletedCount } }));
+        window.dispatchEvent(new Event('mpgbsim_content_updated'));
+        if ('BroadcastChannel' in window) {
+          const bc = new BroadcastChannel('mpgbsim_audit_channel');
+          bc.postMessage({ type: 'AUDIT_LOGS_RESET', count: deletedCount });
+          bc.close();
+        }
+      }
+    } catch {}
+
+    return { success: true, count: deletedCount };
+  };
+
+  useEffect(() => {
+    const handleReset = () => {
+      setAuditLogs([]);
+    };
+    window.addEventListener('mpgbsim_audit_logs_reset', handleReset);
+    return () => window.removeEventListener('mpgbsim_audit_logs_reset', handleReset);
+  }, []);
+
   return (
     <MemberPortalContext.Provider
       value={{
@@ -3726,6 +4045,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         markAllNotificationsRead,
         markAllNotificationsAsRead: markAllNotificationsRead,
         recordAuditLog,
+        resetAllPgbActivityLogs,
         submitSchoolNews,
         updateSchoolNews,
         deleteSchoolNews,
