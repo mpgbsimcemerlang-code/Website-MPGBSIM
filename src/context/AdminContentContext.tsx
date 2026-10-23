@@ -18,6 +18,7 @@ import {
   ExamCalendarItem,
   BirthdaySettingsConfig,
   ProgramCertificateConfig,
+  MembershipCertificateConfig,
 } from '../types';
 import { DEFAULT_BIRTHDAY_SETTINGS } from '../utils/birthdayUtils';
 
@@ -165,6 +166,7 @@ export interface SiteContentState {
   examCalendar?: ExamCalendarItem[];
   birthdaySettings?: BirthdaySettingsConfig;
   programCertificateConfig?: ProgramCertificateConfig;
+  membershipCertificateConfig?: MembershipCertificateConfig;
 }
 
 export interface AdminUser {
@@ -272,6 +274,7 @@ interface AdminContentContextType {
   deleteEventRegistration: (regId: string, eventId: string) => Promise<void>;
   // Program Attendance & Certificate Issuance (PGB & CMS)
   updateProgramCertificateConfig: (data: Partial<ProgramCertificateConfig>) => Promise<void>;
+  updateMembershipCertificateConfig: (data: Partial<MembershipCertificateConfig>) => Promise<void>;
   recordPgbProgramAttendance: (
     eventId: string,
     school: MemberSchool,
@@ -441,8 +444,13 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
 };
 
 export const DEFAULT_PROGRAM_CERTIFICATE_CONFIG: ProgramCertificateConfig = {
+  defaultTemplateId: 'warisan-zaitun',
   certificateTitle: 'SIJIL PENYERTAAN PROGRAM',
   certificateSubtitle: 'MAJLIS PENGETUA GURU BESAR SEKOLAH-SEKOLAH ISLAM MALAYSIA (MPGBSIM)',
+  orgRegistrationTagline: '(MPGBSIM • Pertubuhan Kebangsaan Ditubuhkan Pada 23 April 1996)',
+  rosNumberText: 'NO. PENDAFTARAN ROS: PPM-002-10-23041996',
+  basmalahText: 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
+  participantCardLabel: 'Perwakilan Kepimpinan Pendidikan Islam',
   introText: 'Dengan sukacitanya diperakui dan disahkan bahawa',
   participationText: 'telah menghadiri dan menyertai dengan jayanya program:',
   recognitionClause:
@@ -455,6 +463,73 @@ export const DEFAULT_PROGRAM_CERTIFICATE_CONFIG: ProgramCertificateConfig = {
   secondarySignatoryName: 'SETIAUSAHA AGUNG & URUS SETIA',
   secondarySignatoryRole: 'Sekretariat Kebangsaan MPGBSIM',
   secondarySignatureText: 'Urus Setia Pusat',
+  secondarySignatureImageUrl: '',
+  qrSealLabel: 'SIJIL DIGITAL DISAHKAN',
+  footerAddressText:
+    'Sekretariat MPGBSIM: D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Laman Web Rasmi: https://www.mpgbsim.org/',
+  showRosNumber: true,
+  showCertNumber: true,
+  showLogo: true,
+  showBasmalah: true,
+  showIslamicMotif: true,
+  showOrgHeader: true,
+  showParticipantIc: true,
+  showParticipantPosition: true,
+  showParticipantSchool: true,
+  showProgramModeBadge: true,
+  showProgramTheme: true,
+  showProgramDate: true,
+  showProgramVenue: true,
+  showRecognitionClause: true,
+  showChairmanSign: true,
+  showQrSeal: true,
+  showSecondarySign: true,
+  showIssuedDate: true,
+  showFooterAddress: true,
+};
+
+export const DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG: MembershipCertificateConfig = {
+  templateId: 'warisan-zaitun',
+  certificateTitle: 'SIJIL PERAKUAN KEAHLIAN RASMI',
+  certificateSubtitle: 'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
+  orgRegistrationTagline: '(MPGBSIM • Pertubuhan Kebangsaan Ditubuhkan Pada 23 April 1996)',
+  rosNumberText: 'NO. PENDAFTARAN ROS: PPM-002-10-23041996',
+  basmalahText: 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
+  introText:
+    'Dengan ini diperakui dan disahkan bahawa institusi pendidikan Islam yang tersebut di bawah adalah merupakan ahli berdaftar yang sah di bawah Perlembagaan Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM):',
+  institutionCardLabel: 'Institusi Sekolah Ahli Berdaftar',
+  principalBlockLabel: 'Perwakilan Kepimpinan Rasmi (Pengetua / Guru Besar):',
+  activeSessionLabel: 'Status Sesi 2026/2027: AKTIF',
+  recognitionClause:
+    'Institusi ini diiktiraf secara rasmi dalam jaringan kebangsaan MPGBSIM serta layak menikmati semua keistimewaan kepimpinan, pembangunan profesionalisme PGB, penyelarasan kurikulum bersepadu, dan jaringan kerjasama strategik pendidikan Islam seluruh Malaysia.',
+  chairmanName: 'USTAZ MOHAMAD FAIZ BIN AZIZAN',
+  chairmanRole: 'Pengerusi Kebangsaan MPGBSIM',
+  chairmanOrg: 'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
+  chairmanSignatureImageUrl: '',
+  chairmanSignatureText: 'Mohamad Faiz Azizan',
+  secondarySignatoryName: 'SETIAUSAHA AGUNG & URUS SETIA',
+  secondarySignatoryRole: 'Sekretariat Kebangsaan MPGBSIM',
+  secondarySignatureText: 'Urus Setia Pusat',
+  secondarySignatureImageUrl: '',
+  qrSealLabel: 'METERAI DIGITAL DISAHKAN',
+  footerAddressText:
+    'Sekretariat MPGBSIM: D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Laman Web Rasmi: https://www.mpgbsim.org/',
+  showRosNumber: true,
+  showCertNumber: true,
+  showLogo: true,
+  showSchoolLogo: true,
+  showBasmalah: true,
+  showIslamicMotif: true,
+  showOrgHeader: true,
+  showSchoolAddress: true,
+  showFasalClassification: true,
+  showPrincipalBlock: true,
+  showRecognitionClause: true,
+  showChairmanSign: true,
+  showQrSeal: true,
+  showSecondarySign: true,
+  showIssuedDate: true,
+  showFooterAddress: true,
 };
 
 const DUMMY_MOCK_SCHOOL_IDS = new Set(['sch-1', 'sch-2', 'sch-3', 'sch-4', 'sch-5', 'sch-6', 'sch-7', 'sch-8']);
@@ -1782,6 +1857,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         initialSync?.programCertificateConfig ||
         prev?.programCertificateConfig ||
         DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
+      membershipCertificateConfig:
+        cachedCms?.membershipCertificateConfig ||
+        initialSync?.membershipCertificateConfig ||
+        prev?.membershipCertificateConfig ||
+        DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
     };
   };
 
@@ -2214,6 +2294,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               programCertificateConfig: d.programCertificateConfig
                 ? { ...DEFAULT_PROGRAM_CERTIFICATE_CONFIG, ...prev.programCertificateConfig, ...d.programCertificateConfig }
                 : prev.programCertificateConfig || DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
+              membershipCertificateConfig: d.membershipCertificateConfig
+                ? { ...DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG, ...prev.membershipCertificateConfig, ...d.membershipCertificateConfig }
+                : prev.membershipCertificateConfig || DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
             }));
             clearFirestoreQuotaBreaker();
             setIsReadOnlyMode(false);
@@ -2252,6 +2335,30 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       unsubscribes.push(unsubProgramCert);
     } catch (e) {
       console.warn('ProgramCertificateConfig listener setup error:', e);
+    }
+
+    // 0a2. Dedicated Official School Membership Certificate Config listener
+    try {
+      const unsubMembershipCert = onSnapshot(
+        doc(db, 'siteSettings', 'membershipCertificate'),
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const d = docSnap.data() as Partial<MembershipCertificateConfig>;
+            setSiteData((prev) => ({
+              ...prev,
+              membershipCertificateConfig: {
+                ...DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+                ...(prev.membershipCertificateConfig || {}),
+                ...d,
+              },
+            }));
+          }
+        },
+        (err) => handleListenerError('MembershipCertificateConfig', err)
+      );
+      unsubscribes.push(unsubMembershipCert);
+    } catch (e) {
+      console.warn('MembershipCertificateConfig listener setup error:', e);
     }
 
     // 0b. Leadership listener (Authoritative Barisan Kepimpinan Tertinggi MPGBSIM collection)
@@ -2964,6 +3071,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           dashboardConfig: siteData.dashboardConfig,
           birthdaySettings: siteData.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
           programCertificateConfig: siteData.programCertificateConfig || DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
+          membershipCertificateConfig: siteData.membershipCertificateConfig || DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -2975,6 +3083,18 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           doc(db, 'siteSettings', 'programCertificate'),
           {
             ...siteData.programCertificateConfig,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+        count++;
+      }
+
+      if (siteData.membershipCertificateConfig) {
+        await setDoc(
+          doc(db, 'siteSettings', 'membershipCertificate'),
+          {
+            ...siteData.membershipCertificateConfig,
             updatedAt: new Date().toISOString(),
           },
           { merge: true }
@@ -3654,6 +3774,50 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       );
     } catch (e) {
       console.warn('Firestore updateProgramCertificateConfig notice:', e);
+    }
+
+    try {
+      window.dispatchEvent(new Event('mpgbsim_content_updated'));
+    } catch {}
+  };
+
+  const updateMembershipCertificateConfig = async (
+    data: Partial<MembershipCertificateConfig>
+  ): Promise<void> => {
+    const nowIso = new Date().toISOString();
+    let nextConfig: MembershipCertificateConfig = {
+      ...DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+      ...(siteData.membershipCertificateConfig || {}),
+      ...data,
+      updatedAt: nowIso,
+    };
+
+    setSiteData((prev) => {
+      nextConfig = {
+        ...DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+        ...(prev.membershipCertificateConfig || {}),
+        ...data,
+        updatedAt: nowIso,
+      };
+      const nextState = {
+        ...prev,
+        membershipCertificateConfig: nextConfig,
+      };
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
+
+    await saveCmsContentToFirestore({ membershipCertificateConfig: nextConfig });
+
+    try {
+      await ensureFirebaseAuth().catch(() => null);
+      await setDoc(
+        doc(db, 'siteSettings', 'membershipCertificate'),
+        nextConfig,
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore updateMembershipCertificateConfig notice:', e);
     }
 
     try {
@@ -5274,6 +5438,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         updateEventRegistrationStatus,
         deleteEventRegistration,
         updateProgramCertificateConfig,
+        updateMembershipCertificateConfig,
         recordPgbProgramAttendance,
         bulkRecordPgbProgramAttendance,
         toggleProgramCertificateIssued,

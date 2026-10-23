@@ -194,6 +194,7 @@ export interface ProgramEvent {
   order?: number;
   certificateTitleOverride?: string;
   certificateProgramNameOverride?: string;
+  certificateTemplateId?: CertificateTemplateId;
   certificatesEnabled?: boolean;
 }
 
@@ -671,9 +672,21 @@ export interface BirthdaySettingsConfig {
   updatedAt?: string;
 }
 
+export type CertificateTemplateId =
+  | 'warisan-zaitun'
+  | 'andalusia-diraja'
+  | 'biru-ottoman'
+  | 'hijrah-kontemporari'
+  | 'raudhah-amethyst';
+
 export interface ProgramCertificateConfig {
+  defaultTemplateId?: CertificateTemplateId;
   certificateTitle: string;
   certificateSubtitle: string;
+  orgRegistrationTagline?: string;
+  rosNumberText?: string;
+  basmalahText?: string;
+  participantCardLabel?: string;
   introText: string;
   participationText: string;
   recognitionClause: string;
@@ -685,5 +698,72 @@ export interface ProgramCertificateConfig {
   secondarySignatoryName?: string;
   secondarySignatoryRole?: string;
   secondarySignatureText?: string;
+  secondarySignatureImageUrl?: string;
+  qrSealLabel?: string;
+  footerAddressText?: string;
+  // Item Visibility Toggles (Boleh buang / sembunyikan mana-mana item dalam sijil)
+  showRosNumber?: boolean;
+  showCertNumber?: boolean;
+  showLogo?: boolean;
+  showBasmalah?: boolean;
+  showIslamicMotif?: boolean;
+  showOrgHeader?: boolean;
+  showParticipantIc?: boolean;
+  showParticipantPosition?: boolean;
+  showParticipantSchool?: boolean;
+  showProgramModeBadge?: boolean;
+  showProgramTheme?: boolean;
+  showProgramDate?: boolean;
+  showProgramVenue?: boolean;
+  showRecognitionClause?: boolean;
+  showChairmanSign?: boolean;
+  showQrSeal?: boolean;
+  showSecondarySign?: boolean;
+  showIssuedDate?: boolean;
+  showFooterAddress?: boolean;
   updatedAt?: string;
 }
+
+export interface MembershipCertificateConfig {
+  templateId?: CertificateTemplateId;
+  certificateTitle: string;
+  certificateSubtitle: string;
+  orgRegistrationTagline: string;
+  rosNumberText: string;
+  basmalahText: string;
+  introText: string;
+  institutionCardLabel: string;
+  principalBlockLabel: string;
+  activeSessionLabel: string;
+  recognitionClause: string;
+  chairmanName: string;
+  chairmanRole: string;
+  chairmanOrg: string;
+  chairmanSignatureImageUrl?: string;
+  chairmanSignatureText?: string;
+  secondarySignatoryName: string;
+  secondarySignatoryRole: string;
+  secondarySignatureText?: string;
+  secondarySignatureImageUrl?: string;
+  qrSealLabel: string;
+  footerAddressText: string;
+  // Item Visibility Toggles
+  showRosNumber?: boolean;
+  showCertNumber?: boolean;
+  showLogo?: boolean;
+  showSchoolLogo?: boolean;
+  showBasmalah?: boolean;
+  showIslamicMotif?: boolean;
+  showOrgHeader?: boolean;
+  showSchoolAddress?: boolean;
+  showFasalClassification?: boolean;
+  showPrincipalBlock?: boolean;
+  showRecognitionClause?: boolean;
+  showChairmanSign?: boolean;
+  showQrSeal?: boolean;
+  showSecondarySign?: boolean;
+  showIssuedDate?: boolean;
+  showFooterAddress?: boolean;
+  updatedAt?: string;
+}
+

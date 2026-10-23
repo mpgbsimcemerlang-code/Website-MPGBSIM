@@ -3,6 +3,7 @@ import {
   Award,
   CheckCircle2,
   FileDown,
+  Palette,
   Printer,
   QrCode,
   ShieldCheck,
@@ -10,21 +11,37 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { useMemberPortal } from '../../context/MemberPortalContext';
-import { useAdminContent } from '../../context/AdminContentContext';
-import { MemberSchool } from '../../types';
+import {
+  useAdminContent,
+  DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+} from '../../context/AdminContentContext';
+import {
+  CertificateTemplateId,
+  MemberSchool,
+  MembershipCertificateConfig,
+} from '../../types';
 import { Logo } from '../Logo';
 import { downloadElementAsSinglePagePdf } from '../../utils/pdfGenerator';
+import {
+  CERTIFICATE_TEMPLATES,
+  getCertificateTemplateTheme,
+  IslamicCenterWatermark,
+  IslamicCornerOrnaments,
+  IslamicDividerOrnament,
+} from './certificateTemplates';
 
 interface OfficialSchoolCertificateModalProps {
   isOpen: boolean;
   onClose: () => void;
   schoolOverride?: MemberSchool | null;
+  configOverride?: Partial<MembershipCertificateConfig>;
 }
 
 export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateModalProps> = ({
   isOpen,
   onClose,
   schoolOverride,
+  configOverride,
 }) => {
   const { currentUser, registeredSchools, recordAuditLog } = useMemberPortal();
   const { siteData } = useAdminContent();
@@ -33,6 +50,44 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [previewTemplateChoice, setPreviewTemplateChoice] = useState<CertificateTemplateId | null>(
+    null
+  );
+
+  // Merge MembershipCertificateConfig with fallback to ProgramCertificateConfig for Chairman signature if not set
+  const baseConfig: MembershipCertificateConfig = {
+    ...DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+    ...(siteData.programCertificateConfig?.chairmanSignatureImageUrl
+      ? {
+          chairmanSignatureImageUrl:
+            siteData.programCertificateConfig.chairmanSignatureImageUrl,
+        }
+      : {}),
+    ...(siteData.programCertificateConfig?.chairmanName
+      ? { chairmanName: siteData.programCertificateConfig.chairmanName }
+      : {}),
+    ...(siteData.programCertificateConfig?.chairmanRole
+      ? { chairmanRole: siteData.programCertificateConfig.chairmanRole }
+      : {}),
+    ...(siteData.membershipCertificateConfig || {}),
+    ...(configOverride || {}),
+  };
+
+  // If membershipCertificateConfig has empty string for chairmanSignatureImageUrl, still fall back to programCertificateConfig if available unless overridden
+  const effectiveChairmanSigImg =
+    configOverride?.chairmanSignatureImageUrl !== undefined
+      ? configOverride.chairmanSignatureImageUrl
+      : siteData.membershipCertificateConfig?.chairmanSignatureImageUrl ||
+        siteData.programCertificateConfig?.chairmanSignatureImageUrl ||
+        '';
+
+  useEffect(() => {
+    setPreviewTemplateChoice(null);
+  }, [isOpen, baseConfig.templateId]);
+
+  const activeTemplateId: CertificateTemplateId =
+    previewTemplateChoice || baseConfig.templateId || 'warisan-zaitun';
+  const theme = getCertificateTemplateTheme(activeTemplateId);
 
   const allSchools =
     registeredSchools && registeredSchools.length > 0
@@ -114,7 +169,7 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
         ? 'SEKOLAH RENDAH ISLAM I MUSLEH'
         : 'Sekolah Islam Ahli Berdaftar MPGBSIM');
 
-  const principalName = schoolOverride
+  const rawPrincipalName = schoolOverride
     ? schoolOverride.principal || 'Pengetua / Guru Besar'
     : currentUser?.fullName ||
       matchedSchool?.principal ||
@@ -123,6 +178,8 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
         : isPrimaryMusleh
         ? 'Ustaz Abdul Qayyum bin Yaakop'
         : 'Pengetua / Guru Besar');
+
+  const principalName = rawPrincipalName.replace(/\s*\((Pengetua|Guru Besar|Mudir)\)\s*$/i, '').trim();
 
   const position = schoolOverride
     ? schoolOverride.designation ||
@@ -202,6 +259,27 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
       matchedSchool?.logoUrl ||
       '/mpgbsim-official-logo.png';
 
+  // Item Visibility Flags
+  const showRosNumber = baseConfig.showRosNumber !== false;
+  const showCertNumber = baseConfig.showCertNumber !== false;
+  const showLogo = baseConfig.showLogo !== false;
+  const showSchoolLogo = baseConfig.showSchoolLogo !== false;
+  const showBasmalah = baseConfig.showBasmalah !== false;
+  const showIslamicMotif = baseConfig.showIslamicMotif !== false;
+  const showOrgHeader = baseConfig.showOrgHeader !== false;
+  const showSchoolAddress = baseConfig.showSchoolAddress !== false;
+  const showFasalClassification = baseConfig.showFasalClassification !== false;
+  const showPrincipalBlock = baseConfig.showPrincipalBlock !== false;
+  const showRecognitionClause = baseConfig.showRecognitionClause !== false;
+  const showChairmanSign = baseConfig.showChairmanSign !== false;
+  const showQrSeal = baseConfig.showQrSeal !== false;
+  const showSecondarySign = baseConfig.showSecondarySign !== false;
+  const showIssuedDate = baseConfig.showIssuedDate !== false;
+  const showFooterAddress = baseConfig.showFooterAddress !== false;
+
+  const visibleBottomCols =
+    (showChairmanSign ? 1 : 0) + (showQrSeal ? 1 : 0) + (showSecondarySign ? 1 : 0);
+
   useEffect(() => {
     if (!isOpen) return;
     const payload = JSON.stringify({
@@ -226,7 +304,7 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
       {
         width: 220,
         margin: 1,
-        color: { dark: '#064e3b', light: '#ffffff' },
+        color: { dark: theme.qrDarkHex, light: '#ffffff' },
       },
       (err, url) => {
         if (!err && url) setQrCodeUrl(url);
@@ -241,6 +319,7 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
     principalName,
     state,
     joinYear,
+    theme.qrDarkHex,
   ]);
 
   if (!isOpen) return null;
@@ -277,25 +356,44 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-xs flex flex-col overflow-hidden print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible">
+    <div className="fixed inset-0 z-[130] bg-slate-950/90 backdrop-blur-xs flex flex-col overflow-hidden print:p-0 print:bg-white print:static print:inset-auto print:overflow-visible">
       {/* Top Sticky Action Bar (Hidden in Print) */}
       <div className="no-print shrink-0 w-full bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-3.5 text-white shadow-xl z-20">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="max-w-6xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-400/30 shrink-0">
               <Award className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">
-                Pratonton Sijil Perakuan Keahlian Rasmi (Saiz Penuh A4 — 210mm × 297mm)
+                Pratonton {baseConfig.certificateTitle || 'Sijil Perakuan Keahlian Rasmi'} (Saiz Penuh A4 — 210mm × 297mm)
               </h3>
               <p className="text-[11px] text-slate-400">
-                Tatal (scroll) ke bawah untuk menyemak keseluruhan sijil sebelum muat turun PDF atau cetak penuh 1 muka surat A4.
+                Institusi: <strong className="text-amber-300">{schoolName}</strong> ({effectiveCode})
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Template Selector in Preview Bar */}
+            <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5">
+              <Palette className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <select
+                value={activeTemplateId}
+                onChange={(e) =>
+                  setPreviewTemplateChoice(e.target.value as CertificateTemplateId)
+                }
+                className="bg-transparent text-xs font-bold text-amber-200 focus:outline-hidden cursor-pointer"
+                title="Tukar Rekaan Template Sijil"
+              >
+                {CERTIFICATE_TEMPLATES.map((tpl) => (
+                  <option key={tpl.id} value={tpl.id} className="bg-slate-900 text-white">
+                    {tpl.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <button
               type="button"
               disabled={isDownloadingPdf}
@@ -342,7 +440,7 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
         </div>
 
         {downloadSuccess && (
-          <div className="max-w-5xl mx-auto mt-3 p-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-between shadow-md">
+          <div className="max-w-6xl mx-auto mt-3 p-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>
@@ -362,100 +460,164 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
         <div
           ref={certRef}
           id="official-profile-print-area"
-          className="shrink-0 w-[794px] min-h-[1123px] bg-white text-slate-900 rounded-xl shadow-2xl p-6 border border-slate-200 flex flex-col justify-between relative box-border"
+          className={`shrink-0 w-[794px] min-h-[1123px] ${theme.sheetBgClass} text-slate-900 rounded-xl shadow-2xl p-6 border border-slate-200 flex flex-col justify-between relative box-border`}
         >
           {/* Ornamental Double Border Frame filling Full A4 Height */}
-          <div className="flex-1 border-[3.5px] border-teal-900 rounded-xl p-2 bg-gradient-to-b from-amber-50/25 via-white to-teal-50/25 flex flex-col">
-            <div className="flex-1 border-[1.5px] border-amber-500/80 rounded-lg px-8 py-7 relative flex flex-col justify-between">
-              {/* Corner Accents */}
-              <div className="w-5 h-5 border-t-2 border-l-2 border-amber-600 absolute top-3 left-3" />
-              <div className="w-5 h-5 border-t-2 border-r-2 border-amber-600 absolute top-3 right-3" />
-              <div className="w-5 h-5 border-b-2 border-l-2 border-amber-600 absolute bottom-3 left-3" />
-              <div className="w-5 h-5 border-b-2 border-r-2 border-amber-600 absolute bottom-3 right-3" />
+          <div className={`flex-1 rounded-xl p-2 flex flex-col ${theme.outerBorderClass}`}>
+            <div
+              className={`flex-1 rounded-lg px-8 py-7 relative flex flex-col justify-between overflow-hidden ${theme.innerBorderClass}`}
+            >
+              {/* Subtle Center Islamic Geometric Rosette Watermark */}
+              <IslamicCenterWatermark
+                primaryHex={theme.ornamentColorHex}
+                secondaryHex={theme.ornamentSecondaryHex}
+                showMotif={showIslamicMotif}
+              />
+
+              {/* Islamic Geometric Corner Ornaments */}
+              <IslamicCornerOrnaments
+                primaryHex={theme.ornamentColorHex}
+                secondaryHex={theme.ornamentSecondaryHex}
+                showMotif={showIslamicMotif}
+              />
 
               {/* TOP SECTION: Serial & Reg No Bar + Crest + Organization Title */}
-              <div>
-                <div className="flex items-center justify-between text-[10.5px] font-mono text-slate-500 pb-3.5 border-b border-slate-200">
-                  <span>NO. PENDAFTARAN ROS: PPM-002-10-23041996</span>
-                  <span className="font-bold text-teal-900">
-                    NO. SIJIL: SIJIL/{membershipNumber}
-                  </span>
-                </div>
-
-                <div className="mt-6 flex flex-col items-center text-center">
-                  <div className="flex items-center justify-center gap-4 mb-3">
-                    <Logo showText={false} size="lg" className="shrink-0" />
-                    {logoUrl && logoUrl !== '/mpgbsim-official-logo.png' && (
-                      <img
-                        src={logoUrl}
-                        alt="Logo Sekolah"
-                        crossOrigin="anonymous"
-                        className="w-16 h-16 object-contain rounded-xl border border-slate-200 p-1 bg-white"
-                      />
+              <div className="relative z-10">
+                {(showRosNumber || showCertNumber) && (
+                  <div
+                    className={`flex items-center justify-between text-[10.5px] font-mono pb-3.5 border-b ${theme.serialTextClass}`}
+                  >
+                    <span>
+                      {showRosNumber
+                        ? baseConfig.rosNumberText || 'NO. PENDAFTARAN ROS: PPM-002-10-23041996'
+                        : ''}
+                    </span>
+                    {showCertNumber && (
+                      <span className={`font-bold ${theme.serialHighlightClass}`}>
+                        NO. SIJIL: SIJIL/{membershipNumber}
+                      </span>
                     )}
                   </div>
+                )}
 
-                  <p
-                    className="text-lg font-bold text-teal-900"
-                    style={{ fontFamily: "'Amiri', serif" }}
-                  >
-                    بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
-                  </p>
+                <div className="mt-5 flex flex-col items-center text-center">
+                  {(showLogo || (showSchoolLogo && logoUrl && logoUrl !== '/mpgbsim-official-logo.png')) && (
+                    <div className="flex items-center justify-center gap-4 mb-2.5">
+                      {showLogo && <Logo showText={false} size="lg" className="shrink-0" />}
+                      {showSchoolLogo && logoUrl && logoUrl !== '/mpgbsim-official-logo.png' && (
+                        <img
+                          src={logoUrl}
+                          alt="Logo Sekolah"
+                          crossOrigin="anonymous"
+                          className="w-16 h-16 object-contain rounded-xl border border-slate-200 p-1 bg-white"
+                        />
+                      )}
+                    </div>
+                  )}
 
-                  <h1 className="text-xl font-black text-teal-950 uppercase tracking-wide mt-1.5">
-                    Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia
-                  </h1>
-                  <p className="text-xs font-bold text-amber-800 uppercase tracking-widest mt-1">
-                    (MPGBSIM • Pertubuhan Kebangsaan Ditubuhkan Pada 23 April 1996)
-                  </p>
+                  {showBasmalah && (
+                    <p
+                      className={`text-lg font-bold ${theme.basmalahColorClass}`}
+                      style={{ fontFamily: "'Amiri', serif" }}
+                    >
+                      {baseConfig.basmalahText || 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ'}
+                    </p>
+                  )}
+
+                  <IslamicDividerOrnament
+                    primaryHex={theme.ornamentColorHex}
+                    secondaryHex={theme.ornamentSecondaryHex}
+                    showMotif={showIslamicMotif}
+                  />
+
+                  {showOrgHeader && (
+                    <>
+                      <h1
+                        className={`text-xl font-black uppercase tracking-wide mt-1 ${theme.orgTitleClass}`}
+                      >
+                        {baseConfig.certificateSubtitle ||
+                          'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia'}
+                      </h1>
+                      {baseConfig.orgRegistrationTagline !== '' && (
+                        <p
+                          className={`text-xs font-bold uppercase tracking-widest mt-1 ${theme.orgSubClass}`}
+                        >
+                          {baseConfig.orgRegistrationTagline ||
+                            '(MPGBSIM • Pertubuhan Kebangsaan Ditubuhkan Pada 23 April 1996)'}
+                        </p>
+                      )}
+                    </>
+                  )}
 
                   {/* Main Certificate Banner */}
-                  <div className="mt-6 px-8 py-3 rounded-xl bg-gradient-to-r from-teal-950 via-teal-900 to-teal-950 text-white shadow-sm border border-amber-400/60">
+                  <div
+                    className={`mt-5 px-8 py-3 rounded-xl text-white shadow-sm border ${theme.titleBannerBgClass}`}
+                  >
                     <h2
-                      className="text-2xl font-bold tracking-widest uppercase text-amber-300"
+                      className={`text-2xl font-bold tracking-widest uppercase ${theme.titleBannerTextClass}`}
                       style={{ fontFamily: "'Cinzel', serif" }}
                     >
-                      Sijil Perakuan Keahlian Rasmi
+                      {baseConfig.certificateTitle || 'Sijil Perakuan Keahlian Rasmi'}
                     </h2>
                   </div>
                 </div>
               </div>
 
               {/* MIDDLE SECTION: Proclamation, School Highlight Box, Principal & Constitutional Rights */}
-              <div className="my-6 flex flex-col items-center text-center">
-                <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
-                  Dengan ini diperakui dan disahkan bahawa institusi pendidikan Islam yang tersebut di bawah adalah merupakan ahli berdaftar yang sah di bawah Perlembagaan Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM):
-                </p>
+              <div className="my-5 flex flex-col items-center text-center relative z-10">
+                {baseConfig.introText !== '' && (
+                  <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
+                    {baseConfig.introText}
+                  </p>
+                )}
 
                 {/* School Name & Code Highlight Box */}
-                <div className="mt-5 w-full p-6 rounded-2xl bg-slate-50 border-2 border-teal-800/30 shadow-2xs">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-teal-700 block">
-                    Institusi Sekolah Ahli Berdaftar
-                  </span>
-                  <h3 className="text-2xl font-black text-slate-950 uppercase tracking-tight mt-1.5">
+                <div
+                  className={`mt-5 w-full p-6 rounded-2xl shadow-2xs ${theme.primaryCardBgClass} ${theme.primaryCardBorderClass}`}
+                >
+                  {baseConfig.institutionCardLabel !== '' && (
+                    <span
+                      className={`text-[11px] font-bold uppercase tracking-widest block ${theme.primaryCardKickerClass}`}
+                    >
+                      {baseConfig.institutionCardLabel || 'Institusi Sekolah Ahli Berdaftar'}
+                    </span>
+                  )}
+                  <h3
+                    className={`text-2xl font-black uppercase tracking-tight mt-1.5 ${theme.primaryCardTitleClass}`}
+                  >
                     {schoolName}
                   </h3>
-                  <p className="text-xs text-slate-600 mt-1.5">{address}</p>
+                  {showSchoolAddress && address && (
+                    <p className="text-xs text-slate-600 mt-1.5">{address}</p>
+                  )}
 
-                  <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-3 gap-3 text-xs">
+                  <div
+                    className={`mt-4 pt-4 border-t border-slate-200 grid ${
+                      showFasalClassification ? 'grid-cols-3' : 'grid-cols-2'
+                    } gap-3 text-xs`}
+                  >
                     <div>
                       <span className="text-[10px] text-slate-400 block uppercase">
                         Kod Pendaftaran Sekolah
                       </span>
-                      <strong className="font-mono font-bold text-teal-900 text-sm">
+                      <strong
+                        className={`font-mono font-bold text-sm ${theme.primaryCardAccentTextClass}`}
+                      >
                         {effectiveCode}
                       </strong>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block uppercase">
-                        Klasifikasi Fasal 4
-                      </span>
-                      <strong className="font-bold text-amber-800 text-sm">
-                        {membershipType === 'Ahli Bersekutu'
-                          ? 'Ahli Bersekutu (Fasal 4(3))'
-                          : 'Ahli Biasa (Fasal 4(2))'}
-                      </strong>
-                    </div>
+                    {showFasalClassification && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block uppercase">
+                          Klasifikasi Fasal 4
+                        </span>
+                        <strong className="font-bold text-amber-800 text-sm">
+                          {membershipType === 'Ahli Bersekutu'
+                            ? 'Ahli Bersekutu (Fasal 4(3))'
+                            : 'Ahli Biasa (Fasal 4(2))'}
+                        </strong>
+                      </div>
+                    )}
                     <div>
                       <span className="text-[10px] text-slate-400 block uppercase">
                         Negeri & Kategori
@@ -468,114 +630,172 @@ export const OfficialSchoolCertificateModal: React.FC<OfficialSchoolCertificateM
                 </div>
 
                 {/* Principal / Representative Block */}
-                <div className="mt-5 w-full grid grid-cols-3 gap-4 text-left p-4 rounded-xl bg-teal-50/60 border border-teal-200/80 text-xs">
-                  <div className="col-span-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                      Perwakilan Kepimpinan Rasmi (Pengetua / Guru Besar):
-                    </span>
-                    <strong className="text-base font-extrabold text-teal-950 block mt-0.5">
-                      {principalName}
-                    </strong>
-                    <span className="text-xs text-teal-800 font-semibold">
-                      Jawatan: {position}
-                    </span>
+                {showPrincipalBlock && (
+                  <div className="mt-5 w-full grid grid-cols-3 gap-4 text-left p-4 rounded-xl bg-teal-50/60 border border-teal-200/80 text-xs">
+                    <div className="col-span-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                        {baseConfig.principalBlockLabel ||
+                          'Perwakilan Kepimpinan Rasmi (Pengetua / Guru Besar):'}
+                      </span>
+                      <strong className="text-base font-extrabold text-teal-950 block mt-0.5">
+                        {principalName}
+                      </strong>
+                      <span className="text-xs text-teal-800 font-semibold">
+                        Jawatan: {position}
+                      </span>
+                    </div>
+                    <div className="text-right flex flex-col justify-center">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                        Tahun Mula Keahlian:
+                      </span>
+                      <strong className="text-base font-mono font-black text-amber-800">
+                        Tahun {joinYear}
+                      </strong>
+                      {baseConfig.activeSessionLabel !== '' && (
+                        <span className="text-[11px] text-emerald-700 font-bold">
+                          {baseConfig.activeSessionLabel || 'Status Sesi 2026/2027: AKTIF'}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right flex flex-col justify-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                      Tahun Mula Keahlian:
-                    </span>
-                    <strong className="text-base font-mono font-black text-amber-800">
-                      Tahun {joinYear}
-                    </strong>
-                    <span className="text-[11px] text-emerald-700 font-bold">
-                      Status Sesi 2026/2027: AKTIF
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 {/* Constitutional Recognition Clause */}
-                <div className="mt-5 w-full p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/70 text-[11px] text-slate-600 leading-relaxed">
-                  Institusi ini diiktiraf secara rasmi dalam jaringan kebangsaan MPGBSIM serta layak menikmati semua keistimewaan kepimpinan, pembangunan profesionalisme PGB, penyelarasan kurikulum bersepadu, dan jaringan kerjasama strategik pendidikan Islam seluruh Malaysia.
-                </div>
+                {showRecognitionClause && baseConfig.recognitionClause !== '' && (
+                  <div
+                    className={`mt-5 w-full p-3.5 rounded-xl border text-[11px] leading-relaxed ${theme.clauseBgClass} ${theme.clauseBorderClass} ${theme.clauseTextClass}`}
+                  >
+                    {baseConfig.recognitionClause}
+                  </div>
+                )}
               </div>
 
               {/* BOTTOM SECTION: Signatures, Official Seal, QR Verification & Footnote */}
-              <div>
-                <div className="pt-5 border-t-2 border-slate-200 grid grid-cols-3 gap-4 items-end text-center">
-                  {/* Left: Pengerusi Signature */}
-                  <div className="flex flex-col items-center">
-                    <div
-                      className="text-lg text-teal-900 italic font-serif mb-1 select-none"
-                      style={{ fontFamily: "'Amiri', serif" }}
-                    >
-                      Mohamad Faiz Azizan
-                    </div>
-                    <div className="w-44 border-b border-slate-400 mb-1.5" />
-                    <strong className="text-[11.5px] font-extrabold text-slate-900 block">
-                      USTAZ MOHAMAD FAIZ BIN AZIZAN
-                    </strong>
-                    <span className="text-[10px] text-teal-800 font-semibold block">
-                      Pengerusi Kebangsaan MPGBSIM
-                    </span>
-                    <span className="text-[9px] text-slate-500">
-                      Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia
-                    </span>
-                  </div>
+              <div className="relative z-10">
+                {visibleBottomCols > 0 && (
+                  <div
+                    className={`pt-5 border-t-2 border-slate-200 grid ${
+                      visibleBottomCols === 1
+                        ? 'grid-cols-1'
+                        : visibleBottomCols === 2
+                        ? 'grid-cols-2'
+                        : 'grid-cols-3'
+                    } gap-4 items-end text-center`}
+                  >
+                    {/* Left: Pengerusi Signature */}
+                    {showChairmanSign && (
+                      <div className="flex flex-col items-center">
+                        <div className="h-16 flex items-center justify-center mb-1">
+                          {effectiveChairmanSigImg ? (
+                            <img
+                              src={effectiveChairmanSigImg}
+                              alt="Tandatangan Digital Pengerusi"
+                              crossOrigin="anonymous"
+                              className="max-h-16 max-w-[180px] object-contain select-none"
+                            />
+                          ) : (
+                            <div
+                              className={`text-xl italic font-serif select-none ${theme.signCalligraphyClass}`}
+                              style={{ fontFamily: "'Amiri', serif" }}
+                            >
+                              {baseConfig.chairmanSignatureText || 'Mohamad Faiz Azizan'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-44 border-b border-slate-400 mb-1.5" />
+                        <strong className="text-[11.5px] font-extrabold text-slate-900 uppercase block">
+                          {baseConfig.chairmanName || 'USTAZ MOHAMAD FAIZ BIN AZIZAN'}
+                        </strong>
+                        <span className={`text-[10px] font-semibold block ${theme.signRoleClass}`}>
+                          {baseConfig.chairmanRole || 'Pengerusi Kebangsaan MPGBSIM'}
+                        </span>
+                        {baseConfig.chairmanOrg !== '' && (
+                          <span className="text-[9px] text-slate-500">
+                            {baseConfig.chairmanOrg ||
+                              'Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia'}
+                          </span>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Center: Official Seal & QR Code */}
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="p-2 rounded-xl bg-white border-2 border-amber-500/70 shadow-xs">
-                      {qrCodeUrl ? (
-                        <img
-                          src={qrCodeUrl}
-                          alt="QR Pengesahan Sijil"
-                          className="w-20 h-20 object-contain"
-                        />
-                      ) : (
-                        <QrCode className="w-16 h-16 text-teal-950" />
-                      )}
-                    </div>
-                    <div className="mt-1.5 inline-flex items-center gap-1 text-[9.5px] font-bold text-teal-900">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>METERAI DIGITAL DISAHKAN</span>
-                    </div>
-                    <span className="text-[8.5px] font-mono text-slate-500">
-                      {membershipNumber}
-                    </span>
-                  </div>
+                    {/* Center: Official Seal & QR Code */}
+                    {showQrSeal && (
+                      <div className="flex flex-col items-center justify-center">
+                        <div
+                          className={`p-2 rounded-xl bg-white border-2 shadow-xs ${theme.qrBorderClass}`}
+                        >
+                          {qrCodeUrl ? (
+                            <img
+                              src={qrCodeUrl}
+                              alt="QR Pengesahan Sijil"
+                              className="w-20 h-20 object-contain"
+                            />
+                          ) : (
+                            <QrCode className="w-16 h-16 text-teal-950" />
+                          )}
+                        </div>
+                        <div
+                          className={`mt-1.5 inline-flex items-center gap-1 text-[9.5px] font-bold ${theme.qrBadgeTextClass}`}
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{baseConfig.qrSealLabel || 'METERAI DIGITAL DISAHKAN'}</span>
+                        </div>
+                        <span className="text-[8.5px] font-mono text-slate-500">
+                          {membershipNumber}
+                        </span>
+                      </div>
+                    )}
 
-                  {/* Right: Setiausaha Agung / Urus Setia */}
-                  <div className="flex flex-col items-center">
-                    <div
-                      className="text-lg text-teal-900 italic font-serif mb-1 select-none"
-                      style={{ fontFamily: "'Amiri', serif" }}
-                    >
-                      Urus Setia Pusat
-                    </div>
-                    <div className="w-44 border-b border-slate-400 mb-1.5" />
-                    <strong className="text-[11.5px] font-extrabold text-slate-900 block">
-                      SETIAUSAHA AGUNG & URUS SETIA
-                    </strong>
-                    <span className="text-[10px] text-teal-800 font-semibold block">
-                      Sekretariat Kebangsaan MPGBSIM
-                    </span>
-                    <span className="text-[9px] text-slate-500">
-                      Tarikh Keluaran:{' '}
-                      {new Intl.DateTimeFormat('ms-MY', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      }).format(new Date())}
-                    </span>
+                    {/* Right: Setiausaha Agung / Urus Setia */}
+                    {showSecondarySign && (
+                      <div className="flex flex-col items-center">
+                        <div className="h-16 flex items-center justify-center mb-1">
+                          {baseConfig.secondarySignatureImageUrl ? (
+                            <img
+                              src={baseConfig.secondarySignatureImageUrl}
+                              alt="Tandatangan Setiausaha"
+                              crossOrigin="anonymous"
+                              className="max-h-16 max-w-[180px] object-contain select-none"
+                            />
+                          ) : (
+                            <div
+                              className={`text-xl italic font-serif select-none ${theme.signCalligraphyClass}`}
+                              style={{ fontFamily: "'Amiri', serif" }}
+                            >
+                              {baseConfig.secondarySignatureText || 'Urus Setia Pusat'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-44 border-b border-slate-400 mb-1.5" />
+                        <strong className="text-[11.5px] font-extrabold text-slate-900 uppercase block">
+                          {baseConfig.secondarySignatoryName || 'SETIAUSAHA AGUNG & URUS SETIA'}
+                        </strong>
+                        <span className={`text-[10px] font-semibold block ${theme.signRoleClass}`}>
+                          {baseConfig.secondarySignatoryRole || 'Sekretariat Kebangsaan MPGBSIM'}
+                        </span>
+                        {showIssuedDate && (
+                          <span className="text-[9px] text-slate-500">
+                            Tarikh Keluaran:{' '}
+                            {new Intl.DateTimeFormat('ms-MY', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            }).format(new Date())}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
 
                 {/* Bottom Address Footnote */}
-                <div className="mt-4 pt-2.5 border-t border-slate-200 text-center">
-                  <p className="text-[9px] text-slate-500">
-                    Sekretariat MPGBSIM: D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Laman Web Rasmi: https://www.mpgbsim.org/
-                  </p>
-                </div>
+                {showFooterAddress && baseConfig.footerAddressText !== '' && (
+                  <div className="mt-4 pt-2.5 border-t border-slate-200 text-center">
+                    <p className="text-[9px] text-slate-500">
+                      {baseConfig.footerAddressText}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

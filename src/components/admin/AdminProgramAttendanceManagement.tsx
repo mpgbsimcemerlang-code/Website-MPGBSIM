@@ -1,23 +1,23 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Award,
+  Building2,
   Calendar,
   Check,
   CheckCircle2,
-  Download,
+  Copy,
   Edit3,
   Eye,
-  FileCheck,
   FileSpreadsheet,
-  Filter,
+  LayoutTemplate,
   MapPin,
+  Palette,
   PenTool,
   Plus,
-  RefreshCw,
   Save,
   Search,
-  Send,
   ShieldCheck,
+  Sliders,
   Sparkles,
   Trash2,
   Upload,
@@ -28,17 +28,23 @@ import {
 import {
   useAdminContent,
   DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
+  DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
 } from '../../context/AdminContentContext';
 import {
+  CertificateTemplateId,
   EventRegistration,
   MemberSchool,
+  MembershipCertificateConfig,
   ProgramCertificateConfig,
   ProgramEvent,
 } from '../../types';
 import { OfficialProgramCertificateModal } from '../portal/OfficialProgramCertificateModal';
+import { OfficialSchoolCertificateModal } from '../portal/OfficialSchoolCertificateModal';
+import { CERTIFICATE_TEMPLATES } from '../portal/certificateTemplates';
 
 interface AdminProgramAttendanceManagementProps {
   initialEventId?: string;
+  initialTab?: 'attendance' | 'cert-settings' | 'membership-cert';
 }
 
 interface CombinedPgbAttendanceRow {
@@ -63,7 +69,7 @@ interface CombinedPgbAttendanceRow {
 
 export const AdminProgramAttendanceManagement: React.FC<
   AdminProgramAttendanceManagementProps
-> = ({ initialEventId }) => {
+> = ({ initialEventId, initialTab = 'attendance' }) => {
   const {
     siteData,
     eventRegistrations,
@@ -73,6 +79,7 @@ export const AdminProgramAttendanceManagement: React.FC<
     toggleProgramCertificateIssued,
     bulkIssueProgramCertificates,
     updateProgramCertificateConfig,
+    updateMembershipCertificateConfig,
     updateEventRegistrationStatus,
     registerForEvent,
   } = useAdminContent();
@@ -80,7 +87,10 @@ export const AdminProgramAttendanceManagement: React.FC<
   const programs: ProgramEvent[] = siteData.programs || [];
   const schools: MemberSchool[] = siteData.memberSchools || [];
 
-  const [activeView, setActiveView] = useState<'attendance' | 'cert-settings'>('attendance');
+  const [activeView, setActiveView] = useState<
+    'attendance' | 'cert-settings' | 'membership-cert'
+  >(initialTab);
+
   const [selectedEventId, setSelectedEventId] = useState<string>(() => {
     if (initialEventId && programs.some((p) => p.id === initialEventId)) {
       return initialEventId;
@@ -112,18 +122,23 @@ export const AdminProgramAttendanceManagement: React.FC<
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Preview certificate modal state
+  // Preview certificate modals state
   const [previewReg, setPreviewReg] = useState<EventRegistration | null>(null);
+  const [isMembershipPreviewOpen, setIsMembershipPreviewOpen] = useState(false);
 
-  // Per-program custom certificate title state
+  // Per-program custom certificate title & template state
   const [eventCertTitleOverride, setEventCertTitleOverride] = useState<string>('');
+  const [eventTemplateOverride, setEventTemplateOverride] = useState<
+    CertificateTemplateId | ''
+  >('');
   const [isSavingEventTitle, setIsSavingEventTitle] = useState(false);
 
   useEffect(() => {
     setEventCertTitleOverride(selectedProgram?.certificateTitleOverride || '');
+    setEventTemplateOverride(selectedProgram?.certificateTemplateId || '');
   }, [selectedProgram]);
 
-  // Global Certificate Config Form State
+  // Global Program Certificate Config Form State
   const currentCertConfig: ProgramCertificateConfig = useMemo(
     () => ({
       ...DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
@@ -136,11 +151,37 @@ export const AdminProgramAttendanceManagement: React.FC<
   const [isSavingCertConfig, setIsSavingCertConfig] = useState(false);
   const sigFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Interactive Signature Pad Canvas State
+  // Official School Membership Certificate Config Form State
+  const currentMembershipCertConfig: MembershipCertificateConfig = useMemo(
+    () => ({
+      ...DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+      ...(siteData.programCertificateConfig?.chairmanSignatureImageUrl
+        ? {
+            chairmanSignatureImageUrl:
+              siteData.programCertificateConfig.chairmanSignatureImageUrl,
+          }
+        : {}),
+      ...(siteData.membershipCertificateConfig || {}),
+    }),
+    [siteData.membershipCertificateConfig, siteData.programCertificateConfig]
+  );
+
+  const [membershipCertForm, setMembershipCertForm] = useState<MembershipCertificateConfig>(
+    currentMembershipCertConfig
+  );
+  const [isSavingMembershipCert, setIsSavingMembershipCert] = useState(false);
+  const memSigFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Interactive Signature Pad Canvas State (Program Cert)
   const [sigMode, setSigMode] = useState<'upload' | 'draw'>('upload');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [penColor, setPenColor] = useState<'#0f172a' | '#134e4a' | '#1e3a8a'>('#0f172a');
+
+  // Interactive Signature Pad Canvas State (Membership Cert)
+  const [memSigMode, setMemSigMode] = useState<'upload' | 'draw'>('upload');
+  const memCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isMemDrawing, setIsMemDrawing] = useState(false);
 
   // Walk-in / Manual PGB Attendance Modal
   const [isWalkInOpen, setIsWalkInOpen] = useState(false);
@@ -155,6 +196,10 @@ export const AdminProgramAttendanceManagement: React.FC<
   useEffect(() => {
     setCertForm(currentCertConfig);
   }, [currentCertConfig]);
+
+  useEffect(() => {
+    setMembershipCertForm(currentMembershipCertConfig);
+  }, [currentMembershipCertConfig]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -184,7 +229,11 @@ export const AdminProgramAttendanceManagement: React.FC<
         if (r.schoolId && school.id && r.schoolId === school.id) return true;
         if (normCode && r.schoolCode && r.schoolCode.trim().toUpperCase() === normCode) return true;
         if (normName && r.schoolName && r.schoolName.trim().toLowerCase() === normName) return true;
-        if (normEmail && r.participantEmail && r.participantEmail.trim().toLowerCase() === normEmail)
+        if (
+          normEmail &&
+          r.participantEmail &&
+          r.participantEmail.trim().toLowerCase() === normEmail
+        )
           return true;
         return false;
       });
@@ -221,7 +270,6 @@ export const AdminProgramAttendanceManagement: React.FC<
       });
     }
 
-    // Also include any eventRegistrations that didn't match a school in memberSchools (e.g. walk-in / SLT)
     for (const reg of evRegs) {
       if (matchedRegIds.has(reg.id)) continue;
       rows.push({
@@ -244,7 +292,6 @@ export const AdminProgramAttendanceManagement: React.FC<
       });
     }
 
-    // Sort: Attended first, then Registered, then Alphabetical by School Name
     return rows.sort((a, b) => {
       if (a.isAttended !== b.isAttended) return a.isAttended ? -1 : 1;
       if (a.isRegistered !== b.isRegistered) return a.isRegistered ? -1 : 1;
@@ -281,7 +328,6 @@ export const AdminProgramAttendanceManagement: React.FC<
     });
   }, [combinedRows, stateFilter, statusFilter, searchTerm]);
 
-  // Metrics for currently selected program
   const totalPgbCount = combinedRows.length;
   const registeredCount = combinedRows.filter((r) => r.isRegistered).length;
   const attendedCount = combinedRows.filter((r) => r.isAttended).length;
@@ -408,44 +454,22 @@ export const AdminProgramAttendanceManagement: React.FC<
     }
   };
 
-  // Bulk mark currently filtered schools as attended + issue certificates
-  const handleBulkAttendFilteredSchools = async () => {
-    if (!selectedProgram) return;
-    const targetSchools = filteredRows
-      .filter((r) => !r.isAttended && r.school)
-      .map((r) => r.school!);
-    if (targetSchools.length === 0) {
-      showToast('Semua PGB dalam senarai tapisan semasa telah ditandakan hadir.');
-      return;
-    }
-    setIsBulkProcessing(true);
-    try {
-      await bulkRecordPgbProgramAttendance(
-        selectedProgram.id,
-        targetSchools,
-        true,
-        autoIssueOnAttend
-      );
-      showToast(
-        `Berjaya merekodkan kehadiran${autoIssueOnAttend ? ' & mengeluarkan sijil' : ''} bagi ${targetSchools.length} PGB!`
-      );
-    } finally {
-      setIsBulkProcessing(false);
-    }
-  };
-
-  // Save custom certificate title override for the selected program
-  const handleSaveEventCertTitleOverride = async () => {
+  // Save custom certificate title & template override for the selected program
+  const handleSaveEventCertSettings = async () => {
     if (!selectedProgram) return;
     setIsSavingEventTitle(true);
     try {
       await updateProgram(selectedProgram.id, {
         certificateTitleOverride: eventCertTitleOverride.trim(),
+        certificateTemplateId: (eventTemplateOverride || undefined) as
+          | CertificateTemplateId
+          | undefined,
       });
+      const tplObj = CERTIFICATE_TEMPLATES.find((t) => t.id === eventTemplateOverride);
       showToast(
-        eventCertTitleOverride.trim()
-          ? `Tajuk sijil khas "${eventCertTitleOverride.trim()}" disimpan untuk program ini.`
-          : 'Tajuk sijil program dikembalikan kepada tajuk sijil utama (default).'
+        `Tetapan khas sijil bagi program "${selectedProgram.title}" disimpan (${
+          tplObj ? tplObj.name : 'Ikut Template Default'
+        }).`
       );
     } finally {
       setIsSavingEventTitle(false);
@@ -532,8 +556,11 @@ export const AdminProgramAttendanceManagement: React.FC<
     }
   };
 
-  // Convert uploaded signature image to clean transparent PNG (removes near-white background automatically)
-  const processSignatureImageFile = (file: File) => {
+  // Convert uploaded signature image to clean transparent PNG
+  const processSignatureImageFile = (
+    file: File,
+    target: 'program' | 'membership'
+  ) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
@@ -557,7 +584,6 @@ export const AdminProgramAttendanceManagement: React.FC<
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, w, h);
 
-        // Make white / near-white pixels transparent so the signature blends cleanly on certificates
         const imgData = ctx.getImageData(0, 0, w, h);
         const data = imgData.data;
         for (let i = 0; i < data.length; i += 4) {
@@ -570,22 +596,31 @@ export const AdminProgramAttendanceManagement: React.FC<
         }
         ctx.putImageData(imgData, 0, 0);
         const pngDataUrl = canvas.toDataURL('image/png');
-        setCertForm((prev) => ({
-          ...prev,
-          chairmanSignatureImageUrl: pngDataUrl,
-        }));
-        showToast('Imej tandatangan digital Pengerusi dimuat naik (latar putih dijadikan lutsinar).');
+        if (target === 'program') {
+          setCertForm((prev) => ({
+            ...prev,
+            chairmanSignatureImageUrl: pngDataUrl,
+          }));
+        } else {
+          setMembershipCertForm((prev) => ({
+            ...prev,
+            chairmanSignatureImageUrl: pngDataUrl,
+          }));
+        }
+        showToast(
+          'Imej tandatangan digital Pengerusi dimuat naik (latar putih dijadikan lutsinar).'
+        );
       };
       img.src = ev.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
 
-  // Interactive Signature Pad Drawing Handlers
+  // Interactive Signature Pad Drawing Helpers
   const getCanvasCoords = (
+    canvas: HTMLCanvasElement | null,
     e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
   ) => {
-    const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -603,57 +638,61 @@ export const AdminProgramAttendanceManagement: React.FC<
     };
   };
 
-  const startDrawing = (
+  const startDrawingOnCanvas = (
+    canvas: HTMLCanvasElement | null,
+    setDrawingState: (val: boolean) => void,
     e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
   ) => {
-    const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-    const { x, y } = getCanvasCoords(e);
+    const { x, y } = getCanvasCoords(canvas, e);
     ctx.strokeStyle = penColor;
     ctx.lineWidth = 2.8;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.moveTo(x, y);
-    setIsDrawing(true);
+    setDrawingState(true);
   };
 
-  const drawMove = (
+  const drawMoveOnCanvas = (
+    canvas: HTMLCanvasElement | null,
+    drawingState: boolean,
     e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
   ) => {
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
+    if (!drawingState) return;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
     if ('touches' in e) {
       e.preventDefault();
     }
-    const { x, y } = getCanvasCoords(e);
+    const { x, y } = getCanvasCoords(canvas, e);
     ctx.lineTo(x, y);
     ctx.stroke();
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  const clearSignatureCanvas = () => {
-    const canvas = canvasRef.current;
+  const clearCanvasRef = (canvas: HTMLCanvasElement | null) => {
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  const applyDrawnSignature = () => {
-    const canvas = canvasRef.current;
+  const applyDrawnSignature = (target: 'program' | 'membership') => {
+    const canvas = target === 'program' ? canvasRef.current : memCanvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/png');
-    setCertForm((prev) => ({
-      ...prev,
-      chairmanSignatureImageUrl: dataUrl,
-    }));
-    showToast('Tandatangan digital lukisan telah diterapkan! Sila klik Simpan Tetapan Sijil.');
+    if (target === 'program') {
+      setCertForm((prev) => ({
+        ...prev,
+        chairmanSignatureImageUrl: dataUrl,
+      }));
+    } else {
+      setMembershipCertForm((prev) => ({
+        ...prev,
+        chairmanSignatureImageUrl: dataUrl,
+      }));
+    }
+    showToast('Tandatangan digital lukisan telah diterapkan! Sila klik Simpan Tetapan.');
   };
 
   const handleSaveCertConfig = async (e: React.FormEvent) => {
@@ -662,10 +701,23 @@ export const AdminProgramAttendanceManagement: React.FC<
     try {
       await updateProgramCertificateConfig(certForm);
       showToast(
-        'Tetapan Tajuk Sijil & Tandatangan Digital Pengerusi telah berjaya disimpan dan disegerakkan ke seluruh Portal PGB!'
+        'Tetapan Sijil Penyertaan Program, Template Islamik, Kawalan Item & Tandatangan Pengerusi telah berjaya disimpan!'
       );
     } finally {
       setIsSavingCertConfig(false);
+    }
+  };
+
+  const handleSaveMembershipCertConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingMembershipCert(true);
+    try {
+      await updateMembershipCertificateConfig(membershipCertForm);
+      showToast(
+        'Tetapan Sijil Perakuan Keahlian Rasmi Sekolah (Nama & Tandatangan Digital Pengerusi) telah berjaya disimpan!'
+      );
+    } finally {
+      setIsSavingMembershipCert(false);
     }
   };
 
@@ -698,23 +750,216 @@ export const AdminProgramAttendanceManagement: React.FC<
     };
   }, [combinedRows, selectedProgram, eventCertTitleOverride, certForm.certificateTitle]);
 
+  // Program Certificate Item Visibility Definitions (19 items)
+  const programCertVisibilityItems: {
+    key: keyof ProgramCertificateConfig;
+    label: string;
+    desc: string;
+  }[] = [
+    {
+      key: 'showIslamicMotif',
+      label: 'Unsur & Corak Geometri Islamik (Rub el Hizb / Mihrab)',
+      desc: 'Bintang 8 bucu Islamik pada penjuru, pembahagi tajuk & watermark tengah',
+    },
+    {
+      key: 'showBasmalah',
+      label: 'Kalimah Basmalah (بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ)',
+      desc: 'Kaligrafi Basmalah di bahagian atas sijil',
+    },
+    {
+      key: 'showLogo',
+      label: 'Logo Rasmi MPGBSIM',
+      desc: 'Jata / logo rasmi pertubuhan di bahagian kepala sijil',
+    },
+    {
+      key: 'showRosNumber',
+      label: 'No. Pendaftaran ROS (PPM-002-10-23041996)',
+      desc: 'Baris nombor pendaftaran pertubuhan di penjuru kiri atas',
+    },
+    {
+      key: 'showCertNumber',
+      label: 'No. Rujukan Sijil Rasmi',
+      desc: 'Nombor siri unik sijil di penjuru kanan atas',
+    },
+    {
+      key: 'showOrgHeader',
+      label: 'Nama & Sub-Tajuk Pertubuhan MPGBSIM',
+      desc: 'Nama penuh Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia',
+    },
+    {
+      key: 'showParticipantIc',
+      label: 'No. Kad Pengenalan Peserta / PGB',
+      desc: 'Paparan nombor KP di bawah nama penerima sijil',
+    },
+    {
+      key: 'showParticipantPosition',
+      label: 'Jawatan Rasmi Penerima (Pengetua / Guru Besar)',
+      desc: 'Kotak jawatan rasmi PGB dalam kad penerima',
+    },
+    {
+      key: 'showParticipantSchool',
+      label: 'Nama Sekolah, Kod Sekolah & Negeri',
+      desc: 'Maklumat institusi sekolah ahli bagi penerima sijil',
+    },
+    {
+      key: 'showProgramModeBadge',
+      label: 'Label Mod Program (Fizikal / Dalam Talian / Hibrid)',
+      desc: 'Lencana mod pelaksanaan program di atas nama program',
+    },
+    {
+      key: 'showProgramTheme',
+      label: 'Tema Program',
+      desc: 'Petikan tema program di bawah tajuk program',
+    },
+    {
+      key: 'showProgramDate',
+      label: 'Tarikh & Masa Program',
+      desc: 'Butiran tarikh dan waktu pelaksanaan program',
+    },
+    {
+      key: 'showProgramVenue',
+      label: 'Tempat / Lokasi Pelaksanaan Program',
+      desc: 'Butiran lokasi atau pautan tempat program dijalankan',
+    },
+    {
+      key: 'showRecognitionClause',
+      label: 'Klausa Penghargaan & Pengiktirafan',
+      desc: 'Perenggan penghargaan di bawah kotak butiran program',
+    },
+    {
+      key: 'showChairmanSign',
+      label: 'Ruangan Tandatangan Digital Pengerusi (Kiri)',
+      desc: 'Tandatangan, nama penuh dan jawatan Pengerusi Kebangsaan',
+    },
+    {
+      key: 'showQrSeal',
+      label: 'Kod QR & Meterai Digital Pengesahan (Tengah)',
+      desc: 'Kod QR imbasan pengesahan ketulenan sijil',
+    },
+    {
+      key: 'showSecondarySign',
+      label: 'Ruangan Tandatangan Setiausaha Agung / Urus Setia (Kanan)',
+      desc: 'Boleh dimatikan jika mahu sijil hanya memaparkan tandatangan Pengerusi sahaja',
+    },
+    {
+      key: 'showIssuedDate',
+      label: 'Tarikh Keluaran Sijil',
+      desc: 'Tarikh sijil dijana dan disahkan',
+    },
+    {
+      key: 'showFooterAddress',
+      label: 'Alamat & Maklumat Sekretariat (Nota Kaki Bawah)',
+      desc: 'Baris alamat rasmi, nombor telefon dan laman web di kaki sijil',
+    },
+  ];
+
+  // Membership Certificate Item Visibility Definitions (16 items)
+  const membershipCertVisibilityItems: {
+    key: keyof MembershipCertificateConfig;
+    label: string;
+    desc: string;
+  }[] = [
+    {
+      key: 'showIslamicMotif',
+      label: 'Unsur & Corak Geometri Islamik (Rub el Hizb)',
+      desc: 'Bintang 8 bucu Islamik pada penjuru, pembahagi tajuk & watermark tengah',
+    },
+    {
+      key: 'showBasmalah',
+      label: 'Kalimah Basmalah (بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ)',
+      desc: 'Kaligrafi Basmalah di bahagian atas sijil keahlian',
+    },
+    {
+      key: 'showLogo',
+      label: 'Logo Rasmi MPGBSIM',
+      desc: 'Logo utama MPGBSIM di bahagian atas sijil',
+    },
+    {
+      key: 'showSchoolLogo',
+      label: 'Logo Sekolah Ahli (Bersebelahan Logo MPGBSIM)',
+      desc: 'Paparkan logo institusi sekolah ahli jika ada',
+    },
+    {
+      key: 'showRosNumber',
+      label: 'No. Pendaftaran ROS (PPM-002-10-23041996)',
+      desc: 'Nombor pendaftaran pertubuhan di penjuru kiri atas',
+    },
+    {
+      key: 'showCertNumber',
+      label: 'No. Sijil Keahlian Sekolah',
+      desc: 'Nombor rujukan sijil keahlian di penjuru kanan atas',
+    },
+    {
+      key: 'showOrgHeader',
+      label: 'Nama & Sub-Tajuk Pertubuhan MPGBSIM',
+      desc: 'Tajuk pertubuhan di atas sepanduk sijil',
+    },
+    {
+      key: 'showSchoolAddress',
+      label: 'Alamat Penuh Sekolah Ahli',
+      desc: 'Alamat lokasi sekolah di bawah nama institusi',
+    },
+    {
+      key: 'showFasalClassification',
+      label: 'Klasifikasi Keahlian Fasal 4(2) / Fasal 4(3)',
+      desc: 'Kategori Ahli Biasa atau Ahli Bersekutu mengikut Perlembagaan',
+    },
+    {
+      key: 'showPrincipalBlock',
+      label: 'Blok Perwakilan Kepimpinan Rasmi (Nama PGB & Tahun Keahlian)',
+      desc: 'Kotak maklumat Pengetua/Guru Besar dan tahun mula keahlian',
+    },
+    {
+      key: 'showRecognitionClause',
+      label: 'Klausa Pengiktirafan Perlembagaan',
+      desc: 'Perenggan hak dan keistimewaan ahli berdaftar MPGBSIM',
+    },
+    {
+      key: 'showChairmanSign',
+      label: 'Ruangan Tandatangan Digital Pengerusi (Kiri)',
+      desc: 'Tandatangan, nama penuh dan jawatan Pengerusi Kebangsaan',
+    },
+    {
+      key: 'showQrSeal',
+      label: 'Kod QR & Meterai Digital Pengesahan (Tengah)',
+      desc: 'Kod QR pengesahan keahlian sekolah',
+    },
+    {
+      key: 'showSecondarySign',
+      label: 'Ruangan Tandatangan Setiausaha Agung / Urus Setia (Kanan)',
+      desc: 'Boleh dimatikan jika mahu sijil hanya memaparkan tandatangan Pengerusi sahaja',
+    },
+    {
+      key: 'showIssuedDate',
+      label: 'Tarikh Keluaran Sijil',
+      desc: 'Tarikh cetakan/keluaran sijil keahlian',
+    },
+    {
+      key: 'showFooterAddress',
+      label: 'Alamat & Maklumat Sekretariat (Nota Kaki Bawah)',
+      desc: 'Baris alamat rasmi dan laman web di kaki sijil',
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Top Banner & View Switcher */}
+      {/* Top Banner & 3-Tab View Switcher */}
       <div className="bg-gradient-to-r from-teal-950 via-teal-900 to-slate-900 rounded-3xl p-6 text-white shadow-lg border border-teal-800/80">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[11px] font-bold uppercase tracking-wider">
               <Award className="w-3.5 h-3.5" />
-              Sistem Rekod Kehadiran Takwim & Sijil Penyertaan PGB
+              Sistem Rekod Kehadiran Takwim & Pusat Rekaan Sijil Rasmi (CMS)
             </div>
             <h3 className="text-xl sm:text-2xl font-black text-white">
-              Pengurusan Kehadiran Program & Pengeluaran Sijil Digital PGB
+              Pengurusan Kehadiran, Template Sijil Islamik & Tandatangan Digital Pengerusi
             </h3>
-            <p className="text-xs text-teal-100/85 max-w-2xl leading-relaxed">
-              Tandakan kehadiran PGB mengikut takwim program, keluarkan Sijil Penyertaan Program
-              secara automatik ke Portal PGB masing-masing, serta sunting tajuk sijil dan
-              tandatangan digital Pengerusi.
+            <p className="text-xs text-teal-100/85 max-w-3xl leading-relaxed">
+              Pilih daripada <strong>5 Template Rekaan Sijil Berunsur Islamik</strong> yang berbeza
+              bagi setiap program, sunting keseluruhan kandungan atau buang mana-mana item dalam
+              sijil, serta kemas kini nama dan tandatangan digital Pengerusi bagi{' '}
+              <strong>Sijil Penyertaan Program</strong> dan{' '}
+              <strong>Sijil Rasmi Keahlian Sekolah</strong>.
             </p>
           </div>
 
@@ -722,27 +967,40 @@ export const AdminProgramAttendanceManagement: React.FC<
             <button
               type="button"
               onClick={() => setActiveView('attendance')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
                 activeView === 'attendance'
                   ? 'bg-amber-400 text-slate-950 shadow-md'
                   : 'bg-teal-900/70 hover:bg-teal-800 text-teal-100 border border-teal-700'
               }`}
             >
               <UserCheck className="w-4 h-4" />
-              <span>Rekod Kehadiran & Keluarkan Sijil</span>
+              <span>1. Rekod Kehadiran & Sijil Program</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveView('cert-settings')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
                 activeView === 'cert-settings'
                   ? 'bg-amber-400 text-slate-950 shadow-md'
                   : 'bg-teal-900/70 hover:bg-teal-800 text-teal-100 border border-teal-700'
               }`}
             >
-              <PenTool className="w-4 h-4" />
-              <span>Edit Tajuk Sijil & Sign Digital Pengerusi</span>
+              <Palette className="w-4 h-4" />
+              <span>2. Edit Sijil Program & Template Islamik</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveView('membership-cert')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                activeView === 'membership-cert'
+                  ? 'bg-amber-400 text-slate-950 shadow-md'
+                  : 'bg-teal-900/70 hover:bg-teal-800 text-teal-100 border border-teal-700'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>3. Edit Sijil Rasmi Keahlian Sekolah</span>
             </button>
           </div>
         </div>
@@ -770,10 +1028,11 @@ export const AdminProgramAttendanceManagement: React.FC<
       {/* ========================================================================= */}
       {activeView === 'attendance' && (
         <div className="space-y-5">
-          {/* Step 1: Select Takwim Program */}
+          {/* Step 1: Select Takwim Program + Per-Program Template & Title Override */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex-1 space-y-1.5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+              {/* Program Selector */}
+              <div className="lg:col-span-5 space-y-1.5">
                 <label className="text-[11px] font-black uppercase tracking-wider text-teal-800 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5" />
                   1. Pilih Program Berdasarkan Takwim MPGBSIM
@@ -781,7 +1040,7 @@ export const AdminProgramAttendanceManagement: React.FC<
                 <select
                   value={selectedEventId}
                   onChange={(e) => setSelectedEventId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border-2 border-teal-700/40 bg-teal-50/30 text-slate-900 font-bold text-sm focus:outline-hidden focus:ring-2 focus:ring-teal-600"
+                  className="w-full px-3.5 py-2.5 rounded-xl border-2 border-teal-700/40 bg-teal-50/30 text-slate-900 font-bold text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-teal-600"
                 >
                   {programs.map((prog, idx) => {
                     const evAttended = (eventRegistrations || []).filter(
@@ -800,10 +1059,38 @@ export const AdminProgramAttendanceManagement: React.FC<
                 </select>
               </div>
 
+              {/* Per-Program Template Design Choice (Supaya tidak sama bagi setiap program) */}
+              <div className="lg:col-span-3 space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
+                  <Palette className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Rekaan Template Sijil Program Ini:</span>
+                </label>
+                <select
+                  value={eventTemplateOverride}
+                  onChange={(e) =>
+                    setEventTemplateOverride(e.target.value as CertificateTemplateId | '')
+                  }
+                  className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-teal-600"
+                >
+                  <option value="">
+                    Ikut Template Default (
+                    {CERTIFICATE_TEMPLATES.find(
+                      (t) => t.id === (currentCertConfig.defaultTemplateId || 'warisan-zaitun')
+                    )?.name || 'Warisan Zamrud'}
+                    )
+                  </option>
+                  {CERTIFICATE_TEMPLATES.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      {tpl.name} ({tpl.badgeLabel})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Per-Program Certificate Title Override Quick Input */}
-              <div className="w-full lg:w-96 space-y-1.5">
+              <div className="lg:col-span-4 space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center justify-between">
-                  <span>Tajuk Sijil Program Ini (Boleh Ubah):</span>
+                  <span>Tajuk Sijil Program Ini:</span>
                   <span className="text-[10px] text-teal-700 font-semibold">
                     Default: {currentCertConfig.certificateTitle}
                   </span>
@@ -818,7 +1105,7 @@ export const AdminProgramAttendanceManagement: React.FC<
                   />
                   <button
                     type="button"
-                    onClick={handleSaveEventCertTitleOverride}
+                    onClick={handleSaveEventCertSettings}
                     disabled={isSavingEventTitle}
                     className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer"
                   >
@@ -845,11 +1132,19 @@ export const AdminProgramAttendanceManagement: React.FC<
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('cert-settings')}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-teal-700" />
+                    <span>Edit Item / Template Sijil</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setPreviewReg(samplePreviewRegistration)}
-                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5 text-amber-700" />
                     <span>Pratonton Sijil Program Ini</span>
@@ -908,7 +1203,6 @@ export const AdminProgramAttendanceManagement: React.FC<
           {/* Search, Filter & Bulk Actions Bar */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-              {/* Search Input */}
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -920,7 +1214,6 @@ export const AdminProgramAttendanceManagement: React.FC<
                 />
               </div>
 
-              {/* State Filter */}
               <select
                 value={stateFilter}
                 onChange={(e) => setStateFilter(e.target.value)}
@@ -933,7 +1226,6 @@ export const AdminProgramAttendanceManagement: React.FC<
                 ))}
               </select>
 
-              {/* Status Filter */}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -1040,7 +1332,6 @@ export const AdminProgramAttendanceManagement: React.FC<
                               : 'hover:bg-slate-50/80'
                           }`}
                         >
-                          {/* Nama PGB */}
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2.5">
                               <div
@@ -1064,7 +1355,6 @@ export const AdminProgramAttendanceManagement: React.FC<
                             </div>
                           </td>
 
-                          {/* Sekolah & Kod */}
                           <td className="py-3 px-4">
                             <span className="font-semibold text-slate-800 block line-clamp-1">
                               {row.schoolName}
@@ -1074,10 +1364,8 @@ export const AdminProgramAttendanceManagement: React.FC<
                             </span>
                           </td>
 
-                          {/* Negeri */}
                           <td className="py-3 px-4 font-medium text-slate-700">{row.state}</td>
 
-                          {/* Status Kehadiran */}
                           <td className="py-3 px-4 text-center">
                             <button
                               type="button"
@@ -1110,7 +1398,6 @@ export const AdminProgramAttendanceManagement: React.FC<
                             </button>
                           </td>
 
-                          {/* Status Sijil Penyertaan */}
                           <td className="py-3 px-4 text-center">
                             {row.certificateIssued ? (
                               <div className="flex flex-col items-center">
@@ -1141,7 +1428,6 @@ export const AdminProgramAttendanceManagement: React.FC<
                             )}
                           </td>
 
-                          {/* Tindakan Admin */}
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               {row.isAttended && (
@@ -1200,33 +1486,34 @@ export const AdminProgramAttendanceManagement: React.FC<
       )}
 
       {/* ========================================================================= */}
-      {/* VIEW 2: TETAPAN TAJUK SIJIL & TANDATANGAN DIGITAL PENGERUSI (CMS)        */}
+      {/* VIEW 2: EDIT SIJIL PROGRAM, PILIHAN TEMPLATE ISLAMIK & KAWALAN ITEM       */}
       {/* ========================================================================= */}
       {activeView === 'cert-settings' && (
         <form
           onSubmit={handleSaveCertConfig}
-          className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-6 animate-in fade-in duration-150"
+          className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-7 animate-in fade-in duration-150"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
             <div>
               <h4 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                <PenTool className="w-5 h-5 text-teal-700" />
-                Tetapan Sijil Penyertaan & Tandatangan Digital Pengerusi
+                <Palette className="w-5 h-5 text-teal-700" />
+                Rekaan Template Sijil Program, Suntingan Penuh & Tandatangan Digital Pengerusi
               </h4>
               <p className="text-xs text-slate-500 mt-0.5">
-                Semua perubahan tajuk sijil dan tandatangan digital Pengerusi akan digunakan secara
-                automatik pada semua Sijil Penyertaan Program yang dimuat turun oleh PGB.
+                Pilih template rekaan berunsur Islamik, sunting semua teks pada sijil, muat naik
+                tandatangan digital Pengerusi, atau nyahaktifkan mana-mana item yang ingin dibuang
+                daripada sijil.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setPreviewReg(samplePreviewRegistration)}
                 className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
               >
                 <Eye className="w-4 h-4 text-amber-700" />
-                <span>Pratonton Sijil Penuh (A4)</span>
+                <span>Pratonton Sijil Program (A4)</span>
               </button>
               <button
                 type="submit"
@@ -1234,319 +1521,1266 @@ export const AdminProgramAttendanceManagement: React.FC<
                 className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                <span>{isSavingCertConfig ? 'Menyimpan...' : 'Simpan Tetapan Sijil'}</span>
+                <span>{isSavingCertConfig ? 'Menyimpan...' : 'Simpan Tetapan Sijil Program'}</span>
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Certificate Title & Text Wording */}
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+          {/* SECTION A: 5 ISLAMIC & ROYAL CERTIFICATE TEMPLATES SELECTOR */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
                 <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
-                  <Edit3 className="w-3.5 h-3.5" />
-                  1. Tajuk Sijil & Kandungan Teks Rasmi
+                  <LayoutTemplate className="w-4 h-4 text-amber-600" />
+                  1. Pilih Rekaan Template Default Sijil (5 Pilihan Rekaan Berunsur Islamik)
                 </h5>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Anda juga boleh menetapkan template berbeza bagi setiap program Takwim pada tab{' '}
+                  <strong>Rekod Kehadiran & Sijil Program</strong> supaya rekaan sijil tidak sama bagi
+                  setiap program.
+                </p>
+              </div>
+              <span className="text-[11px] font-bold text-teal-800 bg-teal-100/80 px-3 py-1 rounded-lg border border-teal-200 shrink-0">
+                Aktif:{' '}
+                {CERTIFICATE_TEMPLATES.find(
+                  (t) => t.id === (certForm.defaultTemplateId || 'warisan-zaitun')
+                )?.name || 'Warisan Zamrud'}
+              </span>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {CERTIFICATE_TEMPLATES.map((tpl) => {
+                const isSelected =
+                  (certForm.defaultTemplateId || 'warisan-zaitun') === tpl.id;
+                return (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() =>
+                      setCertForm({ ...certForm, defaultTemplateId: tpl.id })
+                    }
+                    className={`p-3.5 rounded-2xl border-2 text-left transition flex flex-col justify-between cursor-pointer ${
+                      isSelected
+                        ? 'border-teal-800 bg-teal-50/60 shadow-sm ring-2 ring-amber-400/40'
+                        : 'border-slate-200 bg-white hover:border-teal-600/50'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-1">
+                          {tpl.previewSwatches.map((hex, i) => (
+                            <span
+                              key={i}
+                              className="w-4 h-4 rounded-full border border-slate-300 shadow-2xs"
+                              style={{ backgroundColor: hex }}
+                            />
+                          ))}
+                        </div>
+                        {isSelected && (
+                          <span className="px-2 py-0.5 rounded bg-teal-800 text-amber-300 text-[9.5px] font-black">
+                            DIPILIH
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
+                        {tpl.badgeLabel}
+                      </span>
+                      <strong className="text-xs font-black text-slate-900 block mt-0.5 leading-snug">
+                        {tpl.name}
+                      </strong>
+                      <p className="text-[10.5px] text-slate-500 mt-1 leading-relaxed">
+                        {tpl.subtitle}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* SECTION B: TEXT CONTENT & CHAIRMAN DIGITAL SIGNATURE */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Full Certificate Text Content */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+              <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                <Edit3 className="w-3.5 h-3.5" />
+                2. Suntingan Penuh Tajuk & Teks Sijil Penyertaan
+              </h5>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tajuk Utama Sijil (Boleh Diedit) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={certForm.certificateTitle}
+                  onChange={(e) =>
+                    setCertForm({ ...certForm, certificateTitle: e.target.value })
+                  }
+                  placeholder="cth: SIJIL PENYERTAAN PROGRAM"
+                  className="w-full px-3.5 py-2 text-sm font-black uppercase rounded-xl border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-600 text-teal-950"
+                />
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] text-slate-400 font-bold">Pilihan Pantas:</span>
+                  {[
+                    'SIJIL PENYERTAAN PROGRAM',
+                    'SIJIL PENYERTAAN',
+                    'SIJIL PENGHARGAAN & PENYERTAAN',
+                    'SIJIL KEHADIRAN PROGRAM KEPIMPINAN',
+                    'SIJIL ANUGERAH KEPIMPINAN',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setCertForm({ ...certForm, certificateTitle: preset })}
+                      className="px-2 py-0.5 rounded-md bg-white hover:bg-teal-50 text-teal-900 border border-slate-200 text-[10px] font-bold transition cursor-pointer"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Tajuk Utama Sijil (Boleh Diedit) *
+                    Kalimah Basmalah / Pembuka
+                  </label>
+                  <input
+                    type="text"
+                    value={certForm.basmalahText ?? 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ'}
+                    onChange={(e) => setCertForm({ ...certForm, basmalahText: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Teks No. Pendaftaran ROS
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      certForm.rosNumberText ?? 'NO. PENDAFTARAN ROS: PPM-002-10-23041996'
+                    }
+                    onChange={(e) =>
+                      setCertForm({ ...certForm, rosNumberText: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Pertubuhan Di Atas Sijil
+                </label>
+                <input
+                  type="text"
+                  value={certForm.certificateSubtitle}
+                  onChange={(e) =>
+                    setCertForm({ ...certForm, certificateSubtitle: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Sub-Baris Penubuhan Pertubuhan
+                </label>
+                <input
+                  type="text"
+                  value={
+                    certForm.orgRegistrationTagline ??
+                    '(MPGBSIM • Pertubuhan Kebangsaan Ditubuhkan Pada 23 April 1996)'
+                  }
+                  onChange={(e) =>
+                    setCertForm({ ...certForm, orgRegistrationTagline: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Label Kotak Nama Peserta
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      certForm.participantCardLabel ??
+                      'Perwakilan Kepimpinan Pendidikan Islam'
+                    }
+                    onChange={(e) =>
+                      setCertForm({ ...certForm, participantCardLabel: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Label Meterai Kod QR
+                  </label>
+                  <input
+                    type="text"
+                    value={certForm.qrSealLabel ?? 'SIJIL DIGITAL DISAHKAN'}
+                    onChange={(e) => setCertForm({ ...certForm, qrSealLabel: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Ayat Pengenalan Sijil
+                  </label>
+                  <input
+                    type="text"
+                    value={certForm.introText}
+                    onChange={(e) => setCertForm({ ...certForm, introText: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Ayat Pengesahan Kehadiran
+                  </label>
+                  <input
+                    type="text"
+                    value={certForm.participationText}
+                    onChange={(e) =>
+                      setCertForm({ ...certForm, participationText: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Klausa Penghargaan & Pengiktirafan Sijil
+                </label>
+                <textarea
+                  rows={2}
+                  value={certForm.recognitionClause}
+                  onChange={(e) =>
+                    setCertForm({ ...certForm, recognitionClause: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Alamat & Maklumat Sekretariat (Nota Kaki Bawah Sijil)
+                </label>
+                <input
+                  type="text"
+                  value={
+                    certForm.footerAddressText ??
+                    'Sekretariat MPGBSIM: D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor • Tel: 03-4251 6157 / 03-4251 6167 • Laman Web Rasmi: https://www.mpgbsim.org/'
+                  }
+                  onChange={(e) =>
+                    setCertForm({ ...certForm, footerAddressText: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+            </div>
+
+            {/* Right Column: Chairman Digital Signature & Secondary Signatory */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+              <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                <PenTool className="w-3.5 h-3.5" />
+                3. Nama & Tandatangan Digital Pengerusi (Sign Digital Pengerusi)
+              </h5>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nama Penuh Pengerusi *
                   </label>
                   <input
                     type="text"
                     required
-                    value={certForm.certificateTitle}
-                    onChange={(e) =>
-                      setCertForm({ ...certForm, certificateTitle: e.target.value })
-                    }
-                    placeholder="cth: SIJIL PENYERTAAN PROGRAM"
-                    className="w-full px-3.5 py-2 text-sm font-black uppercase rounded-xl border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-teal-600 text-teal-950"
+                    value={certForm.chairmanName}
+                    onChange={(e) => setCertForm({ ...certForm, chairmanName: e.target.value })}
+                    placeholder="USTAZ MOHAMAD FAIZ BIN AZIZAN"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white"
                   />
-                  {/* Quick preset chips */}
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                    <span className="text-[10px] text-slate-400 font-bold">Pilihan Pantas:</span>
-                    {[
-                      'SIJIL PENYERTAAN PROGRAM',
-                      'SIJIL PENYERTAAN',
-                      'SIJIL PENGHARGAAN & PENYERTAAN',
-                      'SIJIL KEHADIRAN PROGRAM KEPIMPINAN',
-                    ].map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setCertForm({ ...certForm, certificateTitle: preset })}
-                        className="px-2 py-0.5 rounded-md bg-white hover:bg-teal-50 text-teal-900 border border-slate-200 text-[10px] font-bold transition cursor-pointer"
-                      >
-                        {preset}
-                      </button>
-                    ))}
-                  </div>
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Sub-Tajuk Organisasi Di Atas Sijil
+                    Jawatan Rasmi Pengerusi *
                   </label>
                   <input
                     type="text"
-                    value={certForm.certificateSubtitle}
-                    onChange={(e) =>
-                      setCertForm({ ...certForm, certificateSubtitle: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                    required
+                    value={certForm.chairmanRole}
+                    onChange={(e) => setCertForm({ ...certForm, chairmanRole: e.target.value })}
+                    placeholder="Pengerusi Kebangsaan MPGBSIM"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white"
                   />
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Ayat Pengenalan Sijil
-                    </label>
-                    <input
-                      type="text"
-                      value={certForm.introText}
-                      onChange={(e) => setCertForm({ ...certForm, introText: e.target.value })}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Ayat Pengesahan Kehadiran
-                    </label>
-                    <input
-                      type="text"
-                      value={certForm.participationText}
-                      onChange={(e) =>
-                        setCertForm({ ...certForm, participationText: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
-                    />
-                  </div>
-                </div>
-
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Klausa Pengiktirafan Sijil
+                    Nama Organisasi Bawah Jawatan Pengerusi
                   </label>
-                  <textarea
-                    rows={2}
-                    value={certForm.recognitionClause}
-                    onChange={(e) =>
-                      setCertForm({ ...certForm, recognitionClause: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  <input
+                    type="text"
+                    value={certForm.chairmanOrg}
+                    onChange={(e) => setCertForm({ ...certForm, chairmanOrg: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Teks Kaligrafi Tandatangan (Jika Tiada Imej)
+                  </label>
+                  <input
+                    type="text"
+                    value={certForm.chairmanSignatureText || ''}
+                    onChange={(e) =>
+                      setCertForm({ ...certForm, chairmanSignatureText: e.target.value })
+                    }
+                    placeholder="Mohamad Faiz Azizan"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Digital Signature Mode Tabs: Upload Image vs Draw Signature */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">
+                    Kaedah Tandatangan Digital Pengerusi:
+                  </span>
+                  <div className="flex items-center gap-1 p-1 bg-slate-200/80 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setSigMode('upload')}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        sigMode === 'upload'
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Muat Naik Imej Sign
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSigMode('draw')}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        sigMode === 'draw'
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Lukis Sign Digital
+                    </button>
+                  </div>
+                </div>
+
+                {sigMode === 'upload' && (
+                  <div className="space-y-3">
+                    <input
+                      ref={sigFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) processSignatureImageFile(file, 'program');
+                        if (e.target) e.target.value = '';
+                      }}
+                    />
+
+                    <div className="p-4 rounded-2xl bg-white border-2 border-dashed border-teal-600/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-40 h-20 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
+                          {certForm.chairmanSignatureImageUrl ? (
+                            <img
+                              src={certForm.chairmanSignatureImageUrl}
+                              alt="Sign Digital Pengerusi"
+                              className="max-h-16 max-w-full object-contain"
+                            />
+                          ) : (
+                            <span
+                              className="text-lg italic text-teal-900 font-serif"
+                              style={{ fontFamily: "'Amiri', serif" }}
+                            >
+                              {certForm.chairmanSignatureText || 'Mohamad Faiz Azizan'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs space-y-1">
+                          <span className="font-bold text-slate-800 block">
+                            {certForm.chairmanSignatureImageUrl
+                              ? 'Imej Tandatangan Digital Aktif'
+                              : 'Tandatangan Kaligrafi Default'}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            PNG lutsinar atau JPG (latar putih dibersihkan automatik).
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => sigFileInputRef.current?.click()}
+                          className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Muat Naik Sign</span>
+                        </button>
+                        {certForm.chairmanSignatureImageUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCertForm({ ...certForm, chairmanSignatureImageUrl: '' })
+                            }
+                            className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer"
+                            title="Buang Imej Tandatangan"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {sigMode === 'draw' && (
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-700">
+                        Lukis Tandatangan Pengerusi Di Bawah:
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400">Warna Dakwat:</span>
+                        {(
+                          [
+                            { color: '#0f172a', label: 'Hitam Rasmi' },
+                            { color: '#134e4a', label: 'Hijau Teal' },
+                            { color: '#1e3a8a', label: 'Biru Dakwat' },
+                          ] as const
+                        ).map((ink) => (
+                          <button
+                            key={ink.color}
+                            type="button"
+                            onClick={() => setPenColor(ink.color)}
+                            className={`w-5 h-5 rounded-full border-2 cursor-pointer ${
+                              penColor === ink.color
+                                ? 'border-amber-500 scale-110'
+                                : 'border-white'
+                            }`}
+                            style={{ backgroundColor: ink.color }}
+                            title={ink.label}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <canvas
+                      ref={canvasRef}
+                      width={460}
+                      height={150}
+                      onMouseDown={(e) =>
+                        startDrawingOnCanvas(canvasRef.current, setIsDrawing, e)
+                      }
+                      onMouseMove={(e) =>
+                        drawMoveOnCanvas(canvasRef.current, isDrawing, e)
+                      }
+                      onMouseUp={() => setIsDrawing(false)}
+                      onMouseLeave={() => setIsDrawing(false)}
+                      onTouchStart={(e) =>
+                        startDrawingOnCanvas(canvasRef.current, setIsDrawing, e)
+                      }
+                      onTouchMove={(e) =>
+                        drawMoveOnCanvas(canvasRef.current, isDrawing, e)
+                      }
+                      onTouchEnd={() => setIsDrawing(false)}
+                      className="w-full h-36 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 cursor-crosshair touch-none"
+                    />
+
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => clearCanvasRef(canvasRef.current)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                      >
+                        Padam Lukisan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyDrawnSignature('program')}
+                        className="px-4 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Guna Tandatangan Lukisan Ini</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Secondary Signatory (Setiausaha Agung / Urus Setia) */}
+              <div className="pt-3 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">
+                    Penandatangan Kedua (Kanan — Setiausaha Agung / Urus Setia):
+                  </span>
+                  <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={certForm.showSecondarySign !== false}
+                      onChange={(e) =>
+                        setCertForm({ ...certForm, showSecondarySign: e.target.checked })
+                      }
+                      className="w-3.5 h-3.5 rounded text-teal-700"
+                    />
+                    <span>Papar Penandatangan Kedua</span>
+                  </label>
+                </div>
+
+                {certForm.showSecondarySign !== false && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Nama / Gelaran Kanan
+                      </label>
+                      <input
+                        type="text"
+                        value={certForm.secondarySignatoryName || ''}
+                        onChange={(e) =>
+                          setCertForm({
+                            ...certForm,
+                            secondarySignatoryName: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Jawatan / Sekretariat
+                      </label>
+                      <input
+                        type="text"
+                        value={certForm.secondarySignatoryRole || ''}
+                        onChange={(e) =>
+                          setCertForm({
+                            ...certForm,
+                            secondarySignatoryRole: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Teks Sign Kanan
+                      </label>
+                      <input
+                        type="text"
+                        value={certForm.secondarySignatureText || ''}
+                        onChange={(e) =>
+                          setCertForm({
+                            ...certForm,
+                            secondarySignatureText: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION C: FULL ITEM VISIBILITY TOGGLES (BOLEH BUANG MANA-MANA ITEM DALAM SIJIL) */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                  <Sliders className="w-4 h-4 text-teal-700" />
+                  4. Kawalan Paparan / Buang Item Dalam Sijil Penyertaan (19 Elemen Sijil)
+                </h5>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Nyahtanda (uncheck) mana-mana item di bawah jika anda ingin membuang atau
+                  menyembunyikan item tersebut daripada Sijil Penyertaan Program.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allTrue: Partial<ProgramCertificateConfig> = {};
+                    programCertVisibilityItems.forEach((it) => {
+                      (allTrue as any)[it.key] = true;
+                    });
+                    setCertForm({ ...certForm, ...allTrue });
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-teal-50 text-teal-900 border border-slate-300 text-[11px] font-bold cursor-pointer"
+                >
+                  Papar Semua Item
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCertForm({
+                      ...certForm,
+                      showSecondarySign: false,
+                      showParticipantIc: false,
+                      showProgramModeBadge: false,
+                      showRecognitionClause: false,
+                      showFooterAddress: false,
+                    })
+                  }
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 text-[11px] font-bold cursor-pointer"
+                >
+                  Mod Ringkas (Buang Item Tambahan)
+                </button>
               </div>
             </div>
 
-            {/* Right Column: Chairman Digital Signature & Signatory Details */}
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
-                <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
-                  <PenTool className="w-3.5 h-3.5" />
-                  2. Tandatangan Digital Pengerusi (Sign Digital Pengerusi)
-                </h5>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Nama Penuh Pengerusi *
-                    </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {programCertVisibilityItems.map((item) => {
+                const isChecked = (certForm[item.key] as boolean | undefined) !== false;
+                return (
+                  <label
+                    key={String(item.key)}
+                    className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer select-none transition ${
+                      isChecked
+                        ? 'bg-white border-teal-600/40 shadow-2xs'
+                        : 'bg-slate-100/70 border-slate-200 opacity-75'
+                    }`}
+                  >
                     <input
-                      type="text"
-                      required
-                      value={certForm.chairmanName}
-                      onChange={(e) => setCertForm({ ...certForm, chairmanName: e.target.value })}
-                      placeholder="USTAZ MOHAMAD FAIZ BIN AZIZAN"
-                      className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white"
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) =>
+                        setCertForm({
+                          ...certForm,
+                          [item.key]: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 mt-0.5 rounded text-teal-700 focus:ring-teal-600 shrink-0"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Jawatan Rasmi Pengerusi *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={certForm.chairmanRole}
-                      onChange={(e) => setCertForm({ ...certForm, chairmanRole: e.target.value })}
-                      placeholder="Pengerusi Kebangsaan MPGBSIM"
-                      className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white"
-                    />
-                  </div>
-                </div>
-
-                {/* Digital Signature Mode Tabs: Upload Image vs Draw Signature */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">
-                      Kaedah Tandatangan Digital Pengerusi:
-                    </span>
-                    <div className="flex items-center gap-1 p-1 bg-slate-200/80 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setSigMode('upload')}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                          sigMode === 'upload'
-                            ? 'bg-white text-slate-900 shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Muat Naik Imej Sign
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSigMode('draw')}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                          sigMode === 'draw'
-                            ? 'bg-white text-slate-900 shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        Lukis Sign Digital
-                      </button>
+                    <div className="text-xs">
+                      <span className="font-bold text-slate-900 block leading-snug">
+                        {item.label}
+                      </span>
+                      <span className="text-[10.5px] text-slate-500 block mt-0.5">
+                        {item.desc}
+                      </span>
                     </div>
-                  </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </form>
+      )}
 
-                  {/* Mode 1: Upload Signature Image */}
-                  {sigMode === 'upload' && (
-                    <div className="space-y-3">
-                      <input
-                        ref={sigFileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) processSignatureImageFile(file);
-                          if (e.target) e.target.value = '';
-                        }}
-                      />
+      {/* ========================================================================= */}
+      {/* VIEW 3: EDIT SIJIL RASMI KEAHLIAN SEKOLAH (NAMA & SIGN PENGERUSI)         */}
+      {/* ========================================================================= */}
+      {activeView === 'membership-cert' && (
+        <form
+          onSubmit={handleSaveMembershipCertConfig}
+          className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-7 animate-in fade-in duration-150"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div>
+              <h4 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-teal-700" />
+                Tetapan Sijil Perakuan Keahlian Rasmi Sekolah (Nama & Tandatangan Digital Pengerusi)
+              </h4>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Kemas kini nama Pengerusi, jawatan, tandatangan digital Pengerusi, template rekaan
+                Islamik, serta kawal item yang ingin dipaparkan pada{' '}
+                <strong>Sijil Rasmi Keahlian Sekolah</strong> di dalam Portal PGB.
+              </p>
+            </div>
 
-                      <div className="p-4 rounded-2xl bg-white border-2 border-dashed border-teal-600/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-40 h-20 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
-                            {certForm.chairmanSignatureImageUrl ? (
-                              <img
-                                src={certForm.chairmanSignatureImageUrl}
-                                alt="Sign Digital Pengerusi"
-                                className="max-h-16 max-w-full object-contain"
-                              />
-                            ) : (
-                              <span
-                                className="text-lg italic text-teal-900 font-serif"
-                                style={{ fontFamily: "'Amiri', serif" }}
-                              >
-                                {certForm.chairmanSignatureText || 'Mohamad Faiz Azizan'}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs space-y-1">
-                            <span className="font-bold text-slate-800 block">
-                              {certForm.chairmanSignatureImageUrl
-                                ? 'Imej Tandatangan Digital Aktif'
-                                : 'Tandatangan Kaligrafi Default'}
-                            </span>
-                            <span className="text-[11px] text-slate-500 block">
-                              PNG lutsinar atau JPG (latar belakang putih dibersihkan automatik).
-                            </span>
-                          </div>
-                        </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsMembershipPreviewOpen(true)}
+                className="px-4 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-amber-700" />
+                <span>Pratonton Sijil Rasmi Keahlian (A4)</span>
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingMembershipCert}
+                className="px-5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>
+                  {isSavingMembershipCert
+                    ? 'Menyimpan...'
+                    : 'Simpan Sijil Rasmi Keahlian'}
+                </span>
+              </button>
+            </div>
+          </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => sigFileInputRef.current?.click()}
-                            className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <Upload className="w-3.5 h-3.5" />
-                            <span>Muat Naik Sign</span>
-                          </button>
-                          {certForm.chairmanSignatureImageUrl && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setCertForm({ ...certForm, chairmanSignatureImageUrl: '' })
-                              }
-                              className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer"
-                              title="Buang Imej Tandatangan"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mode 2: Interactive Canvas Signature Pad */}
-                  {sigMode === 'draw' && (
-                    <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-700">
-                          Lukis Tandatangan Pengerusi Di Bawah:
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-slate-400">Warna Dakwat:</span>
-                          {(
-                            [
-                              { color: '#0f172a', label: 'Hitam Rasmi' },
-                              { color: '#134e4a', label: 'Hijau Teal' },
-                              { color: '#1e3a8a', label: 'Biru Dakwat' },
-                            ] as const
-                          ).map((ink) => (
-                            <button
-                              key={ink.color}
-                              type="button"
-                              onClick={() => setPenColor(ink.color)}
-                              className={`w-5 h-5 rounded-full border-2 cursor-pointer ${
-                                penColor === ink.color
-                                  ? 'border-amber-500 scale-110'
-                                  : 'border-white'
-                              }`}
-                              style={{ backgroundColor: ink.color }}
-                              title={ink.label}
+          {/* 1. Template Design Selector for Official Membership Certificate */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+            <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+              <LayoutTemplate className="w-4 h-4 text-amber-600" />
+              1. Pilih Rekaan Template Sijil Perakuan Keahlian Rasmi Sekolah
+            </h5>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              {CERTIFICATE_TEMPLATES.map((tpl) => {
+                const isSelected =
+                  (membershipCertForm.templateId || 'warisan-zaitun') === tpl.id;
+                return (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() =>
+                      setMembershipCertForm({
+                        ...membershipCertForm,
+                        templateId: tpl.id,
+                      })
+                    }
+                    className={`p-3.5 rounded-2xl border-2 text-left transition flex flex-col justify-between cursor-pointer ${
+                      isSelected
+                        ? 'border-teal-800 bg-teal-50/60 shadow-sm ring-2 ring-amber-400/40'
+                        : 'border-slate-200 bg-white hover:border-teal-600/50'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-1">
+                          {tpl.previewSwatches.map((hex, i) => (
+                            <span
+                              key={i}
+                              className="w-4 h-4 rounded-full border border-slate-300 shadow-2xs"
+                              style={{ backgroundColor: hex }}
                             />
                           ))}
                         </div>
+                        {isSelected && (
+                          <span className="px-2 py-0.5 rounded bg-teal-800 text-amber-300 text-[9.5px] font-black">
+                            DIPILIH
+                          </span>
+                        )}
                       </div>
-
-                      <canvas
-                        ref={canvasRef}
-                        width={460}
-                        height={150}
-                        onMouseDown={startDrawing}
-                        onMouseMove={drawMove}
-                        onMouseUp={stopDrawing}
-                        onMouseLeave={stopDrawing}
-                        onTouchStart={startDrawing}
-                        onTouchMove={drawMove}
-                        onTouchEnd={stopDrawing}
-                        className="w-full h-36 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 cursor-crosshair touch-none"
-                      />
-
-                      <div className="flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={clearSignatureCanvas}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-                        >
-                          Padam Lukisan
-                        </button>
-                        <button
-                          type="button"
-                          onClick={applyDrawnSignature}
-                          className="px-4 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Guna Tandatangan Lukisan Ini</span>
-                        </button>
-                      </div>
+                      <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
+                        {tpl.badgeLabel}
+                      </span>
+                      <strong className="text-xs font-black text-slate-900 block mt-0.5 leading-snug">
+                        {tpl.name}
+                      </strong>
+                      <p className="text-[10.5px] text-slate-500 mt-1 leading-relaxed">
+                        {tpl.subtitle}
+                      </p>
                     </div>
-                  )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 2. Chairman Name & Digital Signature + Text Wording */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Chairman Name, Role & Digital Signature on Membership Cert */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                  <PenTool className="w-3.5 h-3.5" />
+                  2. Nama & Tandatangan Digital Pengerusi (Sijil Keahlian)
+                </h5>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMembershipCertForm((prev) => ({
+                      ...prev,
+                      chairmanName: certForm.chairmanName,
+                      chairmanRole: certForm.chairmanRole,
+                      chairmanOrg: certForm.chairmanOrg,
+                      chairmanSignatureImageUrl: certForm.chairmanSignatureImageUrl,
+                      chairmanSignatureText: certForm.chairmanSignatureText,
+                    }));
+                    showToast(
+                      'Nama & tandatangan digital Pengerusi disalin daripada Sijil Penyertaan Program!'
+                    );
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-900 text-[10.5px] font-bold flex items-center gap-1 transition cursor-pointer"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Salin Daripada Sijil Program</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nama Penuh Pengerusi *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={membershipCertForm.chairmanName}
+                    onChange={(e) =>
+                      setMembershipCertForm({
+                        ...membershipCertForm,
+                        chairmanName: e.target.value,
+                      })
+                    }
+                    placeholder="USTAZ MOHAMAD FAIZ BIN AZIZAN"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Jawatan Rasmi Pengerusi *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={membershipCertForm.chairmanRole}
+                    onChange={(e) =>
+                      setMembershipCertForm({
+                        ...membershipCertForm,
+                        chairmanRole: e.target.value,
+                      })
+                    }
+                    placeholder="Pengerusi Kebangsaan MPGBSIM"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white"
+                  />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nama Organisasi Bawah Jawatan Pengerusi
+                  </label>
+                  <input
+                    type="text"
+                    value={membershipCertForm.chairmanOrg}
+                    onChange={(e) =>
+                      setMembershipCertForm({
+                        ...membershipCertForm,
+                        chairmanOrg: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Teks Kaligrafi Tandatangan (Jika Tiada Imej)
+                  </label>
+                  <input
+                    type="text"
+                    value={membershipCertForm.chairmanSignatureText || ''}
+                    onChange={(e) =>
+                      setMembershipCertForm({
+                        ...membershipCertForm,
+                        chairmanSignatureText: e.target.value,
+                      })
+                    }
+                    placeholder="Mohamad Faiz Azizan"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Signature Upload / Draw for Membership Cert */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">
+                    Tandatangan Digital Pengerusi (Sijil Keahlian):
+                  </span>
+                  <div className="flex items-center gap-1 p-1 bg-slate-200/80 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setMemSigMode('upload')}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        memSigMode === 'upload'
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Muat Naik Imej Sign
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMemSigMode('draw')}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        memSigMode === 'draw'
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Lukis Sign Digital
+                    </button>
+                  </div>
+                </div>
+
+                {memSigMode === 'upload' && (
+                  <div>
+                    <input
+                      ref={memSigFileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) processSignatureImageFile(file, 'membership');
+                        if (e.target) e.target.value = '';
+                      }}
+                    />
+                    <div className="p-4 rounded-2xl bg-white border-2 border-dashed border-teal-600/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-40 h-20 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
+                          {membershipCertForm.chairmanSignatureImageUrl ? (
+                            <img
+                              src={membershipCertForm.chairmanSignatureImageUrl}
+                              alt="Sign Digital Pengerusi"
+                              className="max-h-16 max-w-full object-contain"
+                            />
+                          ) : (
+                            <span
+                              className="text-lg italic text-teal-900 font-serif"
+                              style={{ fontFamily: "'Amiri', serif" }}
+                            >
+                              {membershipCertForm.chairmanSignatureText || 'Mohamad Faiz Azizan'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs space-y-1">
+                          <span className="font-bold text-slate-800 block">
+                            {membershipCertForm.chairmanSignatureImageUrl
+                              ? 'Imej Tandatangan Digital Aktif'
+                              : 'Tandatangan Kaligrafi Default'}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block">
+                            PNG lutsinar atau JPG (latar putih dibersihkan automatik).
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => memSigFileInputRef.current?.click()}
+                          className="px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Muat Naik Sign</span>
+                        </button>
+                        {membershipCertForm.chairmanSignatureImageUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMembershipCertForm({
+                                ...membershipCertForm,
+                                chairmanSignatureImageUrl: '',
+                              })
+                            }
+                            className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold cursor-pointer"
+                            title="Buang Imej Tandatangan"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {memSigMode === 'draw' && (
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+                    <canvas
+                      ref={memCanvasRef}
+                      width={460}
+                      height={150}
+                      onMouseDown={(e) =>
+                        startDrawingOnCanvas(memCanvasRef.current, setIsMemDrawing, e)
+                      }
+                      onMouseMove={(e) =>
+                        drawMoveOnCanvas(memCanvasRef.current, isMemDrawing, e)
+                      }
+                      onMouseUp={() => setIsMemDrawing(false)}
+                      onMouseLeave={() => setIsMemDrawing(false)}
+                      onTouchStart={(e) =>
+                        startDrawingOnCanvas(memCanvasRef.current, setIsMemDrawing, e)
+                      }
+                      onTouchMove={(e) =>
+                        drawMoveOnCanvas(memCanvasRef.current, isMemDrawing, e)
+                      }
+                      onTouchEnd={() => setIsMemDrawing(false)}
+                      className="w-full h-36 rounded-xl bg-slate-50 border-2 border-dashed border-slate-300 cursor-crosshair touch-none"
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => clearCanvasRef(memCanvasRef.current)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+                      >
+                        Padam Lukisan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyDrawnSignature('membership')}
+                        className="px-4 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Guna Tandatangan Lukisan Ini</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Secondary Signatory on Membership Certificate */}
+              <div className="pt-3 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">
+                    Penandatangan Kedua (Kanan — Setiausaha Agung / Urus Setia):
+                  </span>
+                  <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-teal-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={membershipCertForm.showSecondarySign !== false}
+                      onChange={(e) =>
+                        setMembershipCertForm({
+                          ...membershipCertForm,
+                          showSecondarySign: e.target.checked,
+                        })
+                      }
+                      className="w-3.5 h-3.5 rounded text-teal-700"
+                    />
+                    <span>Papar Penandatangan Kedua</span>
+                  </label>
+                </div>
+
+                {membershipCertForm.showSecondarySign !== false && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Nama / Gelaran Kanan
+                      </label>
+                      <input
+                        type="text"
+                        value={membershipCertForm.secondarySignatoryName}
+                        onChange={(e) =>
+                          setMembershipCertForm({
+                            ...membershipCertForm,
+                            secondarySignatoryName: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Jawatan / Sekretariat
+                      </label>
+                      <input
+                        type="text"
+                        value={membershipCertForm.secondarySignatoryRole}
+                        onChange={(e) =>
+                          setMembershipCertForm({
+                            ...membershipCertForm,
+                            secondarySignatoryRole: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        Teks Sign Kanan
+                      </label>
+                      <input
+                        type="text"
+                        value={membershipCertForm.secondarySignatureText || ''}
+                        onChange={(e) =>
+                          setMembershipCertForm({
+                            ...membershipCertForm,
+                            secondarySignatureText: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Membership Certificate Text Wording */}
+            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+              <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+                <Edit3 className="w-3.5 h-3.5" />
+                3. Sunting Tajuk & Kandungan Teks Sijil Rasmi Keahlian Sekolah
+              </h5>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Tajuk Utama Sijil Keahlian *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={membershipCertForm.certificateTitle}
+                    onChange={(e) =>
+                      setMembershipCertForm({
+                        ...membershipCertForm,
+                        certificateTitle: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs font-black uppercase rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Label Status Sesi Keahlian Aktif
+                  </label>
+                  <input
+                    type="text"
+                    value={membershipCertForm.activeSessionLabel}
+                    onChange={(e) =>
+                      setMembershipCertForm({
+                        ...membershipCertForm,
+                        activeSessionLabel: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Pertubuhan Di Atas Sijil
+                </label>
+                <input
+                  type="text"
+                  value={membershipCertForm.certificateSubtitle}
+                  onChange={(e) =>
+                    setMembershipCertForm({
+                      ...membershipCertForm,
+                      certificateSubtitle: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Perenggan Perakuan Keahlian Rasmi
+                </label>
+                <textarea
+                  rows={2}
+                  value={membershipCertForm.introText}
+                  onChange={(e) =>
+                    setMembershipCertForm({
+                      ...membershipCertForm,
+                      introText: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Klausa Pengiktirafan Perlembagaan MPGBSIM
+                </label>
+                <textarea
+                  rows={2}
+                  value={membershipCertForm.recognitionClause}
+                  onChange={(e) =>
+                    setMembershipCertForm({
+                      ...membershipCertForm,
+                      recognitionClause: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Alamat & Maklumat Sekretariat (Nota Kaki Bawah Sijil)
+                </label>
+                <input
+                  type="text"
+                  value={membershipCertForm.footerAddressText}
+                  onChange={(e) =>
+                    setMembershipCertForm({
+                      ...membershipCertForm,
+                      footerAddressText: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Item Visibility Toggles for Official Membership Certificate */}
+          <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+            <h5 className="text-xs font-black uppercase tracking-wider text-teal-900 flex items-center gap-1.5">
+              <Sliders className="w-4 h-4 text-teal-700" />
+              4. Kawalan Paparan / Buang Item Dalam Sijil Rasmi Keahlian Sekolah (16 Elemen)
+            </h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {membershipCertVisibilityItems.map((item) => {
+                const isChecked =
+                  (membershipCertForm[item.key] as boolean | undefined) !== false;
+                return (
+                  <label
+                    key={String(item.key)}
+                    className={`p-3 rounded-xl border flex items-start gap-2.5 cursor-pointer select-none transition ${
+                      isChecked
+                        ? 'bg-white border-teal-600/40 shadow-2xs'
+                        : 'bg-slate-100/70 border-slate-200 opacity-75'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) =>
+                        setMembershipCertForm({
+                          ...membershipCertForm,
+                          [item.key]: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 mt-0.5 rounded text-teal-700 focus:ring-teal-600 shrink-0"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-slate-900 block leading-snug">
+                        {item.label}
+                      </span>
+                      <span className="text-[10.5px] text-slate-500 block mt-0.5">
+                        {item.desc}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
             </div>
           </div>
         </form>
@@ -1670,6 +2904,18 @@ export const AdminProgramAttendanceManagement: React.FC<
         registration={previewReg}
         programEvent={selectedProgram}
         configOverride={activeView === 'cert-settings' ? certForm : undefined}
+        templateOverride={
+          activeView === 'cert-settings'
+            ? certForm.defaultTemplateId
+            : (eventTemplateOverride || undefined)
+        }
+      />
+
+      {/* Official School Membership Certificate Preview & PDF Download Modal */}
+      <OfficialSchoolCertificateModal
+        isOpen={isMembershipPreviewOpen}
+        onClose={() => setIsMembershipPreviewOpen(false)}
+        configOverride={membershipCertForm}
       />
     </div>
   );

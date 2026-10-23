@@ -45,7 +45,7 @@ import { DigitalMembershipCardModal } from './DigitalMembershipCardModal';
 import { OfficialSchoolCertificateModal } from './OfficialSchoolCertificateModal';
 import { compressImageFile, compressDataUrl } from '../../utils/imageCompressor';
 import { downloadElementAsSinglePagePdf } from '../../utils/pdfGenerator';
-import { maskIcNumber, parseBirthDateFromIc } from '../../utils/birthdayUtils';
+import { parseBirthDateFromIc } from '../../utils/birthdayUtils';
 
 const normalizeSchoolCategory = (t?: string): string => {
   if (!t) return 'Sekolah Menengah';
@@ -1045,7 +1045,7 @@ export const PortalProfile: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">No. Kad Pengenalan PGB (Sulit)</label>
+                    <label className="block font-bold text-slate-700 mb-1">No. Kad Pengenalan PGB</label>
                     <input
                       type="text"
                       value={icNumber}
@@ -1058,13 +1058,13 @@ export const PortalProfile: React.FC = () => {
                       if (parsed.isValid) {
                         return (
                           <span className="text-[10px] text-teal-700 font-semibold mt-0.5 block">
-                            Tarikh Hari Lahir Dikesan: {parsed.formattedDayMonth} (Dilindungi daripada paparan awam penuh)
+                            Tarikh Hari Lahir Dikesan: {parsed.formattedDayMonth} (Dipaparkan penuh dalam rekod tertutup Portal PGB)
                           </span>
                         );
                       }
                       return (
                         <span className="text-[10px] text-slate-400 mt-0.5 block">
-                          No. pengenalan diri rasmi PGB (dilindungi & disulitkan untuk paparan awam)
+                          No. pengenalan diri rasmi PGB (dipaparkan penuh dalam rekod tertutup Portal PGB)
                         </span>
                       );
                     })()}
@@ -1964,8 +1964,8 @@ export const PortalProfile: React.FC = () => {
                           <strong className="text-amber-800 font-bold font-mono">{serviceStartYear || '-'}</strong>
                         </div>
                         <div>
-                          <span className="text-[9.5px] text-slate-500 block">No. Kad Pengenalan PGB (Dilindungi):</span>
-                          <span className="text-slate-800 font-mono">{icNumber ? maskIcNumber(icNumber) : 'Dalam Rekod Rasmi'}</span>
+                          <span className="text-[9.5px] text-slate-500 block">No. Kad Pengenalan PGB:</span>
+                          <strong className="text-slate-900 font-mono font-bold">{icNumber || '-'}</strong>
                         </div>
                         <div>
                           <span className="text-[9.5px] text-slate-500 block">Email Rasmi PGB:</span>

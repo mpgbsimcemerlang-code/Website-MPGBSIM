@@ -273,9 +273,9 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
         },
         {
           id: 'kehadiran-sijil-program',
-          label: 'Kehadiran & Sijil Program PGB',
+          label: 'Kehadiran & Rekaan Sijil (Program/Ahli)',
           icon: Award,
-          count: 'Sijil',
+          count: '5 Template',
           isHighlight: true,
         },
         {
