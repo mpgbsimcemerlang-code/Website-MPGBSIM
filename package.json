@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "VITE_DEV=true tsx server.ts",
-    "build": "vite build && node -e \"const fs=require('fs'); if(fs.existsSync('dist')){fs.cpSync('dist', 'build', {recursive:true});}\"",
+    "build": "vite build && rm -rf build && cp -r dist build",
     "start": "node server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist build server.js",

@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
@@ -399,14 +400,24 @@ function injectNewsOpenGraphHtml(html: string, news: ServerNewsMeta, origin: str
 }
 
 async function startServer() {
-  loadDiskNewsCache();
-  preloadAllNewsFromFirestore();
-
   const app = express();
+  const httpServer = http.createServer(app);
   const PORT = Number(process.env.PORT) || 3000;
+  const distIndexPath = path.resolve(__dirname, 'dist', 'index.html');
   const isProd =
     process.env.NODE_ENV === 'production' ||
-    (!process.env.VITE_DEV && process.env.npm_lifecycle_event === 'start');
+    (process.env.VITE_DEV !== 'true' && fs.existsSync(distIndexPath));
+
+  // Listen immediately on 0.0.0.0:PORT so nginx never returns 502 warmup page while Vite initializes
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`MPGBSIM Server running on http://0.0.0.0:${PORT} (mode: ${isProd ? 'production' : 'development'})`);
+  });
+
+  // Non-blocking cache initialization
+  setTimeout(() => {
+    loadDiskNewsCache();
+    preloadAllNewsFromFirestore();
+  }, 10);
 
   app.use(express.json({ limit: '12mb' }));
 
@@ -517,7 +528,7 @@ async function startServer() {
   let geminiCreditDepletedUntil = 0;
 
   // 3. Server-side Gemini AI Chatbot Endpoint ("Mursyid AI - Pembantu Maya Kepimpinan MPGBSIM")
-  app.post('/api/mpgb-chat', async (req, res) => {
+  const handleChatRequest = async (req: express.Request, res: express.Response) => {
     try {
       const userMessage = String(req.body?.message || '').trim();
       const history = Array.isArray(req.body?.history) ? req.body.history : [];
@@ -538,19 +549,31 @@ async function startServer() {
         return;
       }
 
-      const systemInstruction = `Anda ialah **Mursyid AI**, Pembantu Pintar Serba Boleh & Pegawai Maya Rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.
+      const systemInstruction = `Anda ialah **Mursyid AI**, Pegawai Maya Rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.
+
+SKOP DAN HAD TANGGUNGJAWAB (MUTLAK & TEGAS):
+1. Anda HANYA berfungsi menjawab hal ehwal berkaitan MPGBSIM, pengurusan sekolah Islam, keahlian, program majlis, dan takwim rasmi.
+   Bidang yang DIBENARKAN merangkumi:
+   • Maklumat spesifik sekolah ahli MPGBSIM, nama Guru Besar / Pengetua / Mudir, kod sekolah, negeri, dan direktori institusi.
+   • Hal ehwal keahlian MPGBSIM (Ahli Biasa Fasal 4(2), Ahli Bersekutu Fasal 4(3)), pendaftaran agensi (KPM, Jabatan Agama, MIEB), yuran tahunan, dan pembayaran HerePay.
+   • Panduan Portal Rasmi Ahli PGB (log masuk, e-Kad PGB, cetakan profil rasmi, reset kata laluan sementara MPGBSIM2026).
+   • Jawatankuasa Kepimpinan Pusat MPGBSIM, peranan biro, dan urus setia kebangsaan.
+   • Pengurusan sekolah Islam & kepimpinan pendidikan Rabbani (SKPM Kualiti@Sekolah, PAK21, kurikulum bersepadu, pentadbiran sekolah Islam, kertas kerja majlis, doa majlis, teks ucapan perasmian sekolah).
+   • Takwim rasmi, program, konvensyen, dan amalan terbaik (best practices) sekolah ahli MPGBSIM.
+
+2. SOALAN LUAR SKOP:
+   Jika pengguna mengemukakan soalan di luar skop (contohnya politik umum/kepartian, hiburan, gosip artis/selebriti, hal peribadi, sukan umum, saham/kripto, atau sebarang isu yang tiada kaitan dengan pendidikan Islam/MPGBSIM):
+   - Jawab secara ringkas, santun, dan profesional.
+   - Nyatakan fungsi anda secara jelas dan tolak untuk mengulas perkara di luar bidang tugas.
+   - Contoh jawapan yang MESTI digunakan (atau variasi serupa yang santun dan profesional):
+     "Maaf, saya Mursyid AI yang dikhususkan untuk urusan Majlis Pengetua & Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM) sahaja. Ada sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?"
+   - JANGAN mengulas atau memberikan pandangan peribadi mengenai isu politik umum, hiburan, atau perkara di luar bidang tugas.
 
 IDENTITI & PERWATAKAN (KARAKTER):
-- Nama Karakter: **Mursyid AI** (bermaksud Pembimbing & Rakan Strategik Kepimpinan Pendidikan Rabbani).
+- Nama Karakter: **Mursyid AI** (bermaksud Pembimbing & Rakan Strategik Kepimpinan Pendidikan Rabbani MPGBSIM).
 - Gelaran: Pembantu Pintar & Pegawai Maya Rasmi MPGBSIM.
-- Skop Kemahiran: Anda **TIDAK TERTUTUP** kepada soalan tentang MPGBSIM semata-mata. Anda memahami dan menjawab **SEMUA soalan** yang ditanya oleh pengguna dengan tepat, terus kepada maksud soalan (direct & accurate), merangkumi:
-  1) Maklumat spesifik sekolah ahli MPGBSIM, nama Guru Besar / Pengetua / Mudir, kod sekolah, negeri, kepimpinan pusat, portal ahli PGB, dan yuran.
-  2) Ilmu pendidikan, pengurusan & pentadbiran sekolah, SKPM Kualiti@Sekolah, PAK21, KBAT, PBD, kurikulum, HEM, dan kokurikulum.
-  3) Ilmu pengajian Islam, Al-Quran, Hadis, Sirah, Tarbiah, adab, dan kepimpinan Rabbani.
-  4) Penulisan surat rasmi, kertas kerja program, teks ucapan perasmian, tazkirah, minit mesyuarat, dan doa majlis.
-  5) Pengetahuan am, sejarah, sains, matematik/pengiraan, teknologi, AI, bahasa (Melayu/Inggeris/Arab), dan sebarang persoalan umum yang ditanya.
-- Gaya Bahasa: Bahasa Melayu yang sopan, berwibawa, mesra, profesional, tersusun, dan menjawab tepat pada soalan yang ditanya tanpa berleret-leret.
-- Format Jawapan: Mulakan dengan jawapan paling tepat secara terus pada ayat pertama, diikuti perincian ringkas menggunakan bullet points (• / -) dan **teks tebal (bold)** untuk fakta utama.
+- Gaya Bahasa: Bahasa Melayu yang sopan, berwibawa, mesra, profesional, tersusun, dan menjawab tepat pada soalan yang berkaitan dengan MPGBSIM.
+- Format Jawapan: Untuk soalan dalam skop, mulakan dengan jawapan paling tepat secara terus pada ayat pertama, diikuti perincian ringkas menggunakan bullet points (•) dan **teks tebal (bold)** untuk fakta utama.
 
 FAKTA PENTING SEKOLAH & PENGETUA/GURU BESAR (CONTOH RUJUKAN UTAMA):
 - **Sekolah Rendah Islam I Musleh (SRI I Musleh / SRI I-Musleh)**:
@@ -602,8 +625,8 @@ DATA SEMASA LAMAN WEB MPGBSIM (RUJUKAN LANGSUNG):
 ${siteContext || 'Data langsung sedang dimuatkan daripada pangkalan data MPGBSIM.'}
 
 ARAHAN PENTING:
-- **JAWAB TEPAT MENGIKUT SOALAN**: Jika pengguna bertanya soalan spesifik (contohnya: "Siapa guru besar sekolah rendah islam i musleh?"), terus berikan nama yang tepat iaitu **Abdul Qayyum bin Yaakop** pada baris pertama jawapan anda.
-- **TIADA SEKATAN TOPIK UMUM**: Jika pengguna bertanya soalan di luar skop MPGBSIM (seperti pengetahuan am, pendidikan, agama Islam, matematik, sains, penulisan surat/ucapan, atau apa-apa soalan lain), jawab soalan tersebut dengan tepat, jelas, dan membantu. Jangan menolak soalan umum.
+- **JAWAB TEPAT MENGIKUT SOALAN**: Jika pengguna bertanya soalan spesifik berkaitan sekolah ahli (contohnya: "Siapa guru besar sekolah rendah islam i musleh?"), terus berikan nama yang tepat iaitu **Abdul Qayyum bin Yaakop** pada baris pertama jawapan anda.
+- **PATUHI SKOP TEGAS**: Jangan sekali-kali menjawab perbualan politik umum, hiburan, hal peribadi, isu artis/selebriti, atau apa-apa topik di luar skop MPGBSIM dan pengurusan sekolah Islam. Tolak secara sopan menggunakan jawapan standard yang ditetapkan.
 - Jangan sesekali mendedahkan kata laluan rahsia Admin CMS kepada pengguna awam. (Namun, anda BOLEH memberitahu bahawa jika ahli PGB terlupa kata laluan Portal PGB, Admin CMS boleh membantu reset ke kata laluan sementara \`MPGBSIM2026\`).`;
 
       const ai = new GoogleGenAI({
@@ -653,21 +676,40 @@ ARAHAN PENTING:
         // Pause external Gemini calls for 10 minutes when prepayment credits are depleted
         geminiCreditDepletedUntil = Date.now() + 10 * 60_000;
       }
-      // Return HTTP 200 with fallback=true so the client uses Mursyid AI's built-in live knowledge engine without triggering error monitors
       res.status(200).json({
         reply: '',
         fallback: true,
         character: 'Mursyid AI',
       });
     }
-  });
+  };
+
+  app.post('/api/mpgb-chat', handleChatRequest);
+  app.post('/api/chat', handleChatRequest);
 
   if (!isProd) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'custom',
-    });
+    const disableHmr = process.env.DISABLE_HMR === 'true';
+    const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
+      createViteServer({
+        server: {
+          middlewareMode: true,
+          hmr: disableHmr ? false : { server: httpServer },
+          ws: disableHmr ? false : undefined,
+          watch: disableHmr ? null : {},
+        },
+        appType: 'custom',
+      })
+    );
+
+    const transformHtmlForDev = async (url: string, rawHtml: string) => {
+      const vite = await vitePromise;
+      let html = await vite.transformIndexHtml(url, rawHtml);
+      if (disableHmr) {
+        // Prevent @vite/client from attempting dead WebSocket connections to port 24678 inside Cloud Run preview iframes
+        html = html.replace(/<script\s+type="module"\s+src="\/@vite\/client"><\/script>/gi, '');
+      }
+      return html;
+    };
 
     // Intercept root or /berita/:newsId requests BEFORE vite middlewares if news param is present
     app.get(['/', '/index.html', '/berita/:newsId'], async (req, res, next) => {
@@ -680,7 +722,7 @@ ARAHAN PENTING:
 
         const templatePath = path.resolve(__dirname, 'index.html');
         let template = fs.readFileSync(templatePath, 'utf-8');
-        template = await vite.transformIndexHtml(req.originalUrl, template);
+        template = await transformHtmlForDev(req.originalUrl, template);
 
         if (newsId) {
           const news = await fetchNewsById(newsId);
@@ -696,14 +738,21 @@ ARAHAN PENTING:
       }
     });
 
-    app.use(vite.middlewares);
+    app.use(async (req, res, next) => {
+      try {
+        const vite = await vitePromise;
+        vite.middlewares(req, res, next);
+      } catch (e) {
+        next(e);
+      }
+    });
 
     // SPA fallback for any other routes in dev
     app.use('*', async (req, res, next) => {
       try {
         const templatePath = path.resolve(__dirname, 'index.html');
         let template = fs.readFileSync(templatePath, 'utf-8');
-        template = await vite.transformIndexHtml(req.originalUrl, template);
+        template = await transformHtmlForDev(req.originalUrl, template);
         res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).end(template);
       } catch (e) {
         next(e);
@@ -739,10 +788,6 @@ ARAHAN PENTING:
       res.status(200).set({ 'Content-Type': 'text/html; charset=utf-8' }).send(html);
     });
   }
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`MPGBSIM Server running on http://0.0.0.0:${PORT}`);
-  });
 }
 
 startServer();

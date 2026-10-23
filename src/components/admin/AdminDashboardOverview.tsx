@@ -322,13 +322,17 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
       <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3.5">
           <div
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+            className={`w-12 h-12 rounded-2xl overflow-hidden border-2 flex items-center justify-center shrink-0 shadow-xs ${
               dashboardConfig.enableAiChatbot !== false
-                ? 'bg-gradient-to-br from-teal-900 to-teal-700 text-amber-300'
-                : 'bg-slate-100 text-slate-400'
+                ? 'border-teal-700 bg-teal-900'
+                : 'border-slate-300 bg-slate-100 opacity-60 grayscale'
             }`}
           >
-            <Bot className="w-6 h-6" />
+            <img
+              src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
+              alt="Karakter Mursyid AI"
+              className="w-full h-full object-cover object-top"
+            />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">

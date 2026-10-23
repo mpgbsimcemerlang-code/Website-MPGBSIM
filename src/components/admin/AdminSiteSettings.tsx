@@ -438,8 +438,12 @@ export const AdminSiteSettings: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-teal-900 text-amber-300 flex items-center justify-center">
-              <Bot className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-teal-800 bg-teal-900 flex items-center justify-center shrink-0 shadow-2xs">
+              <img
+                src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
+                alt="Karakter Mursyid AI"
+                className="w-full h-full object-cover object-top"
+              />
             </div>
             <div>
               <h4 className="text-sm font-extrabold text-slate-900">

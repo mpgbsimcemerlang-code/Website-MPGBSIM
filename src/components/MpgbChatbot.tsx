@@ -176,7 +176,7 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
     () => ({
       id: 'welcome-mursyid',
       role: 'model',
-      text: `**Assalamualaikum warahmatullahi wabarakatuh & Salam Kepimpinan Pendidikan Rabbani.**\n\nSaya **Mursyid AI**, Pembantu Pintar Serba Boleh & Pegawai Maya Rasmi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.\n\nTuan/Puan bebas bertanya **apa sahaja soalan** kepada saya, termasuk:\n• **Maklumat Spesifik Sekolah & PGB** *(cth: "Siapa Guru Besar Sekolah Rendah Islam I Musleh?")*\n• **Direktori Sekolah Islam Ahli**, Barisan Kepimpinan Pusat, Portal PGB & Yuran HerePay\n• **Ilmu Pendidikan & Pengurusan Sekolah** *(PAK21, KBAT, SKPM, Kertas Kerja, Surat Rasmi, Ucapan)*\n• **Pengetahuan Am, Pengajian Islam, Sains & Matematik**\n\nSilakan pilih soalan pantas di bawah atau taip sebarang soalan Tuan/Puan.`,
+      text: `**Assalamualaikum warahmatullahi wabarakatuh & Salam Kepimpinan Pendidikan Rabbani.**\n\nSaya **Mursyid AI**, Pegawai Maya Rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.\n\nSaya dikhususkan untuk menjawab hal ehwal berkaitan:\n• **Keahlian MPGBSIM & Portal Ahli PGB** *(Pendaftaran, e-Kad, Reset Kata Laluan, Yuran HerePay)*\n• **Direktori Sekolah Islam Ahli & Kepimpinan PGB** *(Maklumat sekolah, Guru Besar & Pengetua)*\n• **Program, Takwim Rasmi Majlis & Konvensyen**\n• **Pengurusan Sekolah Islam & Kepimpinan Rabbani**\n\nAda sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?`,
       timestamp: new Date().toLocaleTimeString('ms-MY', {
         hour: '2-digit',
         minute: '2-digit',
@@ -299,7 +299,7 @@ ${schoolLines}
 `.trim();
   }, [allSchools, allLeaders, siteData.programs, siteData.news, siteData.practices]);
 
-  // Comprehensive & Accurate Local Question-Answering Engine (handles both specific MPGBSIM entity lookups & general knowledge)
+  // Comprehensive & Accurate Local Question-Answering Engine (strictly scoped to MPGBSIM & Islamic school affairs)
   const buildLocalFallbackAnswer = (query: string): string => {
     const rawQuery = query.trim();
     const q = normalizeText(rawQuery);
@@ -310,6 +310,21 @@ ${schoolLines}
     const news = siteData.news || [];
     const practices = siteData.practices || [];
     const alumni = siteData.alumni || [];
+
+    const OUT_OF_SCOPE_RESPONSE =
+      'Maaf, saya Mursyid AI yang dikhususkan untuk urusan Majlis Pengetua & Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM) sahaja. Ada sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?';
+
+    // 0. STRICT OUT-OF-SCOPE FILTERING: Politics, entertainment, personal affairs, gossip, external finance/crypto, unrelated sports
+    const isExplicitlyOutOfScope =
+      /\b(politik|pru|pilihan raya|parti|umno|pas|pkr|dap|bersatu|perikatan nasional|barisan nasional|pakatan harapan|calon pru|undi|kerajaan campuran|menteri kewangan|perdana menteri|kabinet|ahli parlimen|adun)\b/i.test(q) ||
+      /\b(hiburan|artis|selebriti|gossip|gosip|konsert|wayang|movie|drama|lagu|filem|pelakon|penyanyi|netflix|kpop|tiktok|tiktoker|influencer)\b/i.test(q) ||
+      /\b(umur awak|umur kamu|jodoh|dating|kahwin|cinta|girlfriend|boyfriend|peribadi saya|siapa bf|siapa gf)\b/i.test(q) ||
+      /\b(kripto|crypto|bitcoin|forex|saham bursa|skim cepat kaya|pelaburan wang)\b/i.test(q) ||
+      /\b(epl|liga inggeris|manchester united|chelsea|liverpool|arsenal|piala dunia|world cup|formula 1|f1)\b/i.test(q);
+
+    if (isExplicitlyOutOfScope) {
+      return OUT_OF_SCOPE_RESPONSE;
+    }
 
     // =========================================================================
     // A. DIRECT ENTITY MATCHING: SPECIFIC SCHOOL OR PRINCIPAL / HEADMASTER QUERY
@@ -609,35 +624,14 @@ ${schoolLines}
     }
 
     // =========================================================================
-    // C. MATHEMATICAL CALCULATIONS (General Utility)
+    // C. PURE MATH EXPRESSIONS (OUT OF SCOPE)
     // =========================================================================
-    const mathExprMatch = rawQuery
-      .replace(/berapa(kah)?|kira(kan)?|hasil|jumlah|jawapan|bagi|darab|kali|bahagi|tambah|tolak/gi, (m) => {
-        const lower = m.toLowerCase();
-        if (lower === 'darab' || lower === 'kali') return '*';
-        if (lower === 'bahagi') return '/';
-        if (lower === 'tambah') return '+';
-        if (lower === 'tolak') return '-';
-        return '';
-      })
-      .replace(/[?=]/g, '')
-      .trim();
-
-    if (/^[\d\s.+\-*/()%]+$/.test(mathExprMatch) && /[+\-*/%]/.test(mathExprMatch) && /\d/.test(mathExprMatch)) {
-      try {
-        // Safe evaluation of arithmetic expression
-        const sanitizedMath = mathExprMatch.replace(/[^0-9.+\-*/()%]/g, '');
-        // eslint-disable-next-line no-new-func
-        const result = Function(`"use strict"; return (${sanitizedMath})`)();
-        if (typeof result === 'number' && Number.isFinite(result)) {
-          const formattedResult = Number.isInteger(result)
-            ? result.toLocaleString('ms-MY')
-            : Number(result.toFixed(4)).toLocaleString('ms-MY');
-          return `**Jawapan Pengiraan:**\n\n• **${sanitizedMath} = ${formattedResult}**`;
-        }
-      } catch {
-        // Ignore if not a valid math expression
-      }
+    const isPureMath =
+      /^[0-9\s.+\-*/()%]+$/.test(rawQuery.replace(/[?=]/g, '').trim()) &&
+      /[0-9]/.test(rawQuery) &&
+      /[+\-*/%]/.test(rawQuery);
+    if (isPureMath) {
+      return OUT_OF_SCOPE_RESPONSE;
     }
 
     // =========================================================================
@@ -827,26 +821,15 @@ ${schoolLines}
     }
 
     // =========================================================================
-    // K. GENERAL KNOWLEDGE (MALAYSIA, RUKUN NEGARA, AI, ETC.)
+    // K. AI IN ISLAMIC EDUCATION & SCHOOL LEADERSHIP
     // =========================================================================
-    if (q.includes('rukun negara')) {
-      return `**5 Prinsip Rukun Negara Malaysia:**\n\n1. **Kepercayaan kepada Tuhan**\n2. **Kesetiaan kepada Raja dan Negara**\n3. **Keluhuran Perlembagaan**\n4. **Kedaulatan Undang-undang**\n5. **Kesopanan dan Kesusilaan**`;
-    }
-
-    if (
-      q.includes('perdana menteri') ||
-      q.includes('ibu negara malaysia') ||
-      (q.includes('berapa negeri') && q.includes('malaysia'))
-    ) {
-      return `**Maklumat Asas Negara Malaysia:**\n\n• **Ibu Negara**: Kuala Lumpur (Pusat Pentadbiran Kerajaan Persekutuan: **Putrajaya**)\n• **Komposisi Negeri**: **13 buah Negeri** dan **3 Wilayah Persekutuan** (Kuala Lumpur, Putrajaya, Labuan)\n• **Perdana Menteri Malaysia Ke-10**: YAB Dato' Seri Anwar bin Ibrahim\n• **Bahasa Kebangsaan**: Bahasa Melayu | **Agama Persekutuan**: Agama Islam`;
-    }
-
     if (
       q.includes('apa itu ai') ||
       q.includes('kecerdasan buatan') ||
-      q.includes('artificial intelligence')
+      q.includes('artificial intelligence') ||
+      (q.includes('ai') && (q.includes('sekolah') || q.includes('pendidikan') || q.includes('pgb')))
     ) {
-      return `**Apakah Itu Kecerdasan Buatan (Artificial Intelligence - AI)?**\n\n• **Definisi**: Kecerdasan Buatan (AI) ialah cabang sains komputer yang membangunkan sistem pintar yang mampu melaksanakan tugasan yang biasanya memerlukan kecerdasan manusia—seperti memahami bahasa, menganalisis data, membuat keputusan, dan menjana kandungan.\n• **Aplikasi AI Dalam Pendidikan & Sekolah**:\n  1. Membantu Pengetua & Guru Besar menyediakan draf kertas kerja, pelan strategik, dan analisis data peperiksaan dengan pantas.\n  2. Membantu guru merancang RPH, bahan bantu mengajar interaktif, dan soalan pentaksiran mengikut aras KBAT.\n  3. Menyokong pembelajaran terbeza (*differentiated learning*) dan pemantauan hafazan/bacaan murid.`;
+      return `**Aplikasi Kecerdasan Buatan (AI) Dalam Pengurusan Sekolah Islam:**\n\n• **Peranan AI Untuk Pemimpin Sekolah (PGB)**:\n  1. Membantu Pengetua & Guru Besar menyediakan draf kertas kerja, pelan strategik, minit mesyuarat, dan teks ucapan majlis.\n  2. Membantu guru merancang RPH bersepadu, bahan bantu mengajar PAK21, dan soalan pentaksiran aras KBAT.\n  3. Mengoptimumkan pengurusan rekod sekolah, pencerapan guru, dan pemantauan hafazan murid.\n\n*Nota: Mursyid AI dikhususkan untuk urusan MPGBSIM dan pengurusan sekolah Islam sahaja.*`;
     }
 
     // =========================================================================
@@ -984,9 +967,9 @@ ${schoolLines}
       q === 'syukran'
     ) {
       if (q.includes('terima kasih') || q.includes('syukran')) {
-        return `**Sama-sama & Afwan, Tuan/Puan.** Semoga maklumat yang dikongsikan memberi manfaat. Sekiranya ada sebarang soalan lain—sama ada mengenai sekolah ahli MPGBSIM, pengurusan pendidikan, mahupun soalan umum—silakan bertanya pada bila-bila masa.`;
+        return `**Sama-sama & Afwan, Tuan/Puan.** Semoga maklumat yang dikongsikan memberi manfaat. Sekiranya ada sebarang pertanyaan mengenai keahlian, takwim, atau program majlis MPGBSIM, silakan bertanya pada bila-bila masa.`;
       }
-      return `**Waalaikumussalam warahmatullahi wabarakatuh & Salam Kepimpinan Pendidikan Rabbani.**\n\nSaya ialah **Mursyid AI**, Pembantu Pintar Serba Boleh & Pegawai Maya Rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.\n\nSaya bersedia menjawab **semua soalan** Tuan/Puan secara tepat, merangkumi:\n1. **Maklumat Spesifik Sekolah & PGB** *(cth: "Siapa Guru Besar Sekolah Rendah Islam I Musleh?" -> **Abdul Qayyum bin Yaakop**)*\n2. **Direktori ${schools.length} Buah Sekolah Ahli**, Kepimpinan Pusat, Portal PGB & Yuran HerePay\n3. **Pengurusan Pendidikan, Pedagogi (PAK21/KBAT), Surat Rasmi, Kertas Kerja & Teks Ucapan**\n4. **Pengetahuan Am, Pengajian Islam, Sains & Pengiraan**\n\nApakah soalan yang boleh saya bantu jawab hari ini?`;
+      return `**Waalaikumussalam warahmatullahi wabarakatuh & Salam Kepimpinan Pendidikan Rabbani.**\n\nSaya ialah **Mursyid AI**, Pegawai Maya Rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.\n\nSaya dikhususkan untuk menjawab hal ehwal berkaitan:\n1. **Maklumat Spesifik Sekolah & PGB** *(cth: "Siapa Guru Besar Sekolah Rendah Islam I Musleh?" -> **Abdul Qayyum bin Yaakop**)*\n2. **Direktori ${schools.length} Buah Sekolah Ahli**, Kepimpinan Pusat, Portal PGB & Yuran HerePay\n3. **Pengurusan Sekolah Islam, Kurikulum & Kepimpinan Rabbani**\n4. **Program, Konvensyen & Takwim Rasmi Majlis**\n\nAda sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?`;
     }
 
     // =========================================================================
@@ -1002,9 +985,16 @@ ${schoolLines}
     }
 
     // =========================================================================
-    // Q. OPEN-ENDED / GENERAL QUESTION INTELLIGENT RESPONDER
+    // Q. STRICT DECLINE FOR OUT-OF-SCOPE / UNRELATED TOPICS
     // =========================================================================
-    return `**Maklum Balas Mursyid AI bagi pertanyaan: "${rawQuery}"**\n\nBerikut ialah penjelasan dan panduan berhubung perkara yang ditanyakan oleh Tuan/Puan:\n\n• **Ringkasan Fakta & Konteks**: Pertanyaan mengenai **"${rawQuery}"** merangkumi aspek pengetahuan dan pengurusan yang penting. Dalam konteks pendidikan dan kepimpinan bersepadu, setiap perkara perlu diteliti berasaskan fakta yang sahih, perancangan yang rapi (*itqan*), serta pelaksanaan yang berkesan.\n• **Panduan & Rujukan Pantas**:\n  - Jika Tuan/Puan mencari **nama Pengetua / Guru Besar** atau **maklumat sekolah tertentu**, sila nyatakan nama sekolah tersebut *(contoh: "Siapa Guru Besar Sekolah Rendah Islam I Musleh?" — Jawapan: **Abdul Qayyum bin Yaakop**)*. \n  - Jika Tuan/Puan memerlukan **draf surat rasmi, teks ucapan, kertas kerja, doa majlis, atau panduan pengurusan sekolah (PAK21/KBAT/SKPM)**, sila taip kata kunci tersebut dan saya akan menyediakannya serta-merta.`;
+    const isRelatedToMpgbOrSchool =
+      /\b(mpgbsim|sekolah|pgb|guru|pengetua|mudir|pendidikan|murid|pelajar|kurikulum|kpm|mieb|jabatan agama|jain|main|yuran|keahlian|portal|takwim|program|majlis|tarbiah|surat|kertas kerja|ucapan|doa|kepimpinan|islam|peperiksaan|spm|upkk|sppim)\b/i.test(q);
+
+    if (!isRelatedToMpgbOrSchool) {
+      return OUT_OF_SCOPE_RESPONSE;
+    }
+
+    return `**Panduan Urusan MPGBSIM & Pengurusan Sekolah Islam:**\n\nBerikut ialah maklumat berkaitan pertanyaan Tuan/Puan:\n\n• **Fokus Rujukan**: Bagi urusan rasmi MPGBSIM dan pengurusan sekolah Islam, Tuan/Puan boleh mendapatkan maklumat lanjut melalui modul-modul berikut:\n  - **Maklumat Spesifik Sekolah**: Taip nama sekolah seperti *"Siapa guru besar Sekolah Rendah Islam I Musleh?"* (Jawapan: **Abdul Qayyum bin Yaakop**).\n  - **Keahlian & Portal PGB**: Semak syarat keahlian Fasal 4 atau log masuk portal ahli.\n  - **Takwim & Program Majlis**: Rujuk program dan konvensyen kebangsaan yang tersenarai.\n\nAda sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?`;
   };
 
   const detectSuggestedActions = (
@@ -1223,14 +1213,18 @@ ${schoolLines}
             type="button"
             onClick={() => setIsOpen(true)}
             aria-label="Tanya Mursyid AI - Chatbot Rasmi MPGBSIM"
-            className="group flex items-center gap-3 pl-3 pr-4 py-2.5 rounded-2xl bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 hover:from-teal-800 hover:to-slate-800 text-white shadow-2xl border border-amber-400/50 hover:border-amber-300 transition-all duration-200 hover:scale-[1.03] cursor-pointer"
+            className="group flex items-center gap-3 pl-2.5 pr-4 py-2 rounded-2xl bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 hover:from-teal-800 hover:to-slate-800 text-white shadow-2xl border border-amber-400/60 hover:border-amber-300 transition-all duration-200 hover:scale-[1.03] cursor-pointer"
           >
-            {/* Character Avatar Icon */}
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 flex items-center justify-center shadow-md shrink-0">
-              <Bot className="w-5 h-5 stroke-[2.2]" />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            {/* Character Avatar Image */}
+            <div className="relative w-12 h-12 rounded-xl bg-amber-400/20 border-2 border-amber-400/80 flex items-center justify-center shadow-md shrink-0 overflow-visible">
+              <img
+                src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
+                alt="Karakter Mursyid AI - Chatbot Pintar MPGBSIM"
+                className="w-full h-full rounded-[10px] object-cover object-top"
+              />
+              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-slate-900" />
+                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900" />
               </span>
             </div>
 
@@ -1264,8 +1258,12 @@ ${schoolLines}
           {/* Header: Character Persona "Mursyid AI" */}
           <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-teal-900 text-white px-5 py-4 flex items-center justify-between gap-3 border-b border-teal-800/60 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 flex items-center justify-center shadow-md shrink-0 font-black">
-                <Bot className="w-6 h-6 stroke-[2.2]" />
+              <div className="relative w-12 h-12 rounded-2xl bg-amber-400/20 border-2 border-amber-400/80 flex items-center justify-center shadow-md shrink-0">
+                <img
+                  src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
+                  alt="Mursyid AI - Chatbot Pintar MPGBSIM"
+                  className="w-full h-full rounded-[14px] object-cover object-top"
+                />
                 <span
                   className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900"
                   title="Mursyid AI Aktif"
@@ -1374,8 +1372,12 @@ ${schoolLines}
                 >
                   <div className="flex items-start gap-2.5 max-w-[92%] sm:max-w-[88%]">
                     {isBot && (
-                      <div className="w-8 h-8 rounded-xl bg-teal-900 text-amber-300 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                        <Bot className="w-4 h-4" />
+                      <div className="w-9 h-9 rounded-xl border border-teal-800/30 bg-teal-900 overflow-hidden shrink-0 mt-0.5 shadow-xs">
+                        <img
+                          src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
+                          alt="Mursyid AI"
+                          className="w-full h-full object-cover object-top"
+                        />
                       </div>
                     )}
 
@@ -1453,8 +1455,12 @@ ${schoolLines}
 
             {isLoading && (
               <div className="flex items-start gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-teal-900 text-amber-300 flex items-center justify-center shrink-0">
-                  <Bot className="w-4 h-4 animate-pulse" />
+                <div className="w-9 h-9 rounded-xl border border-teal-800/30 bg-teal-900 overflow-hidden shrink-0 shadow-xs">
+                  <img
+                    src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
+                    alt="Mursyid AI"
+                    className="w-full h-full object-cover object-top animate-pulse"
+                  />
                 </div>
                 <div className="rounded-2xl px-4 py-3 bg-white border border-slate-200 text-xs text-slate-600 shadow-xs flex items-center gap-2">
                   <span className="flex gap-1">

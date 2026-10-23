@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -19,7 +19,6 @@ import { PublicBirthdaySection } from './components/PublicBirthdaySection';
 import { LeadershipSection } from './components/LeadershipSection';
 import { AlumniPublicSection } from './components/alumni/AlumniPublicSection';
 import { QuoteSection } from './components/QuoteSection';
-import { ResourcesSection } from './components/ResourcesSection';
 import { CallToAction } from './components/CallToAction';
 import { ContactSection } from './components/ContactSection';
 import { FAQSection } from './components/FAQSection';
@@ -29,7 +28,6 @@ import { DetailModal, ModalContentType } from './components/DetailModal';
 // Admin CMS & Logo Management
 import { AdminContentProvider, useAdminContent } from './context/AdminContentContext';
 import { UploadLogoModal } from './components/UploadLogoModal';
-import { AdminCMSModal } from './components/AdminCMSModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminFloatingControl } from './components/AdminFloatingControl';
 
@@ -37,8 +35,14 @@ import { StrategicFocus, NewsItem, BestPracticeItem, ProgramEvent } from './type
 import { db, doc, getDoc } from './firebase';
 
 import { MemberPortalProvider, useMemberPortal } from './context/MemberPortalContext';
-import { PortalMainLayout } from './components/portal/PortalMainLayout';
 import { MpgbChatbot } from './components/MpgbChatbot';
+
+const AdminCMSModal = React.lazy(() =>
+  import('./components/AdminCMSModal').then((m) => ({ default: m.AdminCMSModal }))
+);
+const PortalMainLayout = React.lazy(() =>
+  import('./components/portal/PortalMainLayout').then((m) => ({ default: m.PortalMainLayout }))
+);
 
 function AppContent() {
   const {
@@ -228,7 +232,20 @@ function AppContent() {
   if (viewMode === 'portal') {
     return (
       <>
-        <PortalMainLayout />
+        <Suspense
+          fallback={
+            <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
+              <div className="text-center space-y-3">
+                <div className="w-10 h-10 border-3 border-teal-500 border-t-amber-400 rounded-full animate-spin mx-auto" />
+                <p className="text-sm font-semibold text-teal-200">
+                  Memuatkan Portal Rasmi Ahli PGB...
+                </p>
+              </div>
+            </div>
+          }
+        >
+          <PortalMainLayout />
+        </Suspense>
         <MpgbChatbot onOpenPortal={handleOpenPortal} />
       </>
     );
@@ -413,10 +430,14 @@ function AppContent() {
         onClose={() => setIsLogoModalOpen(false)}
       />
 
-      <AdminCMSModal
-        isOpen={isCMSOpen}
-        onClose={() => setIsCMSOpen(false)}
-      />
+      {isCMSOpen && (
+        <Suspense fallback={null}>
+          <AdminCMSModal
+            isOpen={isCMSOpen}
+            onClose={() => setIsCMSOpen(false)}
+          />
+        </Suspense>
+      )}
 
       <AdminLoginModal
         isOpen={isLoginModalOpen}
