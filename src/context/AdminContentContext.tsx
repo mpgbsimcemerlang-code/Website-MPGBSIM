@@ -708,7 +708,40 @@ export const DEFAULT_STRATEGIC_FOCUS: StrategicFocus[] = [
     kpi: 'Maklum balas sokongan dan kebajikan diselesaikan dalam tempoh 48 jam.',
     status: 'Fokus Utama',
   },
+  {
+    id: 6,
+    code: 'FS-06',
+    title: 'Penyelidikan Amalan Terbaik & Pengantarabangsaan',
+    shortDesc: 'Memperkasa inovasi pedagogi sekolah ahli, dokumentasi amalan terbaik, dan jaringan pendidikan Islam serantau.',
+    fullDesc: 'Mendokumentasikan kajian tindakan serta inovasi pengurusan sekolah ahli sebagai rujukan kebangsaan, di samping membuka ruang penandaarasan kualiti dan jaringan kolaborasi bersama institusi pendidikan Islam di peringkat serantau dan antarabangsa (Fasal 3(5)).',
+    iconName: 'Share2',
+    initiatives: [
+      'Repositori Kebangsaan Amalan Terbaik & Inovasi Sekolah Islam',
+      'Simposium Penyelidikan Pendidikan Islam & Konvensyen KPSI',
+      'Jaringan Penandaarasan Serantau (ASEAN) & Pertukaran Kepimpinan PGB'
+    ],
+    kpi: 'Sekurang-kurangnya 50 dokumentasi amalan terbaik diterbitkan dan 5 jaringan serantau dimeterai menjelang 2026.',
+    status: 'Sedang Berjalan',
+  },
 ];
+
+function ensureSixStrategicFocus(list?: StrategicFocus[] | null): StrategicFocus[] {
+  if (!Array.isArray(list) || list.length === 0) {
+    return DEFAULT_STRATEGIC_FOCUS;
+  }
+  const isFs06Deleted =
+    typeof window !== 'undefined' && localStorage.getItem('mpgbsim_fs06_deleted') === 'true';
+  if (isFs06Deleted) {
+    return list;
+  }
+  const hasFs06 = list.some(
+    (item) => item.id === 6 || (item.code && item.code.trim().toUpperCase() === 'FS-06')
+  );
+  if (!hasFs06 && list.length === 5) {
+    return [...list, DEFAULT_STRATEGIC_FOCUS[5]];
+  }
+  return list;
+}
 
 export const DEFAULT_MEMBER_SCHOOLS: MemberSchool[] = [
   {
@@ -1817,11 +1850,12 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       branding: cachedCms?.branding || initialSync?.branding || prev?.branding || DEFAULT_BRANDING,
       hero: cachedCms?.hero || initialSync?.hero || prev?.hero || DEFAULT_HERO,
       visionMission: cachedCms?.visionMission || initialSync?.visionMission || prev?.visionMission || DEFAULT_VISION_MISSION,
-      strategicFocus:
+      strategicFocus: ensureSixStrategicFocus(
         (cachedCms?.strategicFocus?.length ? cachedCms.strategicFocus : null) ||
-        (initialSync?.strategicFocus?.length ? initialSync.strategicFocus : null) ||
-        prev?.strategicFocus ||
-        DEFAULT_STRATEGIC_FOCUS,
+          (initialSync?.strategicFocus?.length ? initialSync.strategicFocus : null) ||
+          prev?.strategicFocus ||
+          DEFAULT_STRATEGIC_FOCUS
+      ),
       stats:
         (cachedCms?.stats?.schoolsCount ? cachedCms.stats : null) ||
         (initialSync?.stats?.schoolsCount ? initialSync.stats : null) ||
@@ -2030,7 +2064,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               branding: cached.branding || prev.branding,
               hero: cached.hero || prev.hero,
               visionMission: cached.visionMission || prev.visionMission,
-              strategicFocus: Array.isArray(cached.strategicFocus) ? cached.strategicFocus : prev.strategicFocus,
+              strategicFocus: Array.isArray(cached.strategicFocus)
+                ? ensureSixStrategicFocus(cached.strategicFocus)
+                : ensureSixStrategicFocus(prev.strategicFocus),
               stats: cached.stats || prev.stats,
               memberSchools:
                 prev.memberSchools && prev.memberSchools.length > 0
@@ -2279,7 +2315,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               branding: d.branding ? { ...prev.branding, ...d.branding } : prev.branding,
               hero: d.hero ? { ...prev.hero, ...d.hero } : prev.hero,
               visionMission: d.visionMission ? { ...prev.visionMission, ...d.visionMission } : prev.visionMission,
-              strategicFocus: Array.isArray(d.strategicFocus) && d.strategicFocus.length > 0 ? d.strategicFocus : DEFAULT_STRATEGIC_FOCUS,
+              strategicFocus:
+                Array.isArray(d.strategicFocus) && d.strategicFocus.length > 0
+                  ? ensureSixStrategicFocus(d.strategicFocus)
+                  : DEFAULT_STRATEGIC_FOCUS,
               stats: d.stats && d.stats.schoolsCount ? { ...prev.stats, ...d.stats } : DEFAULT_NETWORK_STATS,
               quote: d.quote ? { ...prev.quote, ...d.quote } : prev.quote,
               cta: d.cta ? { ...prev.cta, ...d.cta } : prev.cta,
@@ -4891,6 +4930,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const deleteStrategicFocus = (id: number) => {
+    if (id === 6 && typeof window !== 'undefined') {
+      localStorage.setItem('mpgbsim_fs06_deleted', 'true');
+    }
     const updated = siteData.strategicFocus.filter((f) => f.id !== id);
     setSiteData((prev) => ({
       ...prev,

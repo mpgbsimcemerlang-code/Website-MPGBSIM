@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { NewsItem } from '../types';
 import { sortNewsByPublishedDate } from '../utils/dateUtils';
-import { copyNewsShareLink } from '../utils/shareUtils';
+import { copyNewsShareLink, buildWhatsAppShareUrl } from '../utils/shareUtils';
 import {
   Newspaper,
   Calendar,
@@ -420,7 +420,18 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                     <span className="text-slate-500 truncate max-w-[140px]">
                       {news.author || 'Urus Setia'}
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={buildWhatsAppShareUrl(news, false)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Kongsi kad berita bergambar ke WhatsApp"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all cursor-pointer"
+                      >
+                        <Share2 className="w-3 h-3" />
+                        <span>WhatsApp</span>
+                      </a>
                       <button
                         type="button"
                         onClick={(e) => handleQuickShare(e, news.id)}
@@ -437,13 +448,10 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                             <span>Disalin!</span>
                           </>
                         ) : (
-                          <>
-                            <Share2 className="w-3 h-3" />
-                            <span>Kongsi</span>
-                          </>
+                          <span>Salin Link</span>
                         )}
                       </button>
-                      <span className="inline-flex items-center gap-1 font-bold text-teal-800 group-hover:translate-x-1 transition-transform">
+                      <span className="inline-flex items-center gap-1 font-bold text-teal-800 group-hover:translate-x-1 transition-transform ml-1">
                         <span>Baca</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </span>
@@ -554,7 +562,18 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                         <span className="truncate max-w-[180px]">{featuredItem.author}</span>
                       </div>
 
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={buildWhatsAppShareUrl(featuredItem, false)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Kongsi kad berita bergambar ke WhatsApp"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-xs"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                          <span>WhatsApp</span>
+                        </a>
                         <button
                           type="button"
                           onClick={(e) => handleQuickShare(e, featuredItem.id)}
@@ -568,13 +587,10 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                           {copiedId === featuredItem.id ? (
                             <>
                               <Check className="w-3.5 h-3.5" />
-                              <span>Pautan Disalin!</span>
+                              <span>Disalin!</span>
                             </>
                           ) : (
-                            <>
-                              <Share2 className="w-3.5 h-3.5 text-amber-400" />
-                              <span>Salin Pautan</span>
-                            </>
+                            <span>Salin Link</span>
                           )}
                         </button>
 
@@ -658,7 +674,18 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
 
                       <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                         <span className="truncate max-w-[140px]">{news.author}</span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={buildWhatsAppShareUrl(news, false)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Kongsi kad berita bergambar ke WhatsApp"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all cursor-pointer"
+                          >
+                            <Share2 className="w-3 h-3" />
+                            <span>WhatsApp</span>
+                          </a>
                           <button
                             type="button"
                             onClick={(e) => handleQuickShare(e, news.id)}
@@ -675,13 +702,10 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
                                 <span>Disalin!</span>
                               </>
                             ) : (
-                              <>
-                                <Share2 className="w-3 h-3 text-teal-700" />
-                                <span>Kongsi</span>
-                              </>
+                              <span>Salin Link</span>
                             )}
                           </button>
-                          <span className="font-bold text-teal-800 inline-flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                          <span className="font-bold text-teal-800 inline-flex items-center gap-0.5 group-hover:translate-x-1 transition-transform ml-1">
                             <span>Baca Berita</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </span>

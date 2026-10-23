@@ -239,12 +239,16 @@ export const CMSStrategicFocus: React.FC = () => {
                 onChange={(e) => setForm({ ...form, iconName: e.target.value })}
                 className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-teal-600"
               >
-                <option value="ShieldCheck">ShieldCheck (Tadbir Urus / Integriti)</option>
+                <option value="Award">Award (Kepimpinan & Governan)</option>
+                <option value="BookOpen">BookOpen (Kurikulum & Ilmu)</option>
                 <option value="Cpu">Cpu (Digital & AI)</option>
+                <option value="Users">Users (Jalinan & Wakaf)</option>
+                <option value="ShieldCheck">ShieldCheck (Tadbir Urus / Kebajikan)</option>
+                <option value="Share2">Share2 (Amalan Terbaik & Kolaborasi)</option>
+                <option value="Globe">Globe (Pengantarabangsaan)</option>
                 <option value="Radio">Radio (Jaringan / Komunikasi)</option>
                 <option value="HeartHandshake">HeartHandshake (Kebajikan & Wakaf)</option>
                 <option value="Sparkles">Sparkles (Kurikulum & Inovasi)</option>
-                <option value="Share2">Share2 (Kolaborasi Strategik)</option>
                 <option value="Flag">Flag (Tindakan Umum)</option>
               </select>
             </div>

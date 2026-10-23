@@ -7,6 +7,10 @@ import {
   Radio,
   HeartHandshake,
   Sparkles,
+  Award,
+  BookOpen,
+  Users,
+  Globe,
   ArrowUpRight,
   CheckCircle,
   Flag
@@ -23,10 +27,18 @@ export const StrategicFocusSection: React.FC<StrategicFocusProps> = ({
 }) => {
   const getIcon = (name: string) => {
     switch (name) {
+      case 'Award':
+        return <Award className="w-6 h-6 text-teal-600" />;
+      case 'BookOpen':
+        return <BookOpen className="w-6 h-6 text-teal-600" />;
+      case 'Users':
+        return <Users className="w-6 h-6 text-amber-600" />;
+      case 'Globe':
+        return <Globe className="w-6 h-6 text-teal-600" />;
       case 'ShieldCheck':
         return <ShieldCheck className="w-6 h-6 text-teal-600" />;
       case 'Share2':
-        return <Share2 className="w-6 h-6 text-teal-600" />;
+        return <Share2 className="w-6 h-6 text-amber-600" />;
       case 'Cpu':
         return <Cpu className="w-6 h-6 text-amber-600" />;
       case 'Radio':

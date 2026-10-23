@@ -63,7 +63,11 @@ function AppContent() {
   // Detect shared news link (?berita=<id> or ?news=<id>) and automatically open & keep the news article modal synced
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const targetNewsId = params.get('berita') || params.get('news');
+    const pathMatch = window.location.pathname.match(/^\/berita\/([^/]+)/);
+    const targetNewsId =
+      params.get('berita') ||
+      params.get('news') ||
+      (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
     if (!targetNewsId) return;
 
     const allNews = siteData.news || [];

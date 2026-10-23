@@ -29,7 +29,16 @@ import { db, doc, getDoc, setDoc } from '../firebase';
 import { useAdminContent } from '../context/AdminContentContext';
 import { useMemberPortal } from '../context/MemberPortalContext';
 import { checkAndRecordRateLimit } from '../utils/rateLimiter';
-import { getNewsShareUrl, getNewsShareMessage, copyNewsShareLink } from '../utils/shareUtils';
+import {
+  getNewsShareUrl,
+  copyNewsShareLink,
+  buildWhatsAppShareUrl,
+  buildTelegramShareUrl,
+  buildFacebookShareUrl,
+  shareNewsNative,
+  updateDocumentOpenGraphMeta,
+  getDisplayDomain,
+} from '../utils/shareUtils';
 
 export type ModalContentType =
   | { type: 'news'; data: NewsItem }
@@ -67,6 +76,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
   } | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedNewsLink, setCopiedNewsLink] = useState(false);
+  const [includeShareCaption, setIncludeShareCaption] = useState(false);
   const [fetchedNewsItem, setFetchedNewsItem] = useState<NewsItem | null>(null);
 
   // Share best practice mini-form state
@@ -119,6 +129,18 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
       setFetchedNewsItem(null);
     }
   }, [content, siteData.news]);
+
+  // Dynamically update document OpenGraph meta tags and URL when a news modal is open
+  React.useEffect(() => {
+    if (content?.type === 'news' && content.data) {
+      const fromSite = siteData.news?.find((n) => String(n.id) === String(content.data.id));
+      const merged = { ...content.data, ...(fromSite || {}), ...(fetchedNewsItem || {}) };
+      updateDocumentOpenGraphMeta(merged);
+      return () => {
+        updateDocumentOpenGraphMeta(null);
+      };
+    }
+  }, [content, siteData.news, fetchedNewsItem]);
 
   if (!content) return null;
 
@@ -377,46 +399,162 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                 {liveNews.content}
               </div>
 
-              {/* Direct News Link & Social Sharing Panel */}
-              <div className="mt-8 p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              {/* Direct News Link & Social Sharing Panel with Live WhatsApp/Telegram/Facebook Card Preview */}
+              <div className="mt-8 p-4 sm:p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
                       <Share2 className="w-4 h-4 text-teal-700" />
-                      <span>Kongsi Pautan Terus Berita Ini</span>
+                      <span>Kongsi Berita Bergambar (WhatsApp, Telegram & Facebook)</span>
                     </h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Apabila pautan ini diklik, pembaca akan dibawa terus ke paparan penuh berita ini.
+                      Apabila pautan dikongsi, kad pratonton bergambar, tajuk berita dan pautan terus akan dipaparkan secara automatik.
                     </p>
                   </div>
 
-                  {/* Quick Social Share Links */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={`https://wa.me/?text=${encodeURIComponent(getNewsShareMessage(liveNews))}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                  {/* Format Toggle: Clean Card + Link (matching screenshot) vs With Caption */}
+                  <div className="inline-flex items-center rounded-xl bg-slate-200/80 p-1 text-[11px] font-bold self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIncludeShareCaption(false)}
+                      className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                        !includeShareCaption
+                          ? 'bg-white text-teal-900 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
                     >
-                      <span>WhatsApp</span>
-                    </a>
-                    <a
-                      href={`https://t.me/share/url?url=${encodeURIComponent(getNewsShareUrl(liveNews.id))}&text=${encodeURIComponent(`📰 ${liveNews.title}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                      Gambar + Link Sahaja
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIncludeShareCaption(true)}
+                      className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                        includeShareCaption
+                          ? 'bg-white text-teal-900 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
                     >
-                      <span>Telegram</span>
-                    </a>
-                    <a
-                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getNewsShareUrl(liveNews.id))}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
-                    >
-                      <span>Facebook</span>
-                    </a>
+                      + Kapsyen Teks
+                    </button>
                   </div>
+                </div>
+
+                {/* Live WhatsApp / Telegram / Facebook Card Preview (Matches User Screenshot) */}
+                <div className="rounded-2xl bg-[#efeae2] p-3 sm:p-4 border border-slate-200/80 shadow-inner">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Pratonton Kad Kongsi (WhatsApp / Telegram / Facebook)
+                    </span>
+                    <span className="text-[10px] font-semibold text-teal-800 bg-white/80 px-2 py-0.5 rounded-md border border-slate-200">
+                      OpenGraph Aktif
+                    </span>
+                  </div>
+
+                  {/* WhatsApp Green Message Bubble */}
+                  <div className="max-w-md mx-auto rounded-2xl bg-[#d9fdd3] p-2 shadow-sm border border-[#b9f0b0]">
+                    {/* Inner Grey Rich Link Preview Card */}
+                    <a
+                      href={getNewsShareUrl(liveNews.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-xl overflow-hidden bg-[#f0f2f5] border border-black/5 hover:opacity-95 transition"
+                    >
+                      <div className="relative w-full h-44 sm:h-52 bg-slate-900 overflow-hidden">
+                        <img
+                          src={liveNews.imageUrl}
+                          alt={liveNews.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="p-3 space-y-1 bg-[#f0f2f5]">
+                        <p className="text-xs sm:text-[13px] font-bold text-slate-900 leading-snug line-clamp-2">
+                          {liveNews.title.includes('MPGBSIM')
+                            ? liveNews.title
+                            : `${liveNews.title} | MPGBSIM`}
+                        </p>
+                        <p className="text-[11px] text-slate-500 leading-snug line-clamp-2 uppercase">
+                          {(liveNews.summary || liveNews.content || '').trim()}
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-medium pt-0.5">
+                          {getDisplayDomain()}
+                        </p>
+                      </div>
+                    </a>
+
+                    {/* Message Text & Clickable Link Underneath the Card */}
+                    <div className="px-2 pt-2 pb-0.5 text-xs sm:text-[13px] text-slate-900 break-all">
+                      {includeShareCaption && (
+                        <div className="mb-1.5 whitespace-pre-line text-slate-800 font-medium">
+                          📰 <span className="font-bold">{liveNews.title}</span>
+                          {liveNews.schoolName ? `\n🏫 ${liveNews.schoolName}` : ''}
+                          {`\n📅 ${liveNews.date}`}
+                        </div>
+                      )}
+                      <div className="flex items-end justify-between gap-2">
+                        <a
+                          href={getNewsShareUrl(liveNews.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#027eb5] hover:underline font-medium break-all leading-snug"
+                        >
+                          {getNewsShareUrl(liveNews.id)}
+                        </a>
+                        <span className="text-[10px] text-slate-500 shrink-0 flex items-center gap-0.5 select-none">
+                          <span>{new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                          <span className="text-[#53bdeb] font-bold tracking-tighter">✓✓</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Social Share Action Buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={buildWhatsAppShareUrl(liveNews, includeShareCaption)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Kongsi ke WhatsApp</span>
+                  </a>
+                  <a
+                    href={buildTelegramShareUrl(liveNews, includeShareCaption)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Kongsi ke Telegram</span>
+                  </a>
+                  <a
+                    href={buildFacebookShareUrl(liveNews)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Kongsi ke Facebook</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const res = await shareNewsNative(liveNews, {
+                        attachImageFile: true,
+                        includeCaption: includeShareCaption,
+                      });
+                      if (res === 'copied') {
+                        setCopiedNewsLink(true);
+                        setTimeout(() => setCopiedNewsLink(false), 3000);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Kongsi Gambar + Link</span>
+                  </button>
                 </div>
 
                 {/* Direct URL Input + Copy Button */}
@@ -431,7 +569,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                   <button
                     type="button"
                     onClick={async () => {
-                      await copyNewsShareLink(liveNews.id);
+                      await copyNewsShareLink(liveNews, includeShareCaption);
                       setCopiedNewsLink(true);
                       setTimeout(() => setCopiedNewsLink(false), 3000);
                     }}
