@@ -27,6 +27,10 @@ import {
   Phone,
   Mail,
   Key,
+  BarChart3,
+  Download,
+  Filter,
+  Layers,
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
 import { MemberSchool } from '../../types';
@@ -45,6 +49,8 @@ export const AdminSchoolManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterAgency, setFilterAgency] = useState<string>('all');
+  const [showStateAgencyBreakdown, setShowStateAgencyBreakdown] = useState<boolean>(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,6 +118,7 @@ export const AdminSchoolManagement: React.FC = () => {
     district: '',
     type: 'Sekolah Menengah',
     membershipType: 'Ahli Biasa',
+    registeredAgencies: [],
     principal: '',
     designation: 'Pengetua',
     principalPhotoUrl: '',
@@ -138,6 +145,195 @@ export const AdminSchoolManagement: React.FC = () => {
   const schoolsList = siteData.memberSchools || [];
   const pendingCount = (siteData.memberApplications || []).filter((a) => a.status === 'pending').length;
 
+  const getSchoolAgencies = (school: MemberSchool): string[] => {
+    return Array.isArray(school.registeredAgencies) ? school.registeredAgencies : [];
+  };
+
+  // Comprehensive Agency Registration Analytics (KPM, Jabatan Agama, MIEB & Combinations)
+  const agencyAnalytics = React.useMemo(() => {
+    const total = schoolsList.length;
+    let kpmCount = 0;
+    let jaCount = 0;
+    let miebCount = 0;
+    let kpmStudents = 0;
+    let jaStudents = 0;
+    let miebStudents = 0;
+
+    let allThreeCount = 0; // KPM + Jabatan Agama + MIEB
+    let dualKpmJa = 0; // KPM + Jabatan Agama sahaja
+    let dualKpmMieb = 0; // KPM + MIEB sahaja
+    let dualJaMieb = 0; // Jabatan Agama + MIEB sahaja
+    let singleKpm = 0; // Hanya KPM
+    let singleJa = 0; // Hanya Jabatan Agama
+    let singleMieb = 0; // Hanya MIEB
+    let unregisteredCount = 0; // Belum pilih agensi
+
+    const byStateMap = new Map<
+      string,
+      {
+        state: string;
+        total: number;
+        kpm: number;
+        ja: number;
+        mieb: number;
+        allThree: number;
+        unregistered: number;
+      }
+    >();
+
+    schoolsList.forEach((s) => {
+      const agencies = getSchoolAgencies(s);
+      const hasKpm = agencies.includes('KPM');
+      const hasJa = agencies.includes('Jabatan Agama');
+      const hasMieb = agencies.includes('MIEB');
+      const std = Number(s.studentCount) || 0;
+
+      if (hasKpm) {
+        kpmCount++;
+        kpmStudents += std;
+      }
+      if (hasJa) {
+        jaCount++;
+        jaStudents += std;
+      }
+      if (hasMieb) {
+        miebCount++;
+        miebStudents += std;
+      }
+
+      if (hasKpm && hasJa && hasMieb) {
+        allThreeCount++;
+      } else if (hasKpm && hasJa && !hasMieb) {
+        dualKpmJa++;
+      } else if (hasKpm && !hasJa && hasMieb) {
+        dualKpmMieb++;
+      } else if (!hasKpm && hasJa && hasMieb) {
+        dualJaMieb++;
+      } else if (hasKpm && !hasJa && !hasMieb) {
+        singleKpm++;
+      } else if (!hasKpm && hasJa && !hasMieb) {
+        singleJa++;
+      } else if (!hasKpm && !hasJa && hasMieb) {
+        singleMieb++;
+      } else {
+        unregisteredCount++;
+      }
+
+      const stKey = s.state || 'Lain-lain';
+      const existing = byStateMap.get(stKey) || {
+        state: stKey,
+        total: 0,
+        kpm: 0,
+        ja: 0,
+        mieb: 0,
+        allThree: 0,
+        unregistered: 0,
+      };
+      existing.total += 1;
+      if (hasKpm) existing.kpm += 1;
+      if (hasJa) existing.ja += 1;
+      if (hasMieb) existing.mieb += 1;
+      if (hasKpm && hasJa && hasMieb) existing.allThree += 1;
+      if (!hasKpm && !hasJa && !hasMieb) existing.unregistered += 1;
+      byStateMap.set(stKey, existing);
+    });
+
+    const pct = (val: number) => (total > 0 ? Math.round((val / total) * 100) : 0);
+
+    return {
+      total,
+      kpmCount,
+      kpmPct: pct(kpmCount),
+      kpmStudents,
+      jaCount,
+      jaPct: pct(jaCount),
+      jaStudents,
+      miebCount,
+      miebPct: pct(miebCount),
+      miebStudents,
+      allThreeCount,
+      allThreePct: pct(allThreeCount),
+      dualTotal: dualKpmJa + dualKpmMieb + dualJaMieb,
+      dualKpmJa,
+      dualKpmMieb,
+      dualJaMieb,
+      singleTotal: singleKpm + singleJa + singleMieb,
+      singleKpm,
+      singleJa,
+      singleMieb,
+      unregisteredCount,
+      unregisteredPct: pct(unregisteredCount),
+      registeredAnyCount: total - unregisteredCount,
+      registeredAnyPct: pct(total - unregisteredCount),
+      byState: Array.from(byStateMap.values()).sort((a, b) => b.total - a.total),
+    };
+  }, [schoolsList]);
+
+  const handleQuickToggleSchoolAgency = async (school: MemberSchool, agency: string) => {
+    const current = getSchoolAgencies(school);
+    const next = current.includes(agency)
+      ? current.filter((a) => a !== agency)
+      : [...current, agency];
+    await updateMemberSchool(school.id, { registeredAgencies: next });
+    setSaveSuccessMsg(
+      `Agensi pendaftaran bagi "${school.name}" dikemas kini: ${
+        next.length > 0 ? next.join(', ') : 'Tiada agensi dipilih'
+      }`
+    );
+    setTimeout(() => setSaveSuccessMsg(null), 3500);
+  };
+
+  const handleExportAgencyAnalysisCsv = () => {
+    const headers = [
+      'Bil',
+      'Kod Sekolah',
+      'Nama Institusi Sekolah',
+      'Negeri',
+      'Daerah',
+      'Kategori Sekolah',
+      'Kategori Keahlian',
+      'Berdaftar KPM',
+      'Berdaftar Jabatan Agama',
+      'Berdaftar MIEB',
+      'Bilangan Agensi Berdaftar',
+      'Senarai Agensi',
+      'Nama PGB',
+      'Jumlah Murid',
+      'Jumlah Guru',
+    ];
+    const rows = filteredSchools.map((s, idx) => {
+      const ags = getSchoolAgencies(s);
+      return [
+        idx + 1,
+        `"${(s.code || '').replace(/"/g, '""')}"`,
+        `"${(s.name || '').replace(/"/g, '""')}"`,
+        `"${(s.state || '').replace(/"/g, '""')}"`,
+        `"${(s.district || '').replace(/"/g, '""')}"`,
+        `"${(s.type || '').replace(/"/g, '""')}"`,
+        `"${(s.membershipType || 'Ahli Biasa').replace(/"/g, '""')}"`,
+        ags.includes('KPM') ? 'YA' : 'TIDAK',
+        ags.includes('Jabatan Agama') ? 'YA' : 'TIDAK',
+        ags.includes('MIEB') ? 'YA' : 'TIDAK',
+        ags.length,
+        `"${(ags.length > 0 ? ags.join(' + ') : 'Belum Dikemas Kini').replace(/"/g, '""')}"`,
+        `"${(s.principal || '').replace(/"/g, '""')}"`,
+        s.studentCount || 0,
+        s.teacherCount || 0,
+      ].join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Analisa_Agensi_Sekolah_Berdaftar_MPGBSIM_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const filteredSchools = schoolsList.filter((school) => {
     const matchesSearch =
       school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -146,7 +342,26 @@ export const AdminSchoolManagement: React.FC = () => {
       school.state.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesState = filterState === 'all' || school.state === filterState;
     const matchesType = filterType === 'all' || school.type === filterType;
-    return matchesSearch && matchesState && matchesType;
+
+    const ags = getSchoolAgencies(school);
+    const hasKpm = ags.includes('KPM');
+    const hasJa = ags.includes('Jabatan Agama');
+    const hasMieb = ags.includes('MIEB');
+
+    let matchesAgency = true;
+    if (filterAgency === 'KPM') matchesAgency = hasKpm;
+    else if (filterAgency === 'Jabatan Agama') matchesAgency = hasJa;
+    else if (filterAgency === 'MIEB') matchesAgency = hasMieb;
+    else if (filterAgency === 'ALL_THREE') matchesAgency = hasKpm && hasJa && hasMieb;
+    else if (filterAgency === 'DUAL_KPM_JA') matchesAgency = hasKpm && hasJa && !hasMieb;
+    else if (filterAgency === 'DUAL_KPM_MIEB') matchesAgency = hasKpm && !hasJa && hasMieb;
+    else if (filterAgency === 'DUAL_JA_MIEB') matchesAgency = !hasKpm && hasJa && hasMieb;
+    else if (filterAgency === 'ONLY_KPM') matchesAgency = hasKpm && !hasJa && !hasMieb;
+    else if (filterAgency === 'ONLY_JA') matchesAgency = !hasKpm && hasJa && !hasMieb;
+    else if (filterAgency === 'ONLY_MIEB') matchesAgency = !hasKpm && !hasJa && hasMieb;
+    else if (filterAgency === 'UNREGISTERED') matchesAgency = !hasKpm && !hasJa && !hasMieb;
+
+    return matchesSearch && matchesState && matchesType && matchesAgency;
   });
 
   const handleOpenAdd = () => {
@@ -162,6 +377,8 @@ export const AdminSchoolManagement: React.FC = () => {
       state: school.state,
       district: school.district || '',
       type: school.type,
+      membershipType: school.membershipType || (school.type === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa'),
+      registeredAgencies: Array.isArray(school.registeredAgencies) ? school.registeredAgencies : [],
       principal: school.principal || '',
       designation:
         school.designation ||
@@ -343,6 +560,391 @@ export const AdminSchoolManagement: React.FC = () => {
         </div>
       )}
 
+      {/* DATA ANALISA SEKOLAH BERDAFTAR MENGIKUT AGENSI (KPM / JABATAN AGAMA / MIEB) */}
+      <div className="bg-white rounded-2xl border border-teal-200 shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-300 flex items-center justify-center shrink-0">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-teal-500/20 border border-teal-400/40 text-teal-200 text-[10px] font-extrabold uppercase tracking-wider">
+                  Analitik Pendaftaran Agensi
+                </span>
+                <h4 className="text-sm sm:text-base font-black text-white">
+                  Data Analisa Sekolah Berdaftar (KPM • Jabatan Agama • MIEB)
+                </h4>
+              </div>
+              <p className="text-xs text-teal-100/85 mt-1 max-w-3xl leading-relaxed">
+                Analisa langsung pendaftaran institusi sekolah ahli di bawah <strong>KPM</strong>, <strong>Jabatan Agama</strong>, dan <strong>MIEB</strong>. Pilihan adalah bebas kerana terdapat sekolah yang berdaftar dengan 1, 2, atau ketiga-tiga agensi serentak. Klik mana-mana kad di bawah untuk menapis senarai sekolah.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowStateAgencyBreakdown((prev) => !prev)}
+              className="px-3.5 py-2 rounded-xl bg-teal-800/80 hover:bg-teal-700 text-teal-100 border border-teal-600/50 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-300" />
+              <span>{showStateAgencyBreakdown ? 'Sembunyi Pecahan Negeri' : 'Analisa Mengikut Negeri'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportAgencyAnalysisCsv}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Muat turun laporan penuh CSV Data Analisa Sekolah Berdaftar (KPM, Jabatan Agama, MIEB)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Eksport CSV Analisa</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-4">
+          {/* 4 Primary Agency KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* KPM Card */}
+            <button
+              type="button"
+              onClick={() => setFilterAgency(filterAgency === 'KPM' ? 'all' : 'KPM')}
+              className={`p-4 rounded-2xl border text-left transition cursor-pointer ${
+                filterAgency === 'KPM'
+                  ? 'bg-blue-950 text-white border-blue-700 ring-2 ring-blue-500/30 shadow-md'
+                  : 'bg-blue-50/60 hover:bg-blue-50 border-blue-200 text-slate-900'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                    filterAgency === 'KPM'
+                      ? 'bg-blue-800 text-blue-200'
+                      : 'bg-blue-100 text-blue-900'
+                  }`}
+                >
+                  Berdaftar KPM
+                </span>
+                <span className="font-mono text-xs font-bold tabular-nums opacity-80">
+                  {agencyAnalytics.kpmPct}%
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-mono tabular-nums">
+                  {agencyAnalytics.kpmCount}
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    filterAgency === 'KPM' ? 'text-blue-200' : 'text-slate-500'
+                  }`}
+                >
+                  / {agencyAnalytics.total} Sekolah
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-blue-200/60 mt-2 overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 rounded-full transition-all"
+                  style={{ width: `${agencyAnalytics.kpmPct}%` }}
+                />
+              </div>
+              <p
+                className={`text-[10px] mt-2 font-medium tabular-nums ${
+                  filterAgency === 'KPM' ? 'text-blue-200' : 'text-slate-600'
+                }`}
+              >
+                Kementerian Pendidikan Malaysia • {agencyAnalytics.kpmStudents.toLocaleString()} murid
+              </p>
+            </button>
+
+            {/* Jabatan Agama Card */}
+            <button
+              type="button"
+              onClick={() =>
+                setFilterAgency(filterAgency === 'Jabatan Agama' ? 'all' : 'Jabatan Agama')
+              }
+              className={`p-4 rounded-2xl border text-left transition cursor-pointer ${
+                filterAgency === 'Jabatan Agama'
+                  ? 'bg-emerald-950 text-white border-emerald-700 ring-2 ring-emerald-500/30 shadow-md'
+                  : 'bg-emerald-50/60 hover:bg-emerald-50 border-emerald-200 text-slate-900'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                    filterAgency === 'Jabatan Agama'
+                      ? 'bg-emerald-800 text-emerald-200'
+                      : 'bg-emerald-100 text-emerald-900'
+                  }`}
+                >
+                  Berdaftar Jabatan Agama
+                </span>
+                <span className="font-mono text-xs font-bold tabular-nums opacity-80">
+                  {agencyAnalytics.jaPct}%
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-mono tabular-nums">
+                  {agencyAnalytics.jaCount}
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    filterAgency === 'Jabatan Agama' ? 'text-emerald-200' : 'text-slate-500'
+                  }`}
+                >
+                  / {agencyAnalytics.total} Sekolah
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-emerald-200/60 mt-2 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-600 rounded-full transition-all"
+                  style={{ width: `${agencyAnalytics.jaPct}%` }}
+                />
+              </div>
+              <p
+                className={`text-[10px] mt-2 font-medium tabular-nums ${
+                  filterAgency === 'Jabatan Agama' ? 'text-emerald-200' : 'text-slate-600'
+                }`}
+              >
+                Jabatan Agama Islam Negeri • {agencyAnalytics.jaStudents.toLocaleString()} murid
+              </p>
+            </button>
+
+            {/* MIEB Card */}
+            <button
+              type="button"
+              onClick={() => setFilterAgency(filterAgency === 'MIEB' ? 'all' : 'MIEB')}
+              className={`p-4 rounded-2xl border text-left transition cursor-pointer ${
+                filterAgency === 'MIEB'
+                  ? 'bg-amber-900 text-white border-amber-600 ring-2 ring-amber-500/30 shadow-md'
+                  : 'bg-amber-50/70 hover:bg-amber-50 border-amber-200 text-slate-900'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                    filterAgency === 'MIEB'
+                      ? 'bg-amber-800 text-amber-200'
+                      : 'bg-amber-100 text-amber-950'
+                  }`}
+                >
+                  Berdaftar MIEB
+                </span>
+                <span className="font-mono text-xs font-bold tabular-nums opacity-80">
+                  {agencyAnalytics.miebPct}%
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-mono tabular-nums">
+                  {agencyAnalytics.miebCount}
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    filterAgency === 'MIEB' ? 'text-amber-200' : 'text-slate-500'
+                  }`}
+                >
+                  / {agencyAnalytics.total} Sekolah
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-amber-200/70 mt-2 overflow-hidden">
+                <div
+                  className="h-full bg-amber-600 rounded-full transition-all"
+                  style={{ width: `${agencyAnalytics.miebPct}%` }}
+                />
+              </div>
+              <p
+                className={`text-[10px] mt-2 font-medium tabular-nums ${
+                  filterAgency === 'MIEB' ? 'text-amber-100' : 'text-slate-600'
+                }`}
+              >
+                Musleh Integrated Education Bhd • {agencyAnalytics.miebStudents.toLocaleString()} murid
+              </p>
+            </button>
+
+            {/* Ketiga-tiga Agensi Card */}
+            <button
+              type="button"
+              onClick={() =>
+                setFilterAgency(filterAgency === 'ALL_THREE' ? 'all' : 'ALL_THREE')
+              }
+              className={`p-4 rounded-2xl border text-left transition cursor-pointer ${
+                filterAgency === 'ALL_THREE'
+                  ? 'bg-purple-950 text-white border-purple-700 ring-2 ring-purple-500/30 shadow-md'
+                  : 'bg-purple-50/60 hover:bg-purple-50 border-purple-200 text-slate-900'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                    filterAgency === 'ALL_THREE'
+                      ? 'bg-purple-800 text-purple-200'
+                      : 'bg-purple-100 text-purple-900'
+                  }`}
+                >
+                  Ketiga-tiga Agensi (3/3)
+                </span>
+                <span className="font-mono text-xs font-bold tabular-nums opacity-80">
+                  {agencyAnalytics.allThreePct}%
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black font-mono tabular-nums">
+                  {agencyAnalytics.allThreeCount}
+                </span>
+                <span
+                  className={`text-xs font-semibold ${
+                    filterAgency === 'ALL_THREE' ? 'text-purple-200' : 'text-slate-500'
+                  }`}
+                >
+                  Sekolah Lengkap 3 Agensi
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-purple-200/60 mt-2 overflow-hidden">
+                <div
+                  className="h-full bg-purple-600 rounded-full transition-all"
+                  style={{ width: `${agencyAnalytics.allThreePct}%` }}
+                />
+              </div>
+              <p
+                className={`text-[10px] mt-2 font-medium ${
+                  filterAgency === 'ALL_THREE' ? 'text-purple-200' : 'text-slate-600'
+                }`}
+              >
+                Berdaftar serentak KPM + Jabatan Agama + MIEB
+              </p>
+            </button>
+          </div>
+
+          {/* Combination Matrix (Pecahan Kombinasi Agensi Bebas) */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-teal-700" />
+                <span>Pecahan Kombinasi Pendaftaran Agensi (Klik untuk Tapis):</span>
+              </span>
+              {filterAgency !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterAgency('all')}
+                  className="text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-200 cursor-pointer"
+                >
+                  Reset Tapisan Agensi ✕
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              {[
+                { id: 'all', label: 'Semua Sekolah', count: agencyAnalytics.total },
+                {
+                  id: 'ALL_THREE',
+                  label: 'Ketiga-tiga (KPM + Jabatan Agama + MIEB)',
+                  count: agencyAnalytics.allThreeCount,
+                },
+                {
+                  id: 'DUAL_KPM_JA',
+                  label: 'Dwi: KPM + Jabatan Agama',
+                  count: agencyAnalytics.dualKpmJa,
+                },
+                {
+                  id: 'DUAL_KPM_MIEB',
+                  label: 'Dwi: KPM + MIEB',
+                  count: agencyAnalytics.dualKpmMieb,
+                },
+                {
+                  id: 'DUAL_JA_MIEB',
+                  label: 'Dwi: Jabatan Agama + MIEB',
+                  count: agencyAnalytics.dualJaMieb,
+                },
+                { id: 'ONLY_KPM', label: 'Hanya KPM', count: agencyAnalytics.singleKpm },
+                {
+                  id: 'ONLY_JA',
+                  label: 'Hanya Jabatan Agama',
+                  count: agencyAnalytics.singleJa,
+                },
+                { id: 'ONLY_MIEB', label: 'Hanya MIEB', count: agencyAnalytics.singleMieb },
+                {
+                  id: 'UNREGISTERED',
+                  label: 'Belum Kemas Kini Agensi',
+                  count: agencyAnalytics.unregisteredCount,
+                },
+              ].map((pill) => {
+                const isActive = filterAgency === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setFilterAgency(pill.id)}
+                    className={`px-2.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                      isActive
+                        ? 'bg-teal-900 text-white border-teal-900 shadow-xs'
+                        : 'bg-white hover:bg-teal-50 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <span>{pill.label}</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-md font-mono text-[10px] tabular-nums ${
+                        isActive
+                          ? 'bg-amber-400 text-slate-950 font-black'
+                          : 'bg-slate-100 text-slate-800'
+                      }`}
+                    >
+                      {pill.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* State Breakdown Table (Expandable) */}
+          {showStateAgencyBreakdown && (
+            <div className="border border-slate-200 rounded-xl overflow-hidden animate-in fade-in duration-200">
+              <div className="bg-slate-100 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-800">
+                  Jadual Analisa Pendaftaran Agensi Mengikut Negeri
+                </span>
+                <span className="text-[11px] text-slate-500 font-mono tabular-nums">
+                  {agencyAnalytics.byState.length} Negeri Direkodkan
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-600">
+                      <th className="py-2.5 px-3">Negeri</th>
+                      <th className="py-2.5 px-3 text-right">Jumlah Sekolah</th>
+                      <th className="py-2.5 px-3 text-right text-blue-800">KPM</th>
+                      <th className="py-2.5 px-3 text-right text-emerald-800">Jabatan Agama</th>
+                      <th className="py-2.5 px-3 text-right text-amber-800">MIEB</th>
+                      <th className="py-2.5 px-3 text-right text-purple-800">Ketiga-tiga (3/3)</th>
+                      <th className="py-2.5 px-3 text-right text-slate-500">Belum Kemas Kini</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
+                    {agencyAnalytics.byState.map((row) => (
+                      <tr
+                        key={row.state}
+                        onClick={() => setFilterState(filterState === row.state ? 'all' : row.state)}
+                        className="hover:bg-teal-50/40 cursor-pointer transition"
+                      >
+                        <td className="py-2 px-3 font-sans font-bold text-slate-900">{row.state}</td>
+                        <td className="py-2 px-3 text-right font-bold text-slate-800">{row.total}</td>
+                        <td className="py-2 px-3 text-right text-blue-700 font-semibold">{row.kpm}</td>
+                        <td className="py-2 px-3 text-right text-emerald-700 font-semibold">{row.ja}</td>
+                        <td className="py-2 px-3 text-right text-amber-700 font-semibold">{row.mieb}</td>
+                        <td className="py-2 px-3 text-right text-purple-700 font-bold">{row.allThree}</td>
+                        <td className="py-2 px-3 text-right text-slate-400">{row.unregistered}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Filter & Search */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
         <div className="relative flex-1">
@@ -356,7 +958,26 @@ export const AdminSchoolManagement: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={filterAgency}
+            onChange={(e) => setFilterAgency(e.target.value)}
+            className="px-3 py-2 text-xs font-bold text-teal-950 rounded-xl border border-teal-300 bg-teal-50/70 focus:outline-hidden focus:ring-2 focus:ring-teal-600"
+          >
+            <option value="all">Semua Agensi ({agencyAnalytics.total})</option>
+            <option value="KPM">Berdaftar KPM ({agencyAnalytics.kpmCount})</option>
+            <option value="Jabatan Agama">Berdaftar Jabatan Agama ({agencyAnalytics.jaCount})</option>
+            <option value="MIEB">Berdaftar MIEB ({agencyAnalytics.miebCount})</option>
+            <option value="ALL_THREE">Ketiga-tiga Agensi: KPM + JA + MIEB ({agencyAnalytics.allThreeCount})</option>
+            <option value="DUAL_KPM_JA">Dwi-Agensi: KPM + Jabatan Agama ({agencyAnalytics.dualKpmJa})</option>
+            <option value="DUAL_KPM_MIEB">Dwi-Agensi: KPM + MIEB ({agencyAnalytics.dualKpmMieb})</option>
+            <option value="DUAL_JA_MIEB">Dwi-Agensi: Jabatan Agama + MIEB ({agencyAnalytics.dualJaMieb})</option>
+            <option value="ONLY_KPM">Hanya KPM ({agencyAnalytics.singleKpm})</option>
+            <option value="ONLY_JA">Hanya Jabatan Agama ({agencyAnalytics.singleJa})</option>
+            <option value="ONLY_MIEB">Hanya MIEB ({agencyAnalytics.singleMieb})</option>
+            <option value="UNREGISTERED">Belum Kemas Kini Agensi ({agencyAnalytics.unregisteredCount})</option>
+          </select>
+
           <select
             value={filterState}
             onChange={(e) => setFilterState(e.target.value)}
@@ -520,6 +1141,43 @@ export const AdminSchoolManagement: React.FC = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Quick Inline Agency Registration Toggles (Pilihan Bebas: KPM, Jabatan Agama, MIEB) */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-500 mr-1">
+                        Berdaftar di Bawah:
+                      </span>
+                      {(['KPM', 'Jabatan Agama', 'MIEB'] as const).map((ag) => {
+                        const isReg = getSchoolAgencies(school).includes(ag);
+                        const activeColors =
+                          ag === 'KPM'
+                            ? 'bg-blue-900 text-white border-blue-900'
+                            : ag === 'Jabatan Agama'
+                            ? 'bg-emerald-800 text-white border-emerald-800'
+                            : 'bg-amber-600 text-white border-amber-600';
+                        return (
+                          <button
+                            key={ag}
+                            type="button"
+                            onClick={() => handleQuickToggleSchoolAgency(school, ag)}
+                            title={`Klik untuk ${isReg ? 'nyahpilih' : 'tandakan'} pendaftaran ${ag} bagi ${school.name}`}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition flex items-center gap-1 cursor-pointer ${
+                              isReg
+                                ? activeColors
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-500 border-slate-200'
+                            }`}
+                          >
+                            {isReg ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : <span>+</span>}
+                            <span>{ag}</span>
+                          </button>
+                        );
+                      })}
+                      {getSchoolAgencies(school).length === 3 && (
+                        <span className="text-[9.5px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-900 border border-purple-200">
+                          ★ Ketiga-tiga Agensi (3/3)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -665,6 +1323,93 @@ export const AdminSchoolManagement: React.FC = () => {
                   <option value="Ahli Biasa">Ahli Biasa — Fasal 4(2) (Rangkaian Penuh IKRAM MUSLEH)</option>
                   <option value="Ahli Bersekutu">Ahli Bersekutu — Fasal 4(3) (Sekolah Rakan Musleh / Bersekutu)</option>
                 </select>
+              </div>
+
+              {/* Berdaftar di Bawah Agensi (Pilihan Bebas: KPM, Jabatan Agama, MIEB) */}
+              <div className="p-3.5 rounded-xl bg-teal-50/60 border border-teal-200 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <label className="block font-extrabold text-teal-950 uppercase tracking-wider text-[11px]">
+                      Berdaftar di Bawah Agensi (Pilihan Bebas: KPM / Jabatan Agama / MIEB)
+                    </label>
+                    <p className="text-[10px] text-slate-600 mt-0.5">
+                      Boleh pilih 1, 2, atau ketiga-tiga agensi serentak mengikut sijil pendaftaran sekolah.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          registeredAgencies: ['KPM', 'Jabatan Agama', 'MIEB'],
+                        })
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-[10px] font-bold transition cursor-pointer"
+                    >
+                      Pilih Ketiga-tiga
+                    </button>
+                    {(formData.registeredAgencies?.length || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, registeredAgencies: [] })}
+                        className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 text-[10px] font-semibold transition cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {[
+                    { id: 'KPM', label: 'KPM', desc: 'Kementerian Pendidikan Malaysia' },
+                    { id: 'Jabatan Agama', label: 'Jabatan Agama', desc: 'Jabatan Agama Islam Negeri' },
+                    { id: 'MIEB', label: 'MIEB', desc: 'Musleh Integrated Education Bhd' },
+                  ].map((ag) => {
+                    const currentAgs = Array.isArray(formData.registeredAgencies)
+                      ? formData.registeredAgencies
+                      : [];
+                    const isChecked = currentAgs.includes(ag.id);
+                    return (
+                      <button
+                        key={ag.id}
+                        type="button"
+                        onClick={() => {
+                          const next = isChecked
+                            ? currentAgs.filter((a) => a !== ag.id)
+                            : [...currentAgs, ag.id];
+                          setFormData({ ...formData, registeredAgencies: next });
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer ${
+                          isChecked
+                            ? 'bg-teal-900 text-white border-teal-900 shadow-xs'
+                            : 'bg-white hover:bg-teal-50 text-slate-800 border-slate-200'
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded flex items-center justify-center shrink-0 mt-0.5 border ${
+                            isChecked
+                              ? 'bg-amber-400 border-amber-300 text-slate-950'
+                              : 'bg-white border-slate-300 text-transparent'
+                          }`}
+                        >
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-xs block">{ag.label}</span>
+                          <span
+                            className={`text-[10px] block leading-tight mt-0.5 ${
+                              isChecked ? 'text-teal-100' : 'text-slate-500'
+                            }`}
+                          >
+                            {ag.desc}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">

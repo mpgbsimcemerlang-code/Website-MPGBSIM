@@ -20,6 +20,7 @@
         "joinYear": { "type": "number" },
         "status": { "type": "string", "enum": ["active", "pending", "inactive"] },
         "hidePhone": { "type": "boolean" },
+        "registeredAgencies": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
@@ -46,7 +47,8 @@
         "description": { "type": "string" },
         "studentCount": { "type": "number" },
         "teacherCount": { "type": "number" },
-        "joinYear": { "type": "number" }
+        "joinYear": { "type": "number" },
+        "registeredAgencies": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["name", "state", "type"]
     },

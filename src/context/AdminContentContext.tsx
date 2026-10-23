@@ -1442,9 +1442,19 @@ const mergeSchoolsPreservingMedia = (
       ? (sch.joinYear && sch.joinYear !== 2026 ? sch.joinYear : (prevMatch?.joinYear && prevMatch.joinYear !== 2026 ? prevMatch.joinYear : 2011))
       : (sch.joinYear || prevMatch?.joinYear || appMatch?.joinYear);
 
+    const registeredAgencies =
+      Array.isArray(sch.registeredAgencies)
+        ? sch.registeredAgencies
+        : Array.isArray(prevMatch?.registeredAgencies)
+        ? prevMatch!.registeredAgencies
+        : Array.isArray(appMatch?.registeredAgencies)
+        ? appMatch!.registeredAgencies
+        : undefined;
+
     return {
       ...sch,
       membershipType,
+      ...(registeredAgencies !== undefined ? { registeredAgencies } : {}),
       ...(resolvedJoinYear ? { joinYear: resolvedJoinYear } : {}),
       ...(schoolPhotoUrl ? { schoolPhotoUrl } : {}),
       ...(logoUrl ? { logoUrl } : {}),
@@ -4475,6 +4485,9 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           if (safeUpdated.membershipType) {
             portalUser.membershipType = safeUpdated.membershipType;
           }
+          if (safeUpdated.registeredAgencies !== undefined) {
+            portalUser.registeredAgencies = safeUpdated.registeredAgencies;
+          }
           portalUser.updatedAt = new Date().toISOString();
           safeLocalStorageSet('mpgbsim_portal_user_v1', JSON.stringify(portalUser));
 
@@ -4610,6 +4623,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
       code: app.schoolCode || `SCH-${Date.now().toString().slice(-4)}`,
       type: app.schoolType || 'Maahad Tahfiz',
       membershipType: app.membershipType || (app.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa'),
+      registeredAgencies: Array.isArray(app.registeredAgencies) ? app.registeredAgencies : [],
       state: app.state,
       district: app.district,
       principal: `${app.fullName} (${app.designation})`,

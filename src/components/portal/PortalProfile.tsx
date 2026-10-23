@@ -89,6 +89,9 @@ export const PortalProfile: React.FC = () => {
   const [membershipType, setMembershipType] = useState<'Ahli Biasa' | 'Ahli Bersekutu'>(
     currentUser?.membershipType || (currentUser?.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa')
   );
+  const [registeredAgencies, setRegisteredAgencies] = useState<string[]>(
+    Array.isArray(currentUser?.registeredAgencies) ? currentUser.registeredAgencies : []
+  );
   const [joinYear, setJoinYear] = useState<number | string>(
     currentUser?.joinYear || 2024
   );
@@ -284,6 +287,17 @@ export const PortalProfile: React.FC = () => {
       matchedApp?.membershipType ||
       (effectiveSchoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa');
 
+    const effectiveRegisteredAgencies: string[] =
+      (Array.isArray(currentUser?.registeredAgencies) && currentUser.registeredAgencies.length > 0
+        ? currentUser.registeredAgencies
+        : undefined) ||
+      (Array.isArray(matchedSchool?.registeredAgencies) && matchedSchool.registeredAgencies.length > 0
+        ? matchedSchool.registeredAgencies
+        : undefined) ||
+      (Array.isArray(matchedApp?.registeredAgencies) && matchedApp.registeredAgencies.length > 0
+        ? matchedApp.registeredAgencies
+        : []);
+
     const effectiveDistrict =
       currentUser?.district ||
       matchedSchool?.district ||
@@ -352,6 +366,7 @@ export const PortalProfile: React.FC = () => {
       setSchoolCode(effectiveSchoolCode);
       setSchoolType(effectiveSchoolType);
       setMembershipType(effectiveMembershipType);
+      setRegisteredAgencies(effectiveRegisteredAgencies);
       setDistrict(effectiveDistrict);
       setAddress(effectiveAddress);
       setSchoolEmail(effectiveSchoolEmail);
@@ -375,6 +390,9 @@ export const PortalProfile: React.FC = () => {
       }
       if (isPrimaryMusleh && Number(joinYear) === 2026 && effectiveJoinYear === 2011) {
         setJoinYear(2011);
+      }
+      if (registeredAgencies.length === 0 && effectiveRegisteredAgencies.length > 0) {
+        setRegisteredAgencies(effectiveRegisteredAgencies);
       }
     }
   }, [currentUser, allSchools, siteData.memberApplications, siteData.submissions]);
@@ -410,6 +428,39 @@ export const PortalProfile: React.FC = () => {
     'Pemangku Pengetua',
     'Penolong Kanan Pentadbiran',
   ];
+
+  const agencyOptionsList = [
+    {
+      id: 'KPM',
+      label: 'KPM',
+      fullName: 'Kementerian Pendidikan Malaysia',
+      desc: 'Berdaftar di bawah KPM (Sekolah Swasta / Bantuan Kerajaan / SMKA / SABK)',
+      activeClass: 'bg-blue-900 text-white border-blue-900 ring-2 ring-blue-500/20',
+      badgeClass: 'bg-blue-100 text-blue-900 border-blue-200',
+    },
+    {
+      id: 'Jabatan Agama',
+      label: 'Jabatan Agama',
+      fullName: 'Jabatan Agama Islam Negeri (JAIN / MAI)',
+      desc: 'Berdaftar di bawah Jabatan Agama Islam Negeri (JAIS, JAIM, JHEAINS, MAIK dsb.)',
+      activeClass: 'bg-emerald-900 text-white border-emerald-900 ring-2 ring-emerald-500/20',
+      badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-200',
+    },
+    {
+      id: 'MIEB',
+      label: 'MIEB',
+      fullName: 'Musleh Integrated Education Berhad',
+      desc: 'Berdaftar di bawah rangkaian pendidikan bersepadu IKRAM MUSLEH (MIEB)',
+      activeClass: 'bg-amber-600 text-white border-amber-600 ring-2 ring-amber-500/20',
+      badgeClass: 'bg-amber-100 text-amber-950 border-amber-200',
+    },
+  ];
+
+  const toggleRegisteredAgency = (agencyId: string) => {
+    setRegisteredAgencies((prev) =>
+      prev.includes(agencyId) ? prev.filter((item) => item !== agencyId) : [...prev, agencyId]
+    );
+  };
 
   // Photo Upload Handlers with automatic client-side compression (<80KB)
   const handlePgbPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -489,6 +540,7 @@ export const PortalProfile: React.FC = () => {
         schoolCode: schoolCode ? schoolCode.trim().toUpperCase() : undefined,
         schoolType: schoolType || 'Sekolah Menengah',
         membershipType: membershipType || 'Ahli Biasa',
+        registeredAgencies,
         state: state || 'Melaka',
         district: district ? district.trim() : undefined,
         address: address ? address.trim() : undefined,
@@ -541,6 +593,7 @@ export const PortalProfile: React.FC = () => {
           code: schoolCode ? schoolCode.trim().toUpperCase() : matchedSchool.code,
           type: schoolType || matchedSchool.type,
           membershipType: membershipType || matchedSchool.membershipType || 'Ahli Biasa',
+          registeredAgencies,
           principal: fullName.trim() || matchedSchool.principal,
           icNumber: icNumber ? icNumber.trim() : matchedSchool.icNumber,
           serviceStartYear: Number(serviceStartYear) || (matchedSchool as any).serviceStartYear,
@@ -799,6 +852,19 @@ export const PortalProfile: React.FC = () => {
                       {membershipType}
                     </span>
                   </div>
+                  {registeredAgencies.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      <span className="text-[8px] text-slate-400 font-semibold">Berdaftar:</span>
+                      {registeredAgencies.map((ag) => (
+                        <span
+                          key={ag}
+                          className="text-[8px] px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30 font-bold"
+                        >
+                          {ag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1276,6 +1342,116 @@ export const PortalProfile: React.FC = () => {
                         </span>
                       </div>
                     </button>
+                  </div>
+                </div>
+
+                {/* Berdaftar di Bawah Agensi (KPM / Jabatan Agama / MIEB - Pilihan Bebas) */}
+                <div className="p-3.5 rounded-2xl bg-white border border-teal-200 space-y-3 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <label className="font-bold text-teal-950 flex items-center gap-1.5 text-xs">
+                        <CheckCircle className="w-4 h-4 text-teal-700" />
+                        <span>Berdaftar di Bawah Agensi (Pilihan Bebas: KPM / Jabatan Agama / MIEB)</span>
+                      </label>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Tandakan mana-mana agensi pendaftaran rasmi sekolah anda. Pilihan adalah bebas (boleh pilih 1, 2, atau ketiga-tiga agensi serentak).
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setRegisteredAgencies(['KPM', 'Jabatan Agama', 'MIEB'])}
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 transition cursor-pointer"
+                      >
+                        Pilih Ketiga-tiga Agensi
+                      </button>
+                      {registeredAgencies.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setRegisteredAgencies([])}
+                          className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {agencyOptionsList.map((agency) => {
+                      const isSelected = registeredAgencies.includes(agency.id);
+                      return (
+                        <button
+                          key={agency.id}
+                          type="button"
+                          onClick={() => toggleRegisteredAgency(agency.id)}
+                          className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                            isSelected
+                              ? `${agency.activeClass} shadow-sm`
+                              : 'bg-slate-50 hover:bg-teal-50/50 text-slate-800 border-slate-200'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 border transition ${
+                              isSelected
+                                ? 'bg-amber-400 border-amber-300 text-slate-950'
+                                : 'bg-white border-slate-300 text-transparent'
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-extrabold text-xs block">{agency.label}</span>
+                              {isSelected && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/20 text-white font-bold">
+                                  Berdaftar
+                                </span>
+                              )}
+                            </div>
+                            <span
+                              className={`text-[10px] font-semibold block mt-0.5 ${
+                                isSelected ? 'text-amber-200' : 'text-slate-700'
+                              }`}
+                            >
+                              {agency.fullName}
+                            </span>
+                            <span
+                              className={`text-[9.5px] block mt-0.5 leading-snug ${
+                                isSelected ? 'text-white/85' : 'text-slate-500'
+                              }`}
+                            >
+                              {agency.desc}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                    <span className="text-slate-600 font-medium">
+                      Status Pendaftaran Agensi Semasa:{' '}
+                      <strong className="text-teal-950 font-mono">
+                        {registeredAgencies.length} / 3 Agensi
+                      </strong>
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {registeredAgencies.length === 0 ? (
+                        <span className="text-[10px] text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 font-semibold">
+                          Belum memilih agensi pendaftaran (Sila tandakan di atas)
+                        </span>
+                      ) : (
+                        registeredAgencies.map((ag) => (
+                          <span
+                            key={ag}
+                            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-teal-900 text-amber-300 border border-teal-800"
+                          >
+                            ✓ {ag}
+                          </span>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -2030,6 +2206,31 @@ export const PortalProfile: React.FC = () => {
                           <span className="text-[9.5px] text-slate-500 block">Daerah:</span>
                           <span className="text-slate-800">{district || '-'}</span>
                         </div>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block">Berdaftar di Bawah Agensi (KPM / Jabatan Agama / MIEB):</span>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            {registeredAgencies.length > 0 ? (
+                              registeredAgencies.map((ag) => (
+                                <span
+                                  key={ag}
+                                  className="px-2 py-0.5 rounded bg-teal-50 text-teal-900 border border-teal-200 text-[10px] font-bold"
+                                >
+                                  ✓ {ag}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-slate-500 italic text-[10px]">Tiada rekod agensi dipilih</span>
+                            )}
+                          </div>
+                        </div>
+                        {registeredAgencies.length === 3 && (
+                          <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9.5px] font-bold">
+                            Berdaftar Ketiga-tiga Agensi (KPM • Jabatan Agama • MIEB)
+                          </span>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-3 gap-2.5 pt-2.5 border-t border-slate-100">

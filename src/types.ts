@@ -63,6 +63,8 @@ export interface AlumniRecord {
 
 export type MembershipCategory = 'Ahli Biasa' | 'Ahli Bersekutu';
 
+export type RegisteredAgency = 'KPM' | 'Jabatan Agama' | 'MIEB' | string;
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -77,6 +79,7 @@ export interface UserProfile {
   schoolCode?: string;
   schoolType?: string;
   membershipType?: MembershipCategory;
+  registeredAgencies?: string[];
   state?: string;
   district?: string;
   address?: string;
@@ -373,6 +376,7 @@ export interface MemberSchool {
   code: string;
   type: 'Sekolah Rendah' | 'Sekolah Menengah' | 'Maahad Tahfiz' | 'Rakan Musleh' | string;
   membershipType?: MembershipCategory;
+  registeredAgencies?: string[];
   state: string;
   district: string;
   principal: string;
@@ -450,6 +454,7 @@ export interface MemberApplication {
   schoolCode: string;
   schoolType: string;
   membershipType?: MembershipCategory;
+  registeredAgencies?: string[];
   state: string;
   district: string;
   website?: string;

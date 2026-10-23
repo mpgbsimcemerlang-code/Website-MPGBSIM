@@ -375,6 +375,10 @@ export function repairSchoolIntegrity(
         pgbStartYear: (sch as any).pgbStartYear || (existing as any).pgbStartYear,
         studentCount: Math.max(sch.studentCount || 0, existing.studentCount || 0),
         teacherCount: Math.max(sch.teacherCount || 0, existing.teacherCount || 0),
+        registeredAgencies:
+          Array.isArray(sch.registeredAgencies) && sch.registeredAgencies.length > 0
+            ? sch.registeredAgencies
+            : existing.registeredAgencies,
         updatedAt: new Date().toISOString(),
       };
       schoolsMap.set(key, merged);
@@ -611,6 +615,9 @@ export function repairSchoolIntegrity(
         if (matched.principal && !repairedUser.fullName) repairedUser.fullName = matched.principal;
         if (matched.name && !repairedUser.school) repairedUser.school = matched.name;
         if (matched.icNumber && !repairedUser.icNumber) repairedUser.icNumber = matched.icNumber;
+        if (Array.isArray(matched.registeredAgencies) && (!repairedUser.registeredAgencies || repairedUser.registeredAgencies.length === 0)) {
+          repairedUser.registeredAgencies = matched.registeredAgencies;
+        }
         actionsTaken.push(`Menyelaraskan profil pengguna portal dengan institusi "${matched.name}"`);
       }
     }

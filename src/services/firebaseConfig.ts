@@ -50,6 +50,7 @@ export interface MemberRegistrationForm {
   schoolCode?: string;
   schoolType: string;
   membershipType?: 'Ahli Biasa' | 'Ahli Bersekutu';
+  registeredAgencies?: string[];
   state: string;
   district?: string;
   schoolEmail?: string; // Email Rasmi Sekolah

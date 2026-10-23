@@ -95,6 +95,7 @@ export const PortalLoginView: React.FC = () => {
     schoolCode: '',
     schoolType: 'Sekolah Menengah',
     membershipType: 'Ahli Biasa',
+    registeredAgencies: ['MIEB'],
     joinYear: new Date().getFullYear(),
     schoolJoinYear: new Date().getFullYear(),
     state: 'Selangor',
@@ -375,6 +376,7 @@ export const PortalLoginView: React.FC = () => {
           schoolCode: regForm.schoolCode || '',
           schoolType: regForm.schoolType,
           membershipType: regForm.membershipType || (regForm.schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa'),
+          registeredAgencies: Array.isArray(regForm.registeredAgencies) ? regForm.registeredAgencies : [],
           state: regForm.state,
           district: regForm.district || '',
           studentCount: Number(regForm.studentCount) || 0,
@@ -1384,6 +1386,74 @@ export const PortalLoginView: React.FC = () => {
                           </p>
                         </div>
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Berdaftar di Bawah Agensi (KPM / Jabatan Agama / MIEB - Pilihan Bebas) */}
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <label className="block text-slate-200 font-bold text-xs flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                          <span>Berdaftar di Bawah Agensi (Pilihan Bebas: KPM / Jabatan Agama / MIEB)</span>
+                        </label>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Boleh pilih satu, dua, atau ketiga-tiga agensi mengikut pendaftaran rasmi sekolah anda.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRegForm({
+                            ...regForm,
+                            registeredAgencies: ['KPM', 'Jabatan Agama', 'MIEB'],
+                          })
+                        }
+                        className="text-[10px] font-bold text-amber-300 bg-amber-400/10 hover:bg-amber-400/20 px-2.5 py-1 rounded-lg border border-amber-400/30 transition cursor-pointer"
+                      >
+                        Pilih Ketiga-tiga
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {[
+                        { id: 'KPM', title: 'KPM', sub: 'Kementerian Pendidikan Malaysia' },
+                        { id: 'Jabatan Agama', title: 'Jabatan Agama', sub: 'Jabatan Agama Islam Negeri' },
+                        { id: 'MIEB', title: 'MIEB', sub: 'Musleh Integrated Education Bhd' },
+                      ].map((ag) => {
+                        const currentList = Array.isArray(regForm.registeredAgencies) ? regForm.registeredAgencies : [];
+                        const isChecked = currentList.includes(ag.id);
+                        return (
+                          <button
+                            key={ag.id}
+                            type="button"
+                            onClick={() => {
+                              const next = isChecked
+                                ? currentList.filter((item) => item !== ag.id)
+                                : [...currentList, ag.id];
+                              setRegForm({ ...regForm, registeredAgencies: next });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                              isChecked
+                                ? 'bg-teal-950/80 border-teal-400/80 ring-1 ring-teal-400/30'
+                                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-4 h-4 rounded border flex items-center justify-center mt-0.5 shrink-0 ${
+                                isChecked
+                                  ? 'border-amber-300 bg-amber-400 text-slate-950'
+                                  : 'border-slate-600'
+                              }`}
+                            >
+                              {isChecked && <CheckCircle2 className="w-3 h-3" />}
+                            </div>
+                            <div>
+                              <span className="font-extrabold text-xs text-white block">{ag.title}</span>
+                              <span className="text-[10px] text-slate-400 block leading-snug">{ag.sub}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

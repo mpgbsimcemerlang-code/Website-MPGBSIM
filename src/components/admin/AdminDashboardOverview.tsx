@@ -92,6 +92,24 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
   const totalSchools = schoolsList.length;
   const statesCovered = new Set(schoolsList.map((s) => s.state)).size;
 
+  const agencySummary = React.useMemo(() => {
+    let kpm = 0;
+    let ja = 0;
+    let mieb = 0;
+    let allThree = 0;
+    schoolsList.forEach((s) => {
+      const ags = Array.isArray(s.registeredAgencies) ? s.registeredAgencies : [];
+      const hKpm = ags.includes('KPM');
+      const hJa = ags.includes('Jabatan Agama');
+      const hMieb = ags.includes('MIEB');
+      if (hKpm) kpm++;
+      if (hJa) ja++;
+      if (hMieb) mieb++;
+      if (hKpm && hJa && hMieb) allThree++;
+    });
+    return { kpm, ja, mieb, allThree };
+  }, [schoolsList]);
+
   const submissions = siteData.submissions || [];
   const unreadSubmissions = submissions.filter((s) => s.status === 'unread').length;
 
@@ -471,8 +489,92 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
             <div className="text-xs font-bold text-slate-600 mt-0.5">{dashboardConfig.cardSchoolsTitle}</div>
             <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span className="text-blue-700 font-semibold">{statesCovered} Negeri & Wilayah</span>
-              <span>SMKA / SABK / Swasta</span>
+              <span className="font-mono text-[10px] text-teal-800 font-bold">
+                KPM:{agencySummary.kpm} • JA:{agencySummary.ja} • MIEB:{agencySummary.mieb}
+              </span>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DATA ANALISA SEKOLAH BERDAFTAR (KPM / JABATAN AGAMA / MIEB) SUMMARY WIDGET */}
+      <div className="bg-white rounded-2xl border border-teal-200 shadow-xs p-5 space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-900 text-[10px] font-extrabold uppercase tracking-wider">
+                Analisa Pendaftaran Agensi
+              </span>
+              <h3 className="text-sm font-black text-slate-900">
+                Data Analisa Sekolah Berdaftar (KPM • Jabatan Agama • MIEB)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Ringkasan pendaftaran agensi institusi sekolah ahli (pilihan bebas: 1, 2, atau ketiga-tiga agensi serentak).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('sekolah-ahli')}
+            className="px-3.5 py-2 rounded-xl bg-teal-900 hover:bg-teal-800 text-white text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-center shrink-0 cursor-pointer"
+          >
+            <School className="w-3.5 h-3.5 text-amber-300" />
+            <span>Buka Analisa Penuh & Direktori</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div
+            onClick={() => onNavigateTab('sekolah-ahli')}
+            className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 cursor-pointer hover:bg-blue-50 transition"
+          >
+            <span className="text-[10px] font-bold uppercase text-blue-800 block">
+              Berdaftar di Bawah KPM
+            </span>
+            <strong className="text-lg font-black text-blue-950 font-mono tabular-nums mt-0.5 block">
+              {agencySummary.kpm}{' '}
+              <span className="text-xs font-semibold text-blue-700">/ {totalSchools} Sekolah</span>
+            </strong>
+          </div>
+
+          <div
+            onClick={() => onNavigateTab('sekolah-ahli')}
+            className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 cursor-pointer hover:bg-emerald-50 transition"
+          >
+            <span className="text-[10px] font-bold uppercase text-emerald-800 block">
+              Berdaftar Jabatan Agama
+            </span>
+            <strong className="text-lg font-black text-emerald-950 font-mono tabular-nums mt-0.5 block">
+              {agencySummary.ja}{' '}
+              <span className="text-xs font-semibold text-emerald-700">/ {totalSchools} Sekolah</span>
+            </strong>
+          </div>
+
+          <div
+            onClick={() => onNavigateTab('sekolah-ahli')}
+            className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 cursor-pointer hover:bg-amber-50 transition"
+          >
+            <span className="text-[10px] font-bold uppercase text-amber-900 block">
+              Berdaftar di Bawah MIEB
+            </span>
+            <strong className="text-lg font-black text-amber-950 font-mono tabular-nums mt-0.5 block">
+              {agencySummary.mieb}{' '}
+              <span className="text-xs font-semibold text-amber-800">/ {totalSchools} Sekolah</span>
+            </strong>
+          </div>
+
+          <div
+            onClick={() => onNavigateTab('sekolah-ahli')}
+            className="p-3 rounded-xl bg-purple-50/70 border border-purple-200 cursor-pointer hover:bg-purple-50 transition"
+          >
+            <span className="text-[10px] font-bold uppercase text-purple-800 block">
+              Ketiga-tiga Agensi (3/3)
+            </span>
+            <strong className="text-lg font-black text-purple-950 font-mono tabular-nums mt-0.5 block">
+              {agencySummary.allThree}{' '}
+              <span className="text-xs font-semibold text-purple-700">Sekolah</span>
+            </strong>
           </div>
         </div>
       </div>

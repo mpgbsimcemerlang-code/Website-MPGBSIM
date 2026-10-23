@@ -368,6 +368,9 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
                   schoolPhotoUrl: sch.schoolPhotoUrl || existing.schoolPhotoUrl,
                   logoUrl: sch.logoUrl || existing.logoUrl,
                   principalPhotoUrl: sch.principalPhotoUrl || existing.principalPhotoUrl,
+                  registeredAgencies: Array.isArray(sch.registeredAgencies)
+                    ? sch.registeredAgencies
+                    : existing.registeredAgencies,
                 }
               : sch;
             schoolsMap.set(sch.id, merged);
@@ -406,6 +409,9 @@ export const getLatestRegisteredSchools = async (): Promise<MemberSchool[]> => {
                     schoolPhotoUrl: sch.schoolPhotoUrl || existing.schoolPhotoUrl,
                     logoUrl: sch.logoUrl || existing.logoUrl,
                     principalPhotoUrl: sch.principalPhotoUrl || existing.principalPhotoUrl,
+                    registeredAgencies: Array.isArray(sch.registeredAgencies)
+                      ? sch.registeredAgencies
+                      : existing.registeredAgencies,
                   };
                   schoolsMap.set(existing.id, merged);
                   if (existing.code) schoolsMap.set(`code:${existing.code.toUpperCase()}`, merged);
@@ -1235,6 +1241,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           const resolvedSchoolPgbEmail = matched.pgbEmail;
           const resolvedSchoolOfficeEmail = matched.schoolEmail || matched.email;
 
+          const needsAgenciesUpdate =
+            Array.isArray(matched.registeredAgencies) &&
+            JSON.stringify(matched.registeredAgencies) !== JSON.stringify(prev.registeredAgencies || []);
+
           const needsUpdate =
             (targetCode && targetCode !== prev.schoolCode) ||
             (targetMemNo && targetMemNo !== prev.membershipNo) ||
@@ -1251,7 +1261,8 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             (matched.principalPhotoUrl && matched.principalPhotoUrl !== prev.photoURL) ||
             (matched.schoolPhotoUrl && matched.schoolPhotoUrl !== prev.schoolPhotoUrl) ||
             (matched.logoUrl && matched.logoUrl !== prev.logoUrl) ||
-            (matched.type && matched.type !== prev.schoolType);
+            (matched.type && matched.type !== prev.schoolType) ||
+            needsAgenciesUpdate;
 
           if (!needsUpdate) return prev;
 
@@ -1275,6 +1286,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
             ...(matched.schoolPhotoUrl ? { schoolPhotoUrl: matched.schoolPhotoUrl } : {}),
             ...(matched.logoUrl ? { logoUrl: matched.logoUrl } : {}),
             ...(matched.type ? { schoolType: matched.type } : {}),
+            ...(Array.isArray(matched.registeredAgencies) ? { registeredAgencies: matched.registeredAgencies } : {}),
             updatedAt: new Date().toISOString(),
           };
           safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
@@ -2350,6 +2362,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     let savedUserIc = '';
     let savedUserJoinYear: number | undefined;
     let savedUserServiceStartYear: number | undefined;
+    let savedUserAgencies: string[] | undefined;
     try {
       const userSnap = await getDoc(doc(db, 'users', `sch-user-${liveSchool.id}`));
       if (userSnap.exists()) {
@@ -2358,6 +2371,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         if (uData?.joinYear) savedUserJoinYear = Number(uData.joinYear);
         if (uData?.serviceStartYear || uData?.pgbStartYear) {
           savedUserServiceStartYear = Number(uData.serviceStartYear || uData.pgbStartYear);
+        }
+        if (Array.isArray(uData?.registeredAgencies)) {
+          savedUserAgencies = uData.registeredAgencies;
         }
       }
     } catch {}
@@ -2454,6 +2470,17 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       school: schoolName,
       schoolCode: cleanCode,
       schoolType,
+      membershipType: liveSchool.membershipType || school.membershipType || matchedApp?.membershipType || (schoolType === 'Rakan Musleh' ? 'Ahli Bersekutu' : 'Ahli Biasa'),
+      registeredAgencies:
+        (Array.isArray(liveSchool.registeredAgencies) && liveSchool.registeredAgencies.length > 0
+          ? liveSchool.registeredAgencies
+          : undefined) ||
+        (Array.isArray(school.registeredAgencies) && school.registeredAgencies.length > 0
+          ? school.registeredAgencies
+          : undefined) ||
+        savedUserAgencies ||
+        matchedApp?.registeredAgencies ||
+        [],
       state,
       district: liveSchool.district || '',
       address: liveSchool.address || '',
@@ -2828,6 +2855,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
               ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
               ...(safeUpdates.membershipType ? { membershipType: safeUpdates.membershipType } : {}),
+              ...(safeUpdates.registeredAgencies !== undefined ? { registeredAgencies: safeUpdates.registeredAgencies } : {}),
               ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
               ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
               ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
@@ -2906,6 +2934,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
                 ...(safeUpdates.schoolCode ? { code: safeUpdates.schoolCode } : {}),
                 ...(safeUpdates.schoolType ? { type: safeUpdates.schoolType } : {}),
                 ...(safeUpdates.membershipType ? { membershipType: safeUpdates.membershipType } : {}),
+                ...(safeUpdates.registeredAgencies !== undefined ? { registeredAgencies: safeUpdates.registeredAgencies } : {}),
                 ...(safeUpdates.state ? { state: safeUpdates.state } : {}),
                 ...(safeUpdates.district ? { district: safeUpdates.district } : {}),
                 ...(safeUpdates.address ? { address: safeUpdates.address } : {}),
