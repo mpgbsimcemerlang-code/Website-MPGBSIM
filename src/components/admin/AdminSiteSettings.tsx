@@ -13,12 +13,13 @@ import {
   ShieldCheck,
   RefreshCw,
   Sliders,
+  Bot,
 } from 'lucide-react';
 import { useAdminContent, BrandingData, ContactInfoData } from '../../context/AdminContentContext';
 import { AdminDashboardEditorModal } from './AdminDashboardEditorModal';
 
 export const AdminSiteSettings: React.FC = () => {
-  const { siteData, updateBranding, updateContactInfo, syncAllToFirestore } = useAdminContent();
+  const { siteData, updateBranding, updateContactInfo, updateDashboardConfig, syncAllToFirestore } = useAdminContent();
   const [isDashboardEditorOpen, setIsDashboardEditorOpen] = useState(false);
 
   const [brandingForm, setBrandingForm] = useState<BrandingData>({
@@ -430,6 +431,65 @@ export const AdminSiteSettings: React.FC = () => {
               className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white"
             />
           </div>
+        </div>
+      </div>
+
+      {/* 4. Kawalan Chatbot AI (Mursyid AI) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-900 text-amber-300 flex items-center justify-center">
+              <Bot className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-extrabold text-slate-900">
+                4. Kawalan Chatbot Pintar (Mursyid AI)
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                Hidupkan (ON) atau matikan (OFF) paparan butang & fungsi Chatbot Mursyid AI pada laman web awam serta portal
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => updateDashboardConfig({ enableAiChatbot: true })}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+                siteData.dashboardConfig?.enableAiChatbot !== false
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              ON (Aktifkan)
+            </button>
+            <button
+              type="button"
+              onClick={() => updateDashboardConfig({ enableAiChatbot: false })}
+              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+                siteData.dashboardConfig?.enableAiChatbot === false
+                  ? 'bg-rose-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              OFF (Matikan)
+            </button>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
+          Status Semasa:{' '}
+          <strong
+            className={
+              siteData.dashboardConfig?.enableAiChatbot !== false
+                ? 'text-emerald-700'
+                : 'text-rose-700'
+            }
+          >
+            {siteData.dashboardConfig?.enableAiChatbot !== false
+              ? 'AKTIF (ON) — Butang "Tanya Mursyid AI" dipaparkan di penjuru kanan bawah laman web.'
+              : 'DIMATIKAN (OFF) — Chatbot Mursyid AI disembunyikan sepenuhnya daripada laman web.'}
+          </strong>
         </div>
       </div>
 

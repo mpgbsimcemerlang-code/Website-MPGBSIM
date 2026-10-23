@@ -38,6 +38,7 @@ import { db, doc, getDoc } from './firebase';
 
 import { MemberPortalProvider, useMemberPortal } from './context/MemberPortalContext';
 import { PortalMainLayout } from './components/portal/PortalMainLayout';
+import { MpgbChatbot } from './components/MpgbChatbot';
 
 function AppContent() {
   const {
@@ -59,6 +60,15 @@ function AppContent() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const handledDeepLinkNewsIdRef = React.useRef<string | null>(null);
   const fetchedDeepLinkDocIdRef = React.useRef<string | null>(null);
+
+  // Listen for admin exit impersonation to seamlessly reopen Admin CMS modal
+  useEffect(() => {
+    const handleReopenCms = () => {
+      setIsCMSOpen(true);
+    };
+    window.addEventListener('mpgbsim_reopen_cms', handleReopenCms);
+    return () => window.removeEventListener('mpgbsim_reopen_cms', handleReopenCms);
+  }, [setIsCMSOpen]);
 
   // Detect shared news link (?berita=<id> or ?news=<id>) and automatically open & keep the news article modal synced
   useEffect(() => {
@@ -210,14 +220,19 @@ function AppContent() {
     document.title = sectionTitles[activeSection] || 'MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia';
   }, [viewMode, activeSection, detailModalContent]);
 
-  // If viewMode is 'portal', render the dedicated MPGBSIM Member Portal interface
-  if (viewMode === 'portal') {
-    return <PortalMainLayout />;
-  }
-
   const handleOpenPortal = () => {
     setViewMode('portal');
   };
+
+  // If viewMode is 'portal', render the dedicated MPGBSIM Member Portal interface + Mursyid AI Chatbot
+  if (viewMode === 'portal') {
+    return (
+      <>
+        <PortalMainLayout />
+        <MpgbChatbot onOpenPortal={handleOpenPortal} />
+      </>
+    );
+  }
 
   const handleSelectNews = (news: NewsItem) => {
     setDetailModalContent({ type: 'news', data: news });
@@ -382,6 +397,12 @@ function AppContent() {
           <span className="hidden sm:inline">Ke Atas</span>
         </button>
       )}
+
+      {/* Floating AI Chatbot: Mursyid AI - Pembantu Maya Rasmi MPGBSIM */}
+      <MpgbChatbot
+        onOpenPortal={handleOpenPortal}
+        onNavigateSection={handleScrollTo}
+      />
 
       {/* Floating Quick Action Widget for Admin CMS & Login/Logout */}
       <AdminFloatingControl />

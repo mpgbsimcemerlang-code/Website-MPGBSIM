@@ -31,8 +31,10 @@ import {
   Download,
   Filter,
   Layers,
+  LogIn,
 } from 'lucide-react';
 import { useAdminContent } from '../../context/AdminContentContext';
+import { useMemberPortal } from '../../context/MemberPortalContext';
 import { MemberSchool } from '../../types';
 import { PORTAL_SCHOOL_TYPES } from '../../data/constants';
 import { DiagnosticReport } from '../../utils/schoolDiagnostic';
@@ -43,19 +45,47 @@ export const AdminSchoolManagement: React.FC = () => {
     addMemberSchool,
     updateMemberSchool,
     deleteMemberSchool,
+    resetPgbPassword,
     runSchoolDiagnostics,
     autoRepairSchoolIntegrity,
+    setIsCMSOpen,
   } = useAdminContent();
+  const { adminLoginAsSchoolWithoutPassword } = useMemberPortal();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterAgency, setFilterAgency] = useState<string>('all');
   const [showStateAgencyBreakdown, setShowStateAgencyBreakdown] = useState<boolean>(false);
+  const [isLoggingInSchoolId, setIsLoggingInSchoolId] = useState<string | null>(null);
+
+  const handleAdminLoginAsSchool = async (school: MemberSchool) => {
+    setIsLoggingInSchoolId(school.id);
+    try {
+      if (setIsCMSOpen) {
+        setIsCMSOpen(false);
+      }
+      await adminLoginAsSchoolWithoutPassword(school);
+    } catch (err: any) {
+      alert('Ralat log masuk portal: ' + (err?.message || 'Sila cuba lagi.'));
+      setIsLoggingInSchoolId(null);
+    }
+  };
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Reset PGB Portal Password Modal States
+  const [schoolToResetPass, setSchoolToResetPass] = useState<MemberSchool | null>(null);
+  const [isResettingPass, setIsResettingPass] = useState(false);
+  const [resetPassResult, setResetPassResult] = useState<{
+    schoolName: string;
+    schoolCode: string;
+    principal: string;
+    tempPassword: string;
+  } | null>(null);
+  const [copiedTempPass, setCopiedTempPass] = useState(false);
 
   // Diagnostic Modal States
   const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
@@ -1177,15 +1207,63 @@ export const AdminSchoolManagement: React.FC = () => {
                           ★ Ketiga-tiga Agensi (3/3)
                         </span>
                       )}
+
+                      {/* Status Kata Laluan Portal PGB */}
+                      <span
+                        className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-md border inline-flex items-center gap-1 ${
+                          !school.password ||
+                          school.password.trim().toUpperCase() === 'MPGBSIM2026' ||
+                          (school as any).isTemporaryPassword
+                            ? 'bg-amber-50 text-amber-900 border-amber-200'
+                            : 'bg-teal-50 text-teal-900 border-teal-200'
+                        }`}
+                        title="Status Kata Laluan Log Masuk Portal PGB"
+                      >
+                        <Key className="w-2.5 h-2.5" />
+                        <span>
+                          {!school.password ||
+                          school.password.trim().toUpperCase() === 'MPGBSIM2026' ||
+                          (school as any).isTemporaryPassword
+                            ? 'Password Sementara: MPGBSIM2026'
+                            : 'Password Peribadi PGB'}
+                        </span>
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-end md:self-center">
+                  <button
+                    type="button"
+                    disabled={isLoggingInSchoolId === school.id}
+                    onClick={() => handleAdminLoginAsSchool(school)}
+                    className="px-2.5 py-1.5 rounded-lg bg-teal-800 hover:bg-teal-900 text-white border border-teal-950 text-[10.5px] font-extrabold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                    title={`Log masuk terus ke Portal PGB bagi institusi ${school.name} tanpa memerlukan kata laluan (Akses Pentadbir CMS)`}
+                  >
+                    {isLoggingInSchoolId === school.id ? (
+                      <RefreshCw className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                    ) : (
+                      <LogIn className="w-3.5 h-3.5 text-amber-300" />
+                    )}
+                    <span>Log Masuk Portal (Tanpa Password)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetPassResult(null);
+                      setCopiedTempPass(false);
+                      setSchoolToResetPass(school);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-300 text-[10.5px] font-extrabold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                    title="Reset kata laluan Portal PGB sekolah ini kepada kata laluan sementara MPGBSIM2026"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>Reset Password</span>
+                  </button>
                   <button
                     onClick={() => handleOpenEdit(school)}
-                    className="p-2 rounded-lg text-slate-600 hover:text-teal-700 hover:bg-slate-100 transition"
+                    className="p-2 rounded-lg text-slate-600 hover:text-teal-700 hover:bg-slate-100 transition cursor-pointer"
                     title="Sunting Sekolah"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -1196,7 +1274,7 @@ export const AdminSchoolManagement: React.FC = () => {
                         deleteMemberSchool(school.id);
                       }
                     }}
-                    className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 transition"
+                    className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 transition cursor-pointer"
                     title="Padam Sekolah"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1216,12 +1294,31 @@ export const AdminSchoolManagement: React.FC = () => {
               <h4 className="text-base font-extrabold text-slate-900">
                 {editingId ? 'Sunting Maklumat Sekolah' : 'Daftar Sekolah Baharu'}
               </h4>
-              <button
-                onClick={() => setIsEditing(false)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const found = schoolsList.find((s) => s.id === editingId);
+                      if (found) {
+                        setIsEditing(false);
+                        handleAdminLoginAsSchool(found);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-teal-900"
+                    title="Log masuk terus ke Portal PGB sekolah ini tanpa kata laluan"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Log Masuk Portal Sekolah Ini</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="py-4 space-y-4 text-xs">
@@ -1591,17 +1688,39 @@ export const AdminSchoolManagement: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[11px] flex items-center gap-1">
-                      <Key className="w-3.5 h-3.5 text-slate-500" />
-                      Kata Laluan Akaun PGB
-                    </label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-1">
+                        <Key className="w-3.5 h-3.5 text-slate-500" />
+                        Kata Laluan Akaun PGB
+                      </label>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setFormData((prev) => ({ ...prev, password: 'MPGBSIM2026' }));
+                          if (editingId) {
+                            await resetPgbPassword(editingId);
+                            setSaveSuccessMsg(
+                              'Kata laluan PGB telah direset serta-merta kepada kata laluan sementara: MPGBSIM2026'
+                            );
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-amber-100 hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-300 text-[10px] font-extrabold transition flex items-center gap-1 cursor-pointer"
+                        title="Set semula kepada kata laluan sementara rasmi MPGBSIM2026"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" />
+                        <span>Reset ke MPGBSIM2026</span>
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={formData.password || ''}
                       onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                      placeholder={formData.code ? `cth: PGB#${formData.code.toUpperCase()}` : 'cth: PGB#2026!'}
+                      placeholder="MPGBSIM2026 (Kata Laluan Sementara Rasmi)"
                       className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 bg-white font-mono"
                     />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Jika PGB terlupa kata laluan portal mereka, klik <strong>Reset ke MPGBSIM2026</strong> untuk mengembalikan kata laluan sementara rasmi.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -2052,6 +2171,161 @@ export const AdminSchoolManagement: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Reset Kata Laluan Portal PGB ke Kata Laluan Sementara (MPGBSIM2026) */}
+      {schoolToResetPass && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-amber-200 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-black text-slate-900">
+                    Reset Kata Laluan Portal PGB
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Tetapkan semula ke kata laluan sementara rasmi
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSchoolToResetPass(null);
+                  setResetPassResult(null);
+                }}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {!resetPassResult ? (
+              <>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+                  <div className="font-black text-slate-900 text-sm">
+                    {schoolToResetPass.name}
+                  </div>
+                  <div className="text-slate-600">
+                    PGB: <strong className="text-slate-900">{schoolToResetPass.principal || 'Pengetua / Guru Besar'}</strong>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-mono text-[10px] font-bold">
+                      Kod: {schoolToResetPass.code}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-bold">
+                      {schoolToResetPass.state}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 space-y-2 text-xs text-amber-950">
+                  <div className="font-extrabold flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>Kata Laluan Sementara Rasmi:</span>
+                  </div>
+                  <div className="px-3 py-2 rounded-xl bg-white border border-amber-300 font-mono text-sm font-black text-center tracking-wider text-slate-900 select-all">
+                    MPGBSIM2026
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    Selepas direset, PGB sekolah ini boleh terus log masuk ke Portal Ahli menggunakan Kod Sekolah (<strong>{schoolToResetPass.code}</strong>) atau Emel berserta kata laluan sementara <strong>MPGBSIM2026</strong>.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    disabled={isResettingPass}
+                    onClick={() => setSchoolToResetPass(null)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isResettingPass}
+                    onClick={async () => {
+                      setIsResettingPass(true);
+                      const res = await resetPgbPassword(schoolToResetPass.id);
+                      setIsResettingPass(false);
+                      if (res.success) {
+                        setResetPassResult({
+                          schoolName: schoolToResetPass.name,
+                          schoolCode: schoolToResetPass.code,
+                          principal: schoolToResetPass.principal || 'Pengetua / Guru Besar',
+                          tempPassword: res.tempPassword,
+                        });
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-amber-900/20 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isResettingPass ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Mereset Kata Laluan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Key className="w-4 h-4" />
+                        <span>Sahkan Reset ke MPGBSIM2026</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2 text-xs text-emerald-950">
+                  <div className="flex items-center gap-2 font-black text-emerald-900 text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span>Kata Laluan Berjaya Direset!</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed">
+                    Akaun Portal PGB bagi <strong>{resetPassResult.principal}</strong> ({resetPassResult.schoolName}) telah ditetapkan semula ke kata laluan sementara rasmi:
+                  </p>
+                  <div className="p-3 rounded-xl bg-white border border-emerald-300 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                        ID Log Masuk / Kod Sekolah: {resetPassResult.schoolCode}
+                      </span>
+                      <span className="font-mono text-base font-black text-slate-900 tracking-wider select-all">
+                        {resetPassResult.tempPassword}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textToCopy = `Makluman Reset Kata Laluan Portal Rasmi PGB MPGBSIM\nSekolah: ${resetPassResult.schoolName}\nKod Sekolah: ${resetPassResult.schoolCode}\nKata Laluan Sementara: ${resetPassResult.tempPassword}\n\nSila log masuk dan tukar kata laluan baharu anda di menu Profil Ahli.`;
+                        navigator.clipboard?.writeText(textToCopy);
+                        setCopiedTempPass(true);
+                        setTimeout(() => setCopiedTempPass(false), 3000);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold transition cursor-pointer shrink-0"
+                    >
+                      {copiedTempPass ? 'Disalin!' : 'Salin Info'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSchoolToResetPass(null);
+                      setResetPassResult(null);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+                  >
+                    Selesai & Tutup
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -45,6 +45,8 @@ export const PortalHeader: React.FC = () => {
     logoutPortal,
     setViewMode,
     setIsSearchOpen,
+    isAdminImpersonating,
+    exitAdminImpersonation,
   } = useMemberPortal();
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -337,6 +339,18 @@ export const PortalHeader: React.FC = () => {
                   </div>
 
                   <div className="p-2 divide-y divide-slate-100 text-xs">
+                    {isAdminImpersonating && (
+                      <button
+                        onClick={() => {
+                          exitAdminImpersonation();
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 flex items-center gap-2 font-black text-amber-950 border border-amber-300 mb-1"
+                      >
+                        <Shield className="w-4 h-4 text-amber-700" />
+                        <span>Kembali ke Admin CMS</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setPortalTab('profil');

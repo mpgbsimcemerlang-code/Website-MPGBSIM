@@ -279,6 +279,10 @@ interface MemberPortalContextType {
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   loginWithEmailPassword: (email: string, pass: string) => Promise<void>;
   loginAsMemberSchool: (school: MemberSchool) => void;
+  // Admin CMS Impersonation (Log Masuk Semua Portal PGB Tanpa Password)
+  isAdminImpersonating: boolean;
+  adminLoginAsSchoolWithoutPassword: (school: MemberSchool) => Promise<void>;
+  exitAdminImpersonation: () => void;
   logoutPortal: () => Promise<void>;
   logout: () => Promise<void>;
   switchDemoRole: (role: UserRole) => void;
@@ -590,6 +594,13 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [portalSubTab, setPortalSubTab] = useState<string>('pgb');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isAdminImpersonating, setIsAdminImpersonating] = useState<boolean>(() => {
+    try {
+      return safeLocalStorageGet('mpgbsim_admin_impersonating') === 'true';
+    } catch {
+      return false;
+    }
+  });
 
   const setPortalTab = React.useCallback((tab: PortalTab) => {
     setPortalTabState(tab);
@@ -865,6 +876,20 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
         return prev;
       });
+
+      setRegisteredSchools((prevSchools) =>
+        prevSchools.map((s) => {
+          if (
+            s.id === detail.id ||
+            (detail.updated.code &&
+              s.code &&
+              s.code.trim().toUpperCase() === detail.updated.code.trim().toUpperCase())
+          ) {
+            return { ...s, ...detail.updated };
+          }
+          return s;
+        })
+      );
     };
 
     window.addEventListener('mpgbsim_school_updated', handleSchoolUpdated);
@@ -2238,6 +2263,12 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       (matched.email && matched.email.toLowerCase().includes('imuslehmelaka'));
 
     let customPasswordSet: string | null = null;
+    const schoolWasResetToTemp =
+      Boolean((matched as any).isTemporaryPassword) ||
+      (matched.password && matched.password.trim().toUpperCase() === 'MPGBSIM2026' && !(matched as any).passwordUpdatedAt);
+    const schoolResetTime = (matched as any).passwordResetAt
+      ? new Date((matched as any).passwordResetAt).getTime()
+      : 0;
 
     // 1. Check Firestore 'users' collection for custom password set by user
     try {
@@ -2250,6 +2281,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         const inputLower = input.toLowerCase().trim();
 
         if (
+          uDoc.id === `sch-user-${matched.id}` ||
           uEmail === inputLower ||
           uCode === inputLower ||
           uMem.includes(inputLower) ||
@@ -2258,14 +2290,27 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
           (isMuslehSchool && (uCode === 'mjac011' || uCode === 'mia1009' || uEmail.includes('imusleh')))
         ) {
           if (uData.portalPassword && uData.portalPassword.trim().length > 0) {
-            customPasswordSet = uData.portalPassword.trim();
+            const candidatePass = uData.portalPassword.trim();
+            const isTempCandidate =
+              Boolean(uData.isTemporaryPassword) ||
+              candidatePass.toUpperCase() === 'MPGBSIM2026';
+            const userPassUpdatedTime = uData.passwordUpdatedAt
+              ? new Date(uData.passwordUpdatedAt).getTime()
+              : 0;
+
+            // If Admin reset the school password after the user's custom password update, or if the user doc itself was reset to MPGBSIM2026, treat as temporary password
+            if (isTempCandidate || (schoolResetTime > 0 && schoolResetTime >= userPassUpdatedTime)) {
+              customPasswordSet = null;
+            } else {
+              customPasswordSet = candidatePass;
+            }
           }
         }
       });
     } catch (e) {}
 
     // 2. Check matched school object in 'schools' collection
-    if (!customPasswordSet && matched.password) {
+    if (!customPasswordSet && matched.password && !schoolWasResetToTemp) {
       const defaultFormats = [
         'MPGBSIM2026',
         'mpgbsim2026',
@@ -2274,7 +2319,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         'PGB#MIA1009',
         'MPGB2026!',
       ];
-      if ((matched as any).passwordUpdatedAt || !defaultFormats.includes(matched.password)) {
+      if ((matched as any).passwordUpdatedAt || !defaultFormats.includes(matched.password.trim())) {
         customPasswordSet = matched.password.trim();
       }
     }
@@ -2282,11 +2327,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     // 3. Perform strict password validation
     let isValidPass = false;
 
-    if (customPasswordSet) {
-      // If user has changed their password, ONLY the new custom password is valid! Default formats like MPGBSIM2026 are REJECTED.
+    if (customPasswordSet && customPasswordSet.toUpperCase() !== 'MPGBSIM2026') {
+      // If user has changed their password (and it hasn't been reset to MPGBSIM2026 by Admin), ONLY the custom password is valid!
       isValidPass = cleanPass === customPasswordSet;
     } else {
-      // If no custom password has been set yet, allow official temporary password MPGBSIM2026 or initial formats
+      // If no custom password is set or Admin has reset the password to MPGBSIM2026, allow official temporary password MPGBSIM2026
       const isTempPassword = cleanPass === 'MPGBSIM2026' || cleanPass.toUpperCase() === 'MPGBSIM2026';
       const expectedPassword = matched.password || 'MPGBSIM2026';
       isValidPass =
@@ -2299,9 +2344,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     if (!isValidPass) {
-      if (customPasswordSet) {
+      if (customPasswordSet && customPasswordSet.toUpperCase() !== 'MPGBSIM2026') {
         throw new Error(
-          `Kata laluan tidak tepat. Anda telah menetapkan kata laluan baharu untuk akaun ini — kata laluan sementara (MPGBSIM2026) tidak lagi sah. Sila masukkan kata laluan peribadi yang telah dikemas kini.`
+          `Kata laluan tidak tepat. Anda telah menetapkan kata laluan peribadi untuk akaun ini — kata laluan sementara (MPGBSIM2026) tidak lagi sah. Jika terlupa kata laluan, sila hubungi Pentadbir CMS untuk reset semula ke MPGBSIM2026.`
         );
       } else {
         throw new Error(
@@ -2549,6 +2594,48 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     );
   };
 
+  const adminLoginAsSchoolWithoutPassword = async (school: MemberSchool) => {
+    setIsAdminImpersonating(true);
+    safeLocalStorageSet('mpgbsim_admin_impersonating', 'true');
+    safeLocalStorageSet('mpgbsim_impersonated_school_id', school.id || '');
+    safeLocalStorageSet('mpgbsim_impersonated_school_code', school.code || '');
+
+    await loginAsMemberSchool(school);
+
+    setViewMode('portal');
+    setPortalTab('dashboard');
+
+    recordAuditLog(
+      'Log Masuk Pentadbir (Tanpa Kata Laluan)',
+      `Pentadbir CMS telah log masuk secara langsung ke Portal Ahli bagi pihak ${school.name} [Kod: ${school.code || '-'}] tanpa kata laluan.`,
+      {
+        user: `Pentadbir CMS (Bagi pihak ${school.principal || school.name})`,
+        schoolName: school.name,
+        schoolCode: school.code,
+        state: school.state,
+        position: 'Pentadbir CMS',
+        category: 'LOG_MASUK',
+      }
+    );
+  };
+
+  const exitAdminImpersonation = () => {
+    setIsAdminImpersonating(false);
+    safeLocalStorageRemove('mpgbsim_admin_impersonating');
+    safeLocalStorageRemove('mpgbsim_impersonated_school_id');
+    safeLocalStorageRemove('mpgbsim_impersonated_school_code');
+
+    if (currentUser) {
+      markPgbPresenceOffline(currentUser).catch(() => {});
+    }
+
+    setCurrentUser(null);
+    safeLocalStorageRemove(STORAGE_KEYS.CURRENT_USER);
+    setViewMode('public');
+
+    window.dispatchEvent(new CustomEvent('mpgbsim_reopen_cms', { detail: { targetTab: 'sekolah-ahli' } }));
+  };
+
   const getPresenceKeyForUser = (user: UserProfile | null) => {
     if (!user) return { schoolCode: '', presenceKey: '' };
     const schoolCode = (
@@ -2688,6 +2775,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       );
     }
     setCurrentUser(null);
+    safeLocalStorageRemove('mpgbsim_admin_impersonating');
+    safeLocalStorageRemove('mpgbsim_impersonated_school_id');
+    safeLocalStorageRemove('mpgbsim_impersonated_school_code');
+    setIsAdminImpersonating(false);
     await markPgbPresenceOffline(outgoingUser);
     try {
       await signOut(auth);
@@ -3005,12 +3096,15 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     // 2. Update user profile document in Firestore
+    const updatedPassIso = new Date().toISOString();
     try {
       await setDoc(
         doc(db, 'users', currentUser.uid),
         {
           portalPassword: cleanPass,
-          passwordUpdatedAt: new Date().toISOString(),
+          passwordUpdatedAt: updatedPassIso,
+          isTemporaryPassword: false,
+          passwordResetAt: null,
         },
         { merge: true }
       );
@@ -3059,7 +3153,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (targetDocId) {
         await updateDoc(doc(db, 'schools', targetDocId), {
           password: cleanPass,
-          passwordUpdatedAt: new Date().toISOString(),
+          passwordUpdatedAt: updatedPassIso,
+          isTemporaryPassword: false,
+          passwordResetAt: null,
         });
       }
     } catch (e) {
@@ -4084,6 +4180,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         deleteFeePayment,
         isSearchOpen,
         setIsSearchOpen,
+        isAdminImpersonating,
+        adminLoginAsSchoolWithoutPassword,
+        exitAdminImpersonation,
       }}
     >
       {children}

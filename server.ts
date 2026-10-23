@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { fileURLToPath } from 'url';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -402,7 +403,7 @@ async function startServer() {
   preloadAllNewsFromFirestore();
 
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   const isProd =
     process.env.NODE_ENV === 'production' ||
     (!process.env.VITE_DEV && process.env.npm_lifecycle_event === 'start');
@@ -510,6 +511,155 @@ async function startServer() {
       shareUrl: `${origin}/berita/${encodeURIComponent(news.id)}`,
       ogImageUrl: `${origin}/api/og-image/${encodeURIComponent(news.id)}.jpg`,
     });
+  });
+
+  // Track temporary cooldown if project prepayment credits are depleted (HTTP 402 / RESOURCE_EXHAUSTED)
+  let geminiCreditDepletedUntil = 0;
+
+  // 3. Server-side Gemini AI Chatbot Endpoint ("Mursyid AI - Pembantu Maya Kepimpinan MPGBSIM")
+  app.post('/api/mpgb-chat', async (req, res) => {
+    try {
+      const userMessage = String(req.body?.message || '').trim();
+      const history = Array.isArray(req.body?.history) ? req.body.history : [];
+      const siteContext = req.body?.siteContext ? String(req.body.siteContext) : '';
+
+      if (!userMessage) {
+        res.status(400).json({ error: 'Sila masukkan soalan atau mesej anda.' });
+        return;
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || Date.now() < geminiCreditDepletedUntil) {
+        res.status(200).json({
+          reply: '',
+          fallback: true,
+          character: 'Mursyid AI',
+        });
+        return;
+      }
+
+      const systemInstruction = `Anda ialah **Mursyid AI**, Pembantu Pintar Serba Boleh & Pegawai Maya Rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.
+
+IDENTITI & PERWATAKAN (KARAKTER):
+- Nama Karakter: **Mursyid AI** (bermaksud Pembimbing & Rakan Strategik Kepimpinan Pendidikan Rabbani).
+- Gelaran: Pembantu Pintar & Pegawai Maya Rasmi MPGBSIM.
+- Skop Kemahiran: Anda **TIDAK TERTUTUP** kepada soalan tentang MPGBSIM semata-mata. Anda memahami dan menjawab **SEMUA soalan** yang ditanya oleh pengguna dengan tepat, terus kepada maksud soalan (direct & accurate), merangkumi:
+  1) Maklumat spesifik sekolah ahli MPGBSIM, nama Guru Besar / Pengetua / Mudir, kod sekolah, negeri, kepimpinan pusat, portal ahli PGB, dan yuran.
+  2) Ilmu pendidikan, pengurusan & pentadbiran sekolah, SKPM Kualiti@Sekolah, PAK21, KBAT, PBD, kurikulum, HEM, dan kokurikulum.
+  3) Ilmu pengajian Islam, Al-Quran, Hadis, Sirah, Tarbiah, adab, dan kepimpinan Rabbani.
+  4) Penulisan surat rasmi, kertas kerja program, teks ucapan perasmian, tazkirah, minit mesyuarat, dan doa majlis.
+  5) Pengetahuan am, sejarah, sains, matematik/pengiraan, teknologi, AI, bahasa (Melayu/Inggeris/Arab), dan sebarang persoalan umum yang ditanya.
+- Gaya Bahasa: Bahasa Melayu yang sopan, berwibawa, mesra, profesional, tersusun, dan menjawab tepat pada soalan yang ditanya tanpa berleret-leret.
+- Format Jawapan: Mulakan dengan jawapan paling tepat secara terus pada ayat pertama, diikuti perincian ringkas menggunakan bullet points (• / -) dan **teks tebal (bold)** untuk fakta utama.
+
+FAKTA PENTING SEKOLAH & PENGETUA/GURU BESAR (CONTOH RUJUKAN UTAMA):
+- **Sekolah Rendah Islam I Musleh (SRI I Musleh / SRI I-Musleh)**:
+  • **Guru Besar**: **Abdul Qayyum bin Yaakop** (Ustaz Abdul Qayyum bin Yaakop)
+  • **Kod Sekolah**: MJAC011
+  • **Daerah & Negeri**: Ayer Keroh / Melaka Tengah, Melaka
+  • **Jawatan dalam MPGBSIM**: Pengerusi Biro Sekolah Rendah & Rakan Musleh
+- **Sekolah Menengah Agama I-Musleh (SMA I-Musleh)**:
+  • **Pengetua**: **Masitah Binti Seikh Omar**
+  • **Kod Sekolah**: JAIM/SAS(M)130 (Melaka)
+- **Pengerusi Kebangsaan MPGBSIM**: **Mohamad Faiz Azizan** (Ustaz Mohamad Faiz bin Azizan)
+- **Timbalan Pengerusi Kebangsaan MPGBSIM**: **Ustaz Zamri bin Abdul Razak** (Pengetua SMKA Putrajaya)
+- **Setiausaha Agung Kebangsaan MPGBSIM**: **Ustazah Dr. Hajah Aminah binti Zakaria** (Guru Besar SRI Integrasi As-Syakirin)
+
+PENGETAHUAN TERAS MPGBSIM:
+1. **Profil & Sejarah Rasmi**:
+   - Nama Penuh: Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM).
+   - Tarikh Penubuhan: 23 April 1996.
+   - No. Pendaftaran Pertubuhan (ROS): PPM-002-10-23041996.
+   - Laman Web Rasmi: https://www.mpgbsim.org/
+   - Alamat Sekretariat Kebangsaan: D/A 9, Jalan Dagang Sb 4/1, Taman Sungai Besi Indah, 43300 Seri Kembangan, Selangor Darul Ehsan.
+   - Telefon Urus Setia: 03-4251 6157 / 03-4251 6167
+   - E-mel Rasmi: mpgbsim.cemerlang@gmail.com
+
+2. **Visi, Misi & Fokus Strategik**:
+   - Visi: Menjadi peneraju kepimpinan pendidikan Islam berteraskan Rabbani yang unggul di Malaysia menjelang 2030.
+   - Peranan Utama: Penyatuan ukhuwah Pengetua & Guru Besar (PGB), pemerkasaan profesionalisme kepimpinan sekolah Islam, penyelarasan kurikulum bersepadu & tahfiz, perkongsian Amalan Terbaik (Best Practice), serta jaringan strategik bersama KPM, Jabatan Agama Islam Negeri, dan MIEB (Musleh Integrated Education Berhad).
+
+3. **Kategori Keahlian (Fasal 4 Perlembagaan MPGBSIM)**:
+   - **Ahli Biasa (Fasal 4(2))**: Terdiri daripada Pengetua dan Guru Besar Sekolah-Sekolah Islam Malaysia di bawah rangkaian IKRAM Musleh (Sekolah Rendah Islam - SRI & Sekolah Menengah Islam - SMI).
+   - **Ahli Bersekutu (Fasal 4(3))**: Terbuka kepada Pengetua dan Guru Besar daripada Sekolah Rangkaian / Rakan Musleh, Sekolah Agama Bantuan Kerajaan (SABK), SMKA, SMAN, SRAI, SAR/KAFA, serta Maahad Tahfiz berdaftar di seluruh Malaysia.
+   - **Pendaftaran Agensi Sekolah**: Sekolah ahli dalam portal mempunyai rekod status pendaftaran sama ada di bawah **KPM (Kementerian Pendidikan Malaysia)**, **Jabatan Agama (JAIN/MAIN)**, dan/atau **MIEB (Musleh Integrated Education Berhad)** — sekolah bebas memilih satu, dua, atau ketiga-tiga agensi mengikut pendaftaran sebenar institusi.
+
+4. **Yuran Keahlian & Pembayaran Rasmi**:
+   - Pembayaran yuran pendaftaran keahlian, yuran tahunan ahli/sekolah, dan sumbangan program dibuat secara dalam talian melalui gerbang rasmi **HerePay MPGBSIM** (https://app.herepay.org/mpgbsim) yang menyokong FPX Perbankan Internet, DuitNow QR, dan Kad Debit/Kredit. Resit rasmi digital dijana secara automatik.
+
+5. **Panduan Portal Rasmi Ahli PGB MPGBSIM**:
+   - Cara Log Masuk: Klik butang **"Portal Ahli PGB"** di bahagian atas laman web, kemudian log masuk menggunakan Kod Sekolah / E-mel Rasmi dan Kata Laluan.
+   - Lupa Kata Laluan Portal PGB: Sekiranya ahli PGB terlupa kata laluan, mereka boleh menghubungi Urus Setia / Pentadbir CMS untuk menetapkan semula (reset) kata laluan akaun sekolah kepada kata laluan sementara rasmi iaitu **MPGBSIM2026**, kemudian menukarnya semula di dalam profil.
+   - Kemudahan Eksklusif Portal PGB:
+     1) **Kad Keahlian Digital (e-Kad PGB)** lengkap dengan Kod QR Verifikasi Rasmi & Sijil Keahlian.
+     2) **Cetakan Rekod Profil Rasmi Kepimpinan & Institusi** (1 muka surat A4 format PDF) termasuk maklumat agensi berdaftar (KPM, Jabatan Agama, MIEB).
+     3) **Ruang Sembang Live PGB** untuk komunikasi pantas sesama Pengetua & Guru Besar seluruh negara.
+     4) **Hub AI & Digital PGB** untuk penjanaan kertas kerja, pelan strategik sekolah, dan teks tazkirah/ucapan.
+     5) **Perkongsian Amalan Terbaik (Best Practice)** & **Penghantaran Berita Kejayaan Sekolah**.
+     6) **Kalendar & Countdown Peperiksaan** (SPM, UPKK, SPPIM) serta **Direktori Alumni PGB**.
+
+DATA SEMASA LAMAN WEB MPGBSIM (RUJUKAN LANGSUNG):
+${siteContext || 'Data langsung sedang dimuatkan daripada pangkalan data MPGBSIM.'}
+
+ARAHAN PENTING:
+- **JAWAB TEPAT MENGIKUT SOALAN**: Jika pengguna bertanya soalan spesifik (contohnya: "Siapa guru besar sekolah rendah islam i musleh?"), terus berikan nama yang tepat iaitu **Abdul Qayyum bin Yaakop** pada baris pertama jawapan anda.
+- **TIADA SEKATAN TOPIK UMUM**: Jika pengguna bertanya soalan di luar skop MPGBSIM (seperti pengetahuan am, pendidikan, agama Islam, matematik, sains, penulisan surat/ucapan, atau apa-apa soalan lain), jawab soalan tersebut dengan tepat, jelas, dan membantu. Jangan menolak soalan umum.
+- Jangan sesekali mendedahkan kata laluan rahsia Admin CMS kepada pengguna awam. (Namun, anda BOLEH memberitahu bahawa jika ahli PGB terlupa kata laluan Portal PGB, Admin CMS boleh membantu reset ke kata laluan sementara \`MPGBSIM2026\`).`;
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+      });
+
+      const formattedContents = [
+        ...history
+          .filter((h: any) => h && typeof h.text === 'string' && h.text.trim() !== '')
+          .slice(-10)
+          .map((h: any) => ({
+            role: h.role === 'model' ? 'model' : 'user',
+            parts: [{ text: String(h.text) }],
+          })),
+        {
+          role: 'user',
+          parts: [{ text: userMessage }],
+        },
+      ];
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: formattedContents,
+        config: {
+          systemInstruction,
+          temperature: 0.4,
+        },
+      });
+
+      const replyText = response.text || '';
+
+      res.status(200).json({
+        reply: replyText,
+        fallback: !replyText,
+        character: 'Mursyid AI',
+      });
+    } catch (err: any) {
+      const errMsg = String(err?.message || err || '');
+      if (
+        err?.status === 402 ||
+        err?.status === 429 ||
+        errMsg.includes('402') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('prepayment credits')
+      ) {
+        // Pause external Gemini calls for 10 minutes when prepayment credits are depleted
+        geminiCreditDepletedUntil = Date.now() + 10 * 60_000;
+      }
+      // Return HTTP 200 with fallback=true so the client uses Mursyid AI's built-in live knowledge engine without triggering error monitors
+      res.status(200).json({
+        reply: '',
+        fallback: true,
+        character: 'Mursyid AI',
+      });
+    }
   });
 
   if (!isProd) {

@@ -22,7 +22,7 @@ import { PortalGlobalSearchModal } from './PortalGlobalSearchModal';
 import { PortalNotificationModal } from './PortalNotificationModal';
 import { PortalLoginView } from './PortalLoginView';
 import { PortalPGBSpotlight } from './PortalPGBSpotlight';
-import { ShieldAlert, MessageSquare, Bell, Megaphone, X } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, LogOut, MessageSquare, Bell, Megaphone, X } from 'lucide-react';
 
 export const PortalMainLayout: React.FC = () => {
   const {
@@ -37,6 +37,8 @@ export const PortalMainLayout: React.FC = () => {
     unreadPersonalChatCount,
     totalUnreadChatCount,
     openDirectChatWithSchool,
+    isAdminImpersonating,
+    exitAdminImpersonation,
   } = useMemberPortal();
 
   const unreadChatBadgeCount = unreadPersonalChatCount > 0 ? unreadPersonalChatCount : totalUnreadChatCount;
@@ -125,6 +127,35 @@ export const PortalMainLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-800 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950">
+      {/* Admin Impersonation Top Banner (Akses Pentadbir CMS Tanpa Password) */}
+      {isAdminImpersonating && currentUser && (
+        <div className="bg-gradient-to-r from-amber-700 via-slate-900 to-teal-950 text-white px-4 py-2 border-b-2 border-amber-400 sticky top-0 z-50 shadow-md">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+              <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0" />
+              <span className="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-black tracking-wider uppercase shrink-0">
+                Akses Pentadbir CMS
+              </span>
+              <p className="text-xs text-amber-100 font-medium truncate">
+                Anda sedang melayari portal bagi pihak: <strong className="text-white underline">{currentUser.school}</strong> (Kod: {currentUser.schoolCode || '-'} • PGB: {currentUser.fullName}) <span className="text-amber-300 font-bold">— Tanpa Kata Laluan</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={exitAdminImpersonation}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                title="Tamatkan sesi akses sekolah ini dan kembali ke Pusat Kawalan Pentadbir CMS"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Kembali ke Admin CMS</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <PortalHeader />
 

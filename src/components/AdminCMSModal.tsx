@@ -28,6 +28,7 @@ import {
   CalendarDays,
   Activity,
   Cake,
+  Bot,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { useMemberPortal } from '../context/MemberPortalContext';
@@ -78,6 +79,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     deleteAlumniRecord,
     toggleFeatureAlumniRecord,
     purgeMockData,
+    updateDashboardConfig,
   } = useAdminContent();
   const { resetAllPgbActivityLogs } = useMemberPortal();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
@@ -352,6 +354,38 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const currentlyEnabled = siteData.dashboardConfig?.enableAiChatbot !== false;
+                updateDashboardConfig({ enableAiChatbot: !currentlyEnabled });
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold transition border cursor-pointer ${
+                siteData.dashboardConfig?.enableAiChatbot !== false
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300'
+              }`}
+              title="Hidupkan (ON) atau Matikan (OFF) Chatbot Mursyid AI pada laman web"
+            >
+              <Bot
+                className={`w-3.5 h-3.5 ${
+                  siteData.dashboardConfig?.enableAiChatbot !== false
+                    ? 'text-emerald-600'
+                    : 'text-slate-400'
+                }`}
+              />
+              <span>
+                Chatbot AI: {siteData.dashboardConfig?.enableAiChatbot !== false ? 'ON' : 'OFF'}
+              </span>
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  siteData.dashboardConfig?.enableAiChatbot !== false
+                    ? 'bg-emerald-500 animate-pulse'
+                    : 'bg-slate-400'
+                }`}
+              />
+            </button>
+
             <button
               onClick={handlePurgeMockData}
               className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition border border-amber-200 cursor-pointer"

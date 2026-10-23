@@ -26,6 +26,7 @@ import {
   Activity,
   UserCheck,
   LogIn,
+  Bot,
 } from 'lucide-react';
 import { useAdminContent, DEFAULT_DASHBOARD_CONFIG } from '../../context/AdminContentContext';
 import { useMemberPortal } from '../../context/MemberPortalContext';
@@ -46,6 +47,7 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
     approveMemberApplication,
     rejectMemberApplication,
     eventRegistrations,
+    updateDashboardConfig,
   } = useAdminContent();
 
   const { auditLogs, currentUser } = useMemberPortal();
@@ -314,6 +316,76 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
             <span>{syncStatus.message}</span>
           </div>
         )}
+      </div>
+
+      {/* KAWALAN ON / OFF CHATBOT AI (MURSYID AI) */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div
+            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+              dashboardConfig.enableAiChatbot !== false
+                ? 'bg-gradient-to-br from-teal-900 to-teal-700 text-amber-300'
+                : 'bg-slate-100 text-slate-400'
+            }`}
+          >
+            <Bot className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-extrabold text-slate-900">
+                Kawalan Chatbot AI Rasmi (Mursyid AI)
+              </h3>
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                  dashboardConfig.enableAiChatbot !== false
+                    ? 'bg-emerald-100 text-emerald-900'
+                    : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    dashboardConfig.enableAiChatbot !== false
+                      ? 'bg-emerald-500 animate-pulse'
+                      : 'bg-slate-500'
+                  }`}
+                />
+                <span>
+                  {dashboardConfig.enableAiChatbot !== false
+                    ? 'STATUS: ON (AKTIF DI LAMAN WEB)'
+                    : 'STATUS: OFF (DIMATIKAN)'}
+                </span>
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+              Mursyid AI menjawab semua soalan pelawat & ahli PGB secara pintar (termasuk carian nama Guru Besar/Pengetua sekolah seperti <strong>Abdul Qayyum bin Yaakop — Sekolah Rendah Islam I Musleh</strong>, maklumat MPGBSIM, pendidikan & pengetahuan umum). Matikan (OFF) suis ini sekiranya tidak lagi digunakan.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <button
+            type="button"
+            onClick={() => updateDashboardConfig({ enableAiChatbot: true })}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              dashboardConfig.enableAiChatbot !== false
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            ON (Aktifkan)
+          </button>
+          <button
+            type="button"
+            onClick={() => updateDashboardConfig({ enableAiChatbot: false })}
+            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              dashboardConfig.enableAiChatbot === false
+                ? 'bg-rose-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            OFF (Matikan)
+          </button>
+        </div>
       </div>
 
       {/* DASHBOARD ANNOUNCEMENT / NOTIS PENTADBIR */}

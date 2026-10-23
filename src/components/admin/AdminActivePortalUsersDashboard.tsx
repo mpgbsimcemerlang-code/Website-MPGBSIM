@@ -28,6 +28,7 @@ import {
   TrendingUp,
   Trash2,
   MessageSquare,
+  Key,
 } from 'lucide-react';
 import { useMemberPortal } from '../../context/MemberPortalContext';
 import { useAdminContent } from '../../context/AdminContentContext';
@@ -235,8 +236,35 @@ function formatRelativeTime(isoOrDateStr: string): string {
 }
 
 export const AdminActivePortalUsersDashboard: React.FC = () => {
-  const { auditLogs, registeredSchools, currentUser, resetAllPgbActivityLogs } = useMemberPortal();
-  const { siteData } = useAdminContent();
+  const { auditLogs, registeredSchools, currentUser, resetAllPgbActivityLogs, adminLoginAsSchoolWithoutPassword } = useMemberPortal();
+  const { siteData, resetPgbPassword, setIsCMSOpen } = useAdminContent();
+
+  const handleAdminLoginAsSchoolFromSummary = async (u: ActivePortalUserSummary) => {
+    const targetSchool = directorySchools.find(
+      (s) =>
+        (u.schoolId && s.id === u.schoolId) ||
+        (u.schoolCode && s.code && s.code.toUpperCase() === u.schoolCode.toUpperCase()) ||
+        (u.schoolName && s.name && s.name.toLowerCase().trim() === u.schoolName.toLowerCase().trim())
+    ) || ({
+      id: u.schoolId || `sch-${u.schoolCode}`,
+      name: u.schoolName,
+      code: u.schoolCode,
+      principal: u.pgbName,
+      state: u.state,
+      email: u.email !== '-' ? u.email : '',
+      phone: u.phone !== '-' ? u.phone : '',
+      type: u.schoolType as any,
+    } as MemberSchool);
+
+    try {
+      if (setIsCMSOpen) {
+        setIsCMSOpen(false);
+      }
+      await adminLoginAsSchoolWithoutPassword(targetSchool);
+    } catch (err: any) {
+      alert('Ralat log masuk portal: ' + (err?.message || 'Sila cuba lagi.'));
+    }
+  };
 
   const [remoteLogs, setRemoteLogs] = useState<AuditLogItem[]>([]);
   const [remoteProfiles, setRemoteProfiles] = useState<UserProfile[]>([]);
@@ -244,6 +272,15 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
   const [showResetModal, setShowResetModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+  const [userToResetPass, setUserToResetPass] = useState<ActivePortalUserSummary | null>(null);
+  const [isResettingUserPass, setIsResettingUserPass] = useState(false);
+  const [userPassResetDone, setUserPassResetDone] = useState<{
+    pgbName: string;
+    schoolName: string;
+    schoolCode: string;
+    tempPassword: string;
+  } | null>(null);
+  const [copiedUserTempPass, setCopiedUserTempPass] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string>(() =>
     new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
@@ -1667,14 +1704,38 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
 
                           {/* Action */}
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedUserDetail(u)}
-                              className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-900 text-teal-900 hover:text-white border border-teal-200 text-[11px] font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Jejak Penuh</span>
-                            </button>
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleAdminLoginAsSchoolFromSummary(u)}
+                                title="Log masuk terus ke Portal PGB sekolah ini tanpa memerlukan kata laluan"
+                                className="px-2.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white border border-teal-950 text-[11px] font-bold inline-flex items-center gap-1 transition cursor-pointer shadow-xs"
+                              >
+                                <LogIn className="w-3.5 h-3.5 text-amber-300" />
+                                <span>Akses Portal</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUserPassResetDone(null);
+                                  setCopiedUserTempPass(false);
+                                  setUserToResetPass(u);
+                                }}
+                                title="Reset Kata Laluan Portal PGB ke MPGBSIM2026"
+                                className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-200 text-[11px] font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                              >
+                                <Key className="w-3.5 h-3.5" />
+                                <span>Reset Password</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUserDetail(u)}
+                                className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-900 text-teal-900 hover:text-white border border-teal-200 text-[11px] font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Jejak Penuh</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1916,14 +1977,38 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
 
                       {/* Tindakan Admin */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedUserDetail(u)}
-                          className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-900 text-teal-900 hover:text-white border border-teal-200 text-[11px] font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Jejak Penuh</span>
-                        </button>
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleAdminLoginAsSchoolFromSummary(u)}
+                            title="Log masuk terus ke Portal PGB sekolah ini tanpa memerlukan kata laluan"
+                            className="px-2.5 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-900 text-white border border-teal-950 text-[11px] font-bold inline-flex items-center gap-1 transition cursor-pointer shadow-xs"
+                          >
+                            <LogIn className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Akses Portal</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserPassResetDone(null);
+                              setCopiedUserTempPass(false);
+                              setUserToResetPass(u);
+                            }}
+                            title="Reset Kata Laluan Portal PGB ke MPGBSIM2026"
+                            className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-200 text-[11px] font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                            <span>Reset Password</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUserDetail(u)}
+                            className="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-900 text-teal-900 hover:text-white border border-teal-200 text-[11px] font-bold inline-flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Jejak Penuh</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -2116,13 +2201,37 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
                           <span className="font-mono font-bold text-teal-900">{u.schoolCode}</span> • {u.state}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedUserDetail(u)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-teal-900 hover:text-white text-slate-700 text-[10px] font-bold shrink-0 transition cursor-pointer"
-                      >
-                        Lihat Info
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleAdminLoginAsSchoolFromSummary(u)}
+                          className="px-2.5 py-1 rounded-lg bg-teal-800 hover:bg-teal-900 text-white text-[10px] font-bold inline-flex items-center gap-1 transition cursor-pointer shadow-xs border border-teal-950"
+                          title="Log masuk terus ke Portal PGB sekolah ini tanpa memerlukan kata laluan"
+                        >
+                          <LogIn className="w-3 h-3 text-amber-300" />
+                          <span>Akses Portal</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserPassResetDone(null);
+                            setCopiedUserTempPass(false);
+                            setUserToResetPass(u);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-200 text-[10px] font-bold inline-flex items-center gap-1 transition cursor-pointer"
+                          title="Reset kata laluan PGB ke MPGBSIM2026"
+                        >
+                          <Key className="w-3 h-3" />
+                          <span>Reset Password</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUserDetail(u)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-teal-900 hover:text-white text-slate-700 text-[10px] font-bold shrink-0 transition cursor-pointer"
+                        >
+                          Lihat Info
+                        </button>
+                      </div>
                     </div>
                   ))
               )}
@@ -2152,13 +2261,28 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
                   {selectedUserDetail.position} — {selectedUserDetail.schoolName} ({selectedUserDetail.state})
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedUserDetail(null)}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const u = selectedUserDetail;
+                    setSelectedUserDetail(null);
+                    handleAdminLoginAsSchoolFromSummary(u);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white border border-teal-600 text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                  title="Log masuk terus ke Portal PGB sekolah ini tanpa kata laluan"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Log Masuk Portal (Tanpa Password)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserDetail(null)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
@@ -2298,7 +2422,21 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = selectedUserDetail;
+                  setSelectedUserDetail(null);
+                  setUserPassResetDone(null);
+                  setCopiedUserTempPass(false);
+                  setUserToResetPass(target);
+                }}
+                className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black inline-flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>Reset Kata Laluan Portal PGB (MPGBSIM2026)</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setSelectedUserDetail(null)}
@@ -2307,6 +2445,163 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
                 Tutup Paparan
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENGESAHAN RESET KATA LALUAN PORTAL PGB KE MPGBSIM2026 */}
+      {userToResetPass && (
+        <div className="fixed inset-0 z-[145] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-amber-200 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-black text-slate-900">
+                    Reset Kata Laluan Portal PGB
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Tetapkan semula ke kata laluan sementara rasmi
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setUserToResetPass(null);
+                  setUserPassResetDone(null);
+                }}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {!userPassResetDone ? (
+              <>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+                  <div className="font-black text-slate-900 text-sm">
+                    {userToResetPass.schoolName}
+                  </div>
+                  <div className="text-slate-600">
+                    PGB: <strong className="text-slate-900">{userToResetPass.pgbName}</strong>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-mono text-[10px] font-bold">
+                      Kod: {userToResetPass.schoolCode}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-teal-50 text-teal-800 border border-teal-200 text-[10px] font-bold">
+                      {userToResetPass.state}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 space-y-2 text-xs text-amber-950">
+                  <div className="font-extrabold flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>Kata Laluan Sementara Rasmi:</span>
+                  </div>
+                  <div className="px-3 py-2 rounded-xl bg-white border border-amber-300 font-mono text-sm font-black text-center tracking-wider text-slate-900 select-all">
+                    MPGBSIM2026
+                  </div>
+                  <p className="text-[11px] text-amber-900 leading-relaxed">
+                    Sekiranya PGB terlupa kata laluan peribadi mereka, tindakan ini akan mereset semula kata laluan log masuk Portal PGB kepada <strong>MPGBSIM2026</strong> serta-merta.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    disabled={isResettingUserPass}
+                    onClick={() => setUserToResetPass(null)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isResettingUserPass}
+                    onClick={async () => {
+                      setIsResettingUserPass(true);
+                      const targetKey = userToResetPass.schoolId || userToResetPass.schoolCode;
+                      const res = await resetPgbPassword(targetKey);
+                      setIsResettingUserPass(false);
+                      if (res.success) {
+                        setUserPassResetDone({
+                          pgbName: userToResetPass.pgbName,
+                          schoolName: userToResetPass.schoolName,
+                          schoolCode: userToResetPass.schoolCode,
+                          tempPassword: res.tempPassword,
+                        });
+                        setResetSuccessMessage(res.message);
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-amber-900/20 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isResettingUserPass ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Mereset Kata Laluan...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Key className="w-4 h-4" />
+                        <span>Sahkan Reset ke MPGBSIM2026</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2 text-xs text-emerald-950">
+                  <div className="flex items-center gap-2 font-black text-emerald-900 text-sm">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span>Kata Laluan Berjaya Direset!</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed">
+                    Kata laluan Portal PGB bagi <strong>{userPassResetDone.pgbName}</strong> ({userPassResetDone.schoolName}) telah dikembalikan kepada kata laluan sementara rasmi:
+                  </p>
+                  <div className="p-3 rounded-xl bg-white border border-emerald-300 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                        Kod Sekolah: {userPassResetDone.schoolCode}
+                      </span>
+                      <span className="font-mono text-base font-black text-slate-900 tracking-wider select-all">
+                        {userPassResetDone.tempPassword}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textToCopy = `Makluman Reset Kata Laluan Portal Rasmi PGB MPGBSIM\nSekolah: ${userPassResetDone.schoolName}\nKod Sekolah: ${userPassResetDone.schoolCode}\nKata Laluan Sementara: ${userPassResetDone.tempPassword}\n\nSila log masuk dan tukar kata laluan baharu anda di menu Profil Ahli.`;
+                        navigator.clipboard?.writeText(textToCopy);
+                        setCopiedUserTempPass(true);
+                        setTimeout(() => setCopiedUserTempPass(false), 3000);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold transition cursor-pointer shrink-0"
+                    >
+                      {copiedUserTempPass ? 'Disalin!' : 'Salin Info'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserToResetPass(null);
+                      setUserPassResetDone(null);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+                  >
+                    Selesai & Tutup
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

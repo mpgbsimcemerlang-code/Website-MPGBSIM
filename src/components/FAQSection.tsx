@@ -415,20 +415,23 @@ export const FAQSection: React.FC<FAQSectionProps> = ({
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-teal-50/70 border border-teal-200/80 text-xs text-teal-950 space-y-2">
-              <strong className="font-bold block text-sm text-teal-900">
-                Perlukan Bantuan Lanjut Urus Setia?
-              </strong>
-              <p className="text-slate-600 leading-relaxed">
-                Hubungi Sekretariat Kebangsaan MPGBSIM di talian <strong>03-4251 6157 / 03-4251 6167</strong> atau e-mel ke{' '}
-                <a
-                  href="mailto:mpgbsim.cemerlang@gmail.com"
-                  className="font-semibold text-teal-800 underline"
-                >
-                  mpgbsim.cemerlang@gmail.com
-                </a>{' '}
-                untuk pengesahan keahlian sekolah anda.
-              </p>
+            <div className="p-5 rounded-2xl bg-teal-50/70 border border-teal-200/80 text-xs text-teal-950 space-y-3">
+              <div>
+                <strong className="font-bold block text-sm text-teal-900">
+                  Tanya Mursyid AI (Pembantu Pintar MPGBSIM)
+                </strong>
+                <p className="text-slate-600 leading-relaxed mt-1">
+                  Ada soalan khusus mengenai senarai sekolah ahli, perlembagaan, jawatankuasa kepimpinan, atau cara reset kata laluan Portal PGB? Tanya terus kepada <strong>Mursyid AI</strong> atau hubungi Sekretariat di talian <strong>03-4251 6157 / 03-4251 6167</strong>.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-mursyid-ai'))}
+                className="w-full py-2.5 px-4 rounded-xl bg-teal-900 hover:bg-teal-800 text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-xs"
+              >
+                <span>Buka Sembang Mursyid AI</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </aside>
         </div>

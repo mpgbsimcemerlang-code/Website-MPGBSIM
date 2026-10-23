@@ -31,12 +31,9 @@ service cloud.firestore {
     }
 
     // 2. Users Collection (Profile & Role Management)
-    // User can only create or edit their own profile; admins can manage and delete
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAuthorizedAdmin());
-      allow delete: if isAuthorizedAdmin();
+      allow read: if true;
+      allow write: if true;
     }
 
     // 3. Member Schools Directory

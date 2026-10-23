@@ -542,6 +542,7 @@ export interface DashboardConfig {
   adminMemo: string;
   adminMemoAuthor?: string;
   adminMemoDate?: string;
+  enableAiChatbot?: boolean;
 }
 
 export type ExamPublishStatus = 'published' | 'draft' | 'archived';

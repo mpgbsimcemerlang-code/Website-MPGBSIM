@@ -244,6 +244,9 @@ interface AdminContentContextType {
   addMemberSchool: (item: MemberSchool) => Promise<void>;
   updateMemberSchool: (id: string, item: Partial<MemberSchool>) => Promise<void>;
   deleteMemberSchool: (id: string) => Promise<void>;
+  resetPgbPassword: (
+    schoolId: string
+  ) => Promise<{ success: boolean; message: string; tempPassword: string }>;
   runSchoolDiagnostics: () => DiagnosticReport;
   autoRepairSchoolIntegrity: () => {
     repairedSchools: MemberSchool[];
@@ -441,6 +444,7 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
   adminMemo: 'Tugasan Utama: 1) Kemas kini takwim Konvensyen Nasional 2026. 2) Semak pendaftaran Sekolah Rendah Islam I Musleh & rakan Musleh.',
   adminMemoAuthor: 'Urus Setia Kebangsaan',
   adminMemoDate: '23 September 2026',
+  enableAiChatbot: true,
 };
 
 export const DEFAULT_PROGRAM_CERTIFICATE_CONFIG: ProgramCertificateConfig = {
@@ -1451,8 +1455,13 @@ const mergeSchoolsPreservingMedia = (
         ? appMatch!.registeredAgencies
         : undefined;
 
+    const resolvedPrincipal = isSriMusleh
+      ? (sch.principal && sch.principal.trim() !== '' && sch.principal !== '-' ? sch.principal : 'Abdul Qayyum bin Yaakop')
+      : sch.principal;
+
     return {
       ...sch,
+      ...(resolvedPrincipal ? { principal: resolvedPrincipal } : {}),
       membershipType,
       ...(registeredAgencies !== undefined ? { registeredAgencies } : {}),
       ...(resolvedJoinYear ? { joinYear: resolvedJoinYear } : {}),
@@ -3051,7 +3060,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     return {
       success: false,
-      message: 'Kata laluan tidak tepat. Sila gunakan kata laluan pentadbir rasmi (MPGB@Admin2026) atau Log Masuk Google rasmi.',
+      message: 'Kata laluan tidak tepat. Sila masukkan kata laluan pentadbir yang sah atau gunakan Log Masuk Google rasmi.',
     };
   };
 
@@ -4521,6 +4530,235 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  // Reset PGB Portal Password back to temporary password MPGBSIM2026
+  const resetPgbPassword = async (
+    schoolId: string
+  ): Promise<{ success: boolean; message: string; tempPassword: string }> => {
+    const TEMP_PASSWORD = 'MPGBSIM2026';
+    const resetIso = new Date().toISOString();
+
+    const targetSchool = (siteData.memberSchools || []).find(
+      (s) =>
+        s.id === schoolId ||
+        (s.code && s.code.trim().toUpperCase() === schoolId.trim().toUpperCase())
+    );
+
+    if (!targetSchool) {
+      return {
+        success: false,
+        tempPassword: TEMP_PASSWORD,
+        message: 'Rekod institusi sekolah tidak ditemui dalam direktori ahli.',
+      };
+    }
+
+    const realId = targetSchool.id;
+    const resetPayload: Partial<MemberSchool> & Record<string, any> = {
+      password: TEMP_PASSWORD,
+      passwordUpdatedAt: null,
+      passwordResetAt: resetIso,
+      isTemporaryPassword: true,
+    };
+
+    // 1. Update in-memory siteData & IndexedDB/localStorage
+    setSiteData((prev) => {
+      const updatedSchools = (prev.memberSchools || []).map((s) => {
+        if (
+          s.id === realId ||
+          (targetSchool.code &&
+            s.code &&
+            s.code.trim().toUpperCase() === targetSchool.code.trim().toUpperCase())
+        ) {
+          const nextObj: any = {
+            ...s,
+            password: TEMP_PASSWORD,
+            passwordResetAt: resetIso,
+            isTemporaryPassword: true,
+          };
+          delete nextObj.passwordUpdatedAt;
+          return nextObj as MemberSchool;
+        }
+        return s;
+      });
+      const nextState = { ...prev, memberSchools: updatedSchools };
+      persistSiteContent(nextState).catch(() => {});
+      return nextState;
+    });
+
+    // 2. Update localStorage CMS v3 cache
+    try {
+      const key = 'mpgbsim_cms_content_v3';
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.memberSchools)) {
+          parsed.memberSchools = parsed.memberSchools.map((s: any) => {
+            if (
+              s.id === realId ||
+              (targetSchool.code &&
+                s.code &&
+                s.code.trim().toUpperCase() === targetSchool.code.trim().toUpperCase())
+            ) {
+              const nextObj = {
+                ...s,
+                password: TEMP_PASSWORD,
+                passwordResetAt: resetIso,
+                isTemporaryPassword: true,
+              };
+              delete nextObj.passwordUpdatedAt;
+              return nextObj;
+            }
+            return s;
+          });
+          safeLocalStorageSet(key, JSON.stringify(parsed));
+        }
+      }
+    } catch (e) {}
+
+    // 3. Persist to Firestore 'schools' and 'users' collections
+    try {
+      await ensureFirebaseAuth();
+
+      // Update school doc
+      await setDoc(
+        doc(db, 'schools', realId),
+        {
+          ...resetPayload,
+          updatedAt: resetIso,
+        },
+        { merge: true }
+      );
+
+      // Update direct school user doc
+      await setDoc(
+        doc(db, 'users', `sch-user-${realId}`),
+        {
+          portalPassword: TEMP_PASSWORD,
+          passwordUpdatedAt: null,
+          passwordResetAt: resetIso,
+          isTemporaryPassword: true,
+          updatedAt: resetIso,
+        },
+        { merge: true }
+      ).catch(() => {});
+
+      // Also check any other user documents in 'users' collection matching this school
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const codeLower = (targetSchool.code || '').trim().toLowerCase();
+      const nameLower = (targetSchool.name || '').trim().toLowerCase();
+      const pgbEmailLower = (targetSchool.pgbEmail || '').trim().toLowerCase();
+      const schoolEmailLower = (targetSchool.email || targetSchool.schoolEmail || '').trim().toLowerCase();
+
+      const updatePromises: Promise<any>[] = [];
+      usersSnap.forEach((uDoc) => {
+        const uData = uDoc.data();
+        const uCode = (uData.schoolCode || '').trim().toLowerCase();
+        const uMem = (uData.membershipNo || '').trim().toLowerCase();
+        const uSchool = (uData.school || '').trim().toLowerCase();
+        const uEmail = (uData.email || uData.pgbEmail || '').trim().toLowerCase();
+
+        const isMatchedUser =
+          uDoc.id === `sch-user-${realId}` ||
+          uData.schoolId === realId ||
+          (codeLower && (uCode === codeLower || uMem.includes(codeLower))) ||
+          (nameLower && uSchool === nameLower) ||
+          (pgbEmailLower && uEmail === pgbEmailLower) ||
+          (schoolEmailLower && uEmail === schoolEmailLower && (!uSchool || uSchool === nameLower));
+
+        if (isMatchedUser) {
+          updatePromises.push(
+            setDoc(
+              doc(db, 'users', uDoc.id),
+              {
+                portalPassword: TEMP_PASSWORD,
+                passwordUpdatedAt: null,
+                passwordResetAt: resetIso,
+                isTemporaryPassword: true,
+                updatedAt: resetIso,
+              },
+              { merge: true }
+            ).catch(() => {})
+          );
+        }
+      });
+
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+      }
+
+      // Record an audit log in Firestore 'auditLogs'
+      const now = new Date();
+      const logId = `log-reset-${now.getTime()}-${Math.random().toString(36).slice(2, 6)}`;
+      const auditEntry = {
+        id: logId,
+        user: adminUser?.name || 'Pentadbir Utama CMS',
+        email: adminUser?.email || 'mpgbsim.cemerlang@gmail.com',
+        action: 'Reset Kata Laluan Portal PGB (Admin CMS)',
+        content: `Kata laluan Portal PGB bagi ${targetSchool.principal || 'PGB'} — ${targetSchool.name} [${targetSchool.code}] telah direset oleh Admin ke kata laluan sementara (${TEMP_PASSWORD}).`,
+        timestamp: now.toLocaleString('ms-MY', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+        isoTimestamp: resetIso,
+        schoolName: targetSchool.name,
+        schoolCode: targetSchool.code,
+        state: targetSchool.state,
+        position: targetSchool.designation || 'Pengetua / Guru Besar',
+        membershipNo: targetSchool.code ? `MPGB-2026-${targetSchool.code}` : 'MPGB-AHLI',
+        category: 'KESELAMATAN',
+      };
+      await setDoc(doc(db, 'auditLogs', logId), auditEntry).catch(() => {});
+    } catch (e) {
+      console.warn('Firestore reset PGB password notice:', e);
+    }
+
+    // 4. Synchronize local portal user session if currently active on this device
+    try {
+      const portalUserRaw = localStorage.getItem('mpgbsim_portal_user_v1');
+      if (portalUserRaw) {
+        const portalUser = JSON.parse(portalUserRaw);
+        const matchCode =
+          targetSchool.code &&
+          ((portalUser.schoolCode &&
+            portalUser.schoolCode.toUpperCase() === targetSchool.code.toUpperCase()) ||
+            (portalUser.membershipNo &&
+              portalUser.membershipNo.toUpperCase().includes(targetSchool.code.toUpperCase())));
+        const matchId =
+          portalUser.schoolId === realId ||
+          portalUser.uid === `sch-user-${realId}` ||
+          portalUser.uid === realId;
+        if (matchCode || matchId) {
+          portalUser.portalPassword = TEMP_PASSWORD;
+          delete portalUser.passwordUpdatedAt;
+          portalUser.passwordResetAt = resetIso;
+          portalUser.isTemporaryPassword = true;
+          safeLocalStorageSet('mpgbsim_portal_user_v1', JSON.stringify(portalUser));
+        }
+      }
+    } catch (e) {}
+
+    // 5. Broadcast update events
+    window.dispatchEvent(
+      new CustomEvent('mpgbsim_school_updated', {
+        detail: {
+          id: realId,
+          updated: resetPayload,
+          school: { ...targetSchool, ...resetPayload },
+        },
+      })
+    );
+    window.dispatchEvent(new Event('mpgbsim_content_updated'));
+
+    return {
+      success: true,
+      tempPassword: TEMP_PASSWORD,
+      message: `Kata laluan Portal PGB bagi ${targetSchool.name} (${targetSchool.code}) telah berjaya direset ke kata laluan sementara: ${TEMP_PASSWORD}`,
+    };
+  };
+
   // 4c. School Diagnostic & Integrity Repair
   const runSchoolDiagnostics = (): DiagnosticReport => {
     const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem('mpgbsim_portal_user_v1') : null;
@@ -5477,6 +5715,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         addMemberSchool,
         updateMemberSchool,
         deleteMemberSchool,
+        resetPgbPassword,
         runSchoolDiagnostics,
         autoRepairSchoolIntegrity,
         addMemberApplication,
