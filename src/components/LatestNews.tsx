@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { NewsItem } from '../types';
 import { sortNewsByPublishedDate } from '../utils/dateUtils';
-import { copyNewsShareLink, buildWhatsAppShareUrl } from '../utils/shareUtils';
+import { copyNewsShareLink, buildWhatsAppShareUrl, syncNewsToServerCache } from '../utils/shareUtils';
 import {
   Newspaper,
   Calendar,
@@ -84,9 +84,16 @@ export const LatestNewsSection: React.FC<LatestNewsProps> = ({
   const [isViewAll, setIsViewAll] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (Array.isArray(newsList) && newsList.length > 0) {
+      syncNewsToServerCache(newsList);
+    }
+  }, [newsList]);
+
   const handleQuickShare = async (e: React.MouseEvent, newsId: string) => {
     e.stopPropagation();
-    await copyNewsShareLink(newsId);
+    const targetNews = newsList.find((n) => String(n.id) === String(newsId));
+    await copyNewsShareLink(targetNews || newsId);
     setCopiedId(newsId);
     setTimeout(() => {
       setCopiedId((prev) => (prev === newsId ? null : prev));

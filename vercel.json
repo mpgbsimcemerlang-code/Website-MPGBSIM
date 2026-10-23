@@ -2,6 +2,14 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/og-image/:newsId",
+      "destination": "/api/og-image?id=:newsId"
+    },
+    {
+      "source": "/berita/:newsId",
+      "destination": "/api/berita?id=:newsId"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -371,7 +371,7 @@ export const DetailModal: React.FC<DetailModalProps> = ({ content, onClose }) =>
                 <button
                   type="button"
                   onClick={async () => {
-                    await copyNewsShareLink(liveNews.id);
+                    await copyNewsShareLink(liveNews);
                     setCopiedNewsLink(true);
                     setTimeout(() => setCopiedNewsLink(false), 3000);
                   }}

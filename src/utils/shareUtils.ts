@@ -22,27 +22,46 @@ export function getDisplayDomain(): string {
 }
 
 /**
- * Generates a direct deep-link URL to a specific news item.
- * When clicked or shared on WhatsApp/Telegram/Facebook, the server injects
- * OpenGraph tags (title, summary, and /api/og-image/:newsId) so the rich image card appears.
+ * Syncs news item(s) to the Express server cache so /berita/:newsId and /api/og-image/:newsId.jpg
+ * always have instant access to the latest title, summary, and imageUrl.
  */
-export function getNewsShareUrl(newsId: string): string {
-  return `${getSiteOrigin()}/?berita=${encodeURIComponent(newsId)}`;
+export async function syncNewsToServerCache(news: NewsItem | NewsItem[]): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    await fetch('/api/news-cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ news }),
+    });
+  } catch {
+    // Non-blocking best-effort sync
+  }
 }
 
 /**
- * Generates the HTTP binary OpenGraph image endpoint URL for a news article.
- * Converts base64 data:image URIs in Firestore into a valid HTTP image for WhatsApp/Telegram/Facebook crawlers.
+ * Generates a unique path-based deep-link URL to a specific news item (/berita/:newsId).
+ * Path-based URLs ensure WhatsApp, Telegram, and Facebook never reuse cached homepage logos
+ * and always fetch the article's dedicated 1200x630 JPEG OpenGraph card.
+ */
+export function getNewsShareUrl(newsId: string): string {
+  const cleanId = String(newsId || '').trim();
+  return `${getSiteOrigin()}/berita/${encodeURIComponent(cleanId)}`;
+}
+
+/**
+ * Generates the HTTP binary 1200x630 JPEG OpenGraph image endpoint URL for a news article.
+ * Converts WebP/PNG/JPEG base64 data URIs in Firestore into a standard JPEG for WhatsApp/Telegram/Facebook crawlers.
  */
 export function getNewsOgImageUrl(newsId: string): string {
-  return `${getSiteOrigin()}/api/og-image/${encodeURIComponent(newsId)}`;
+  const cleanId = String(newsId || '').trim();
+  return `${getSiteOrigin()}/api/og-image/${encodeURIComponent(cleanId)}.jpg`;
 }
 
 /**
  * Formats the share payload for WhatsApp/Telegram.
  * By default (includeCaption = false), returns ONLY the clean URL so WhatsApp/Telegram/Facebook
  * renders the rich OpenGraph photo preview card at the top + the clickable link below it
- * (matching the exact preview card style requested).
+ * (matching the exact "Pratonton Kad Kongsi" preview card style).
  */
 export function getNewsShareMessage(news: NewsItem, includeCaption = false): string {
   const url = getNewsShareUrl(news.id);
@@ -73,12 +92,73 @@ export function buildFacebookShareUrl(news: NewsItem): string {
 }
 
 /**
+ * Converts any news image (including data:image/webp) into a standard 1200x630 image/jpeg Blob
+ * in the browser so Web Share API (navigator.share) never passes unsupported WebP files to WhatsApp.
+ */
+async function convertNewsImageToJpegBlob(news: NewsItem): Promise<Blob | null> {
+  // First try the server's 1200x630 sharp JPEG endpoint
+  try {
+    const ogResp = await fetch(getNewsOgImageUrl(news.id));
+    if (ogResp.ok) {
+      const contentType = ogResp.headers.get('content-type') || '';
+      if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+        return await ogResp.blob();
+      }
+    }
+  } catch {
+    // Fallback to client canvas conversion below
+  }
+
+  if (!news.imageUrl || typeof document === 'undefined') return null;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1200;
+        canvas.height = 630;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, 1200, 630);
+
+        const scale = Math.max(1200 / img.width, 630 / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        const x = (1200 - w) / 2;
+        const y = (630 - h) / 2;
+        ctx.drawImage(img, x, y, w, h);
+
+        canvas.toBlob(
+          (blob) => resolve(blob),
+          'image/jpeg',
+          0.88
+        );
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = news.imageUrl;
+  });
+}
+
+/**
  * Copies the direct news link (or caption + link) to clipboard and returns true if successful.
  */
 export async function copyNewsShareLink(
   newsOrId: string | NewsItem,
   includeCaption = false
 ): Promise<boolean> {
+  if (typeof newsOrId !== 'string') {
+    syncNewsToServerCache(newsOrId);
+  }
+
   const textToCopy =
     typeof newsOrId === 'string'
       ? getNewsShareUrl(newsOrId)
@@ -110,32 +190,34 @@ export async function copyNewsShareLink(
 }
 
 /**
- * Shares the news link (and optionally attaches the actual image file if requested via Web Share API).
+ * Shares the news link (and optionally attaches the 1200x630 JPEG image file if requested via Web Share API).
  */
 export async function shareNewsNative(
   news: NewsItem,
   options?: { attachImageFile?: boolean; includeCaption?: boolean }
 ): Promise<'shared' | 'copied'> {
+  await syncNewsToServerCache(news);
+
   const url = getNewsShareUrl(news.id);
   const title = news.title.includes('MPGBSIM') ? news.title : `${news.title} | MPGBSIM`;
+  const summaryText = (news.summary || news.content || '').replace(/\s+/g, ' ').trim();
+  const shortSummary = summaryText.length > 160 ? `${summaryText.slice(0, 157)}...` : summaryText;
   const text = options?.includeCaption ? getNewsShareMessage(news, true) : undefined;
 
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     if (options?.attachImageFile && news.imageUrl) {
       try {
-        const imgSource = news.imageUrl.startsWith('data:image/')
-          ? news.imageUrl
-          : getNewsOgImageUrl(news.id);
-        const resp = await fetch(imgSource);
-        if (resp.ok) {
-          const blob = await resp.blob();
-          const ext = blob.type.includes('png') ? 'png' : 'jpg';
-          const file = new File([blob], `berita-${news.id}.${ext}`, {
-            type: blob.type || 'image/jpeg',
+        const jpegBlob = await convertNewsImageToJpegBlob(news);
+        if (jpegBlob) {
+          const file = new File([jpegBlob], `berita-${news.id}.jpg`, {
+            type: 'image/jpeg',
           });
+          const captionWithLink = options?.includeCaption
+            ? getNewsShareMessage(news, true)
+            : `*${title}*\n${shortSummary ? `${shortSummary}\n\n` : ''}${url}`;
           const shareDataWithFile: ShareData = {
             title,
-            text: `${title}\n${url}`,
+            text: captionWithLink,
             files: [file],
           };
           if (typeof navigator.canShare === 'function' && navigator.canShare(shareDataWithFile)) {
@@ -175,8 +257,8 @@ function setMetaTagContent(selector: string, content: string): void {
 }
 
 /**
- * Updates client-side document <head> OpenGraph & Twitter meta tags and browser address bar
- * when a news article is opened or closed.
+ * Updates client-side document <head> OpenGraph & Twitter meta tags, syncs the news item to the
+ * server OG cache, and updates the browser address bar when a news article is opened or closed.
  */
 export function updateDocumentOpenGraphMeta(news: NewsItem | null): void {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
@@ -184,6 +266,8 @@ export function updateDocumentOpenGraphMeta(news: NewsItem | null): void {
   const origin = getSiteOrigin();
 
   if (news) {
+    syncNewsToServerCache(news);
+
     const cleanTitle = news.title.trim();
     const fullTitle = cleanTitle.includes('MPGBSIM') ? cleanTitle : `${cleanTitle} | MPGBSIM`;
     const rawDesc = (news.summary || news.content || cleanTitle).replace(/\s+/g, ' ').trim();
@@ -200,6 +284,7 @@ export function updateDocumentOpenGraphMeta(news: NewsItem | null): void {
     setMetaTagContent('meta[property="og:description"]', shortDesc);
     setMetaTagContent('meta[property="og:image"]', ogImage);
     setMetaTagContent('meta[property="og:image:secure_url"]', ogImage);
+    setMetaTagContent('meta[property="og:image:type"]', 'image/jpeg');
     setMetaTagContent('meta[property="og:image:alt"]', fullTitle);
     setMetaTagContent('meta[name="twitter:url"]', shareUrl);
     setMetaTagContent('meta[name="twitter:title"]', fullTitle);
@@ -212,10 +297,9 @@ export function updateDocumentOpenGraphMeta(news: NewsItem | null): void {
     }
 
     try {
-      const currentUrl = new URL(window.location.href);
-      if (currentUrl.searchParams.get('berita') !== news.id) {
-        currentUrl.searchParams.set('berita', news.id);
-        window.history.replaceState({}, fullTitle, currentUrl.toString());
+      const targetPath = `/berita/${encodeURIComponent(news.id)}`;
+      if (window.location.pathname !== targetPath) {
+        window.history.replaceState({}, fullTitle, targetPath);
       }
     } catch {
       // Ignore URL update errors in constrained frames
@@ -231,6 +315,7 @@ export function updateDocumentOpenGraphMeta(news: NewsItem | null): void {
     setMetaTagContent('meta[property="og:description"]', DEFAULT_SITE_DESC);
     setMetaTagContent('meta[property="og:image"]', defaultLogo);
     setMetaTagContent('meta[property="og:image:secure_url"]', defaultLogo);
+    setMetaTagContent('meta[property="og:image:type"]', 'image/png');
     setMetaTagContent('meta[name="twitter:url"]', `${origin}/`);
     setMetaTagContent('meta[name="twitter:title"]', DEFAULT_SITE_TITLE);
     setMetaTagContent('meta[name="twitter:description"]', DEFAULT_SITE_DESC);
@@ -243,7 +328,12 @@ export function updateDocumentOpenGraphMeta(news: NewsItem | null): void {
 
     try {
       const currentUrl = new URL(window.location.href);
-      if (currentUrl.searchParams.has('berita') || currentUrl.searchParams.has('news')) {
+      if (
+        currentUrl.pathname.startsWith('/berita/') ||
+        currentUrl.searchParams.has('berita') ||
+        currentUrl.searchParams.has('news')
+      ) {
+        currentUrl.pathname = '/';
         currentUrl.searchParams.delete('berita');
         currentUrl.searchParams.delete('news');
         window.history.replaceState({}, DEFAULT_SITE_TITLE, currentUrl.toString());

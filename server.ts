@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,30 +67,70 @@ const DEFAULT_NEWS_FALLBACK: Record<string, ServerNewsMeta> = {
   },
 };
 
-function loadFirebaseConfig(): { projectId: string; firestoreDatabaseId: string } {
+function loadFirebaseConfig(): { projectId: string; firestoreDatabaseId: string; apiKey: string } {
   try {
     const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
     if (fs.existsSync(configPath)) {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       return {
-        projectId: parsed.projectId || 'compact-vigil-cf6jr',
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID || parsed.projectId || 'compact-vigil-cf6jr',
         firestoreDatabaseId:
-          parsed.firestoreDatabaseId || 'ai-studio-mpgbsimmajlispen-d6e7972c-8fd2-4adc-81e6-ff46f648dee7',
+          process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID ||
+          parsed.firestoreDatabaseId ||
+          'ai-studio-mpgbsimmajlispen-d6e7972c-8fd2-4adc-81e6-ff46f648dee7',
+        apiKey: process.env.VITE_FIREBASE_API_KEY || parsed.apiKey || '',
       };
     }
   } catch (err) {
     console.warn('Failed to read firebase-applet-config.json:', err);
   }
   return {
-    projectId: 'compact-vigil-cf6jr',
-    firestoreDatabaseId: 'ai-studio-mpgbsimmajlispen-d6e7972c-8fd2-4adc-81e6-ff46f648dee7',
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'compact-vigil-cf6jr',
+    firestoreDatabaseId:
+      process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID ||
+      'ai-studio-mpgbsimmajlispen-d6e7972c-8fd2-4adc-81e6-ff46f648dee7',
+    apiKey: process.env.VITE_FIREBASE_API_KEY || '',
   };
 }
 
 const firebaseConfig = loadFirebaseConfig();
+const DISK_CACHE_PATH = path.resolve(__dirname, '.news-meta-cache.json');
 
-// Short-lived cache for news metadata so HTML + /api/og-image requests are fast
+// In-memory cache for news metadata + converted JPEG buffers
 const newsCache = new Map<string, { item: ServerNewsMeta; expiresAt: number }>();
+const ogJpegCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
+
+function loadDiskNewsCache(): void {
+  try {
+    if (fs.existsSync(DISK_CACHE_PATH)) {
+      const raw = JSON.parse(fs.readFileSync(DISK_CACHE_PATH, 'utf-8'));
+      if (raw && typeof raw === 'object') {
+        for (const [id, item] of Object.entries(raw)) {
+          if (item && typeof item === 'object' && (item as any).title) {
+            newsCache.set(id, {
+              item: item as ServerNewsMeta,
+              expiresAt: Date.now() + 24 * 3600_000,
+            });
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore disk cache read errors
+  }
+}
+
+function saveDiskNewsCache(): void {
+  try {
+    const out: Record<string, ServerNewsMeta> = {};
+    for (const [id, entry] of newsCache.entries()) {
+      out[id] = entry.item;
+    }
+    fs.writeFileSync(DISK_CACHE_PATH, JSON.stringify(out), 'utf-8');
+  } catch {
+    // Ignore disk cache write errors
+  }
+}
 
 function extractFirestoreString(field: any): string {
   if (!field || typeof field !== 'object') return '';
@@ -105,56 +146,108 @@ function extractFirstArrayString(field: any): string {
   return '';
 }
 
+function parseFirestoreNewsDoc(docId: string, fields: any): ServerNewsMeta | null {
+  if (!fields) return null;
+  const title = extractFirestoreString(fields.title);
+  if (!title) return null;
+  const summary = extractFirestoreString(fields.summary);
+  const content = extractFirestoreString(fields.content);
+  const primaryImage = extractFirestoreString(fields.imageUrl);
+  const fallbackGalleryImage = extractFirstArrayString(fields.additionalImages);
+  const imageUrl = primaryImage || fallbackGalleryImage || '';
+
+  return {
+    id: docId,
+    title,
+    summary: summary || (content ? content.slice(0, 220) : ''),
+    content,
+    imageUrl,
+    category: extractFirestoreString(fields.category),
+    date: extractFirestoreString(fields.date),
+    author: extractFirestoreString(fields.author),
+    schoolName: extractFirestoreString(fields.schoolName),
+  };
+}
+
+async function preloadAllNewsFromFirestore(): Promise<void> {
+  try {
+    const keyParam = firebaseConfig.apiKey
+      ? `&key=${encodeURIComponent(firebaseConfig.apiKey)}`
+      : '';
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
+      firebaseConfig.projectId
+    )}/databases/${encodeURIComponent(
+      firebaseConfig.firestoreDatabaseId
+    )}/documents/news?pageSize=100${keyParam}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (resp.ok) {
+      const data: any = await resp.json();
+      const docs = Array.isArray(data?.documents) ? data.documents : [];
+      let updated = false;
+      for (const d of docs) {
+        const docName = String(d?.name || '');
+        const docId = docName.split('/').pop() || '';
+        if (!docId) continue;
+        const parsed = parseFirestoreNewsDoc(docId, d.fields);
+        if (parsed) {
+          newsCache.set(docId, { item: parsed, expiresAt: Date.now() + 10 * 60_000 });
+          updated = true;
+        }
+      }
+      if (updated) {
+        saveDiskNewsCache();
+      }
+    }
+  } catch {
+    // Non-blocking preload
+  }
+}
+
 async function fetchNewsById(newsId: string): Promise<ServerNewsMeta | null> {
   if (!newsId) return null;
-  const cleanId = newsId.trim();
+  const cleanId = decodeURIComponent(newsId.trim()).replace(/\.(jpg|jpeg|png|webp)$/i, '');
 
   const cached = newsCache.get(cleanId);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached && cached.expiresAt > Date.now() && cached.item.imageUrl) {
     return cached.item;
   }
 
   try {
+    const keyParam = firebaseConfig.apiKey
+      ? `?key=${encodeURIComponent(firebaseConfig.apiKey)}`
+      : '';
     const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
       firebaseConfig.projectId
-    )}/databases/${encodeURIComponent(firebaseConfig.firestoreDatabaseId)}/documents/news/${encodeURIComponent(
-      cleanId
-    )}`;
+    )}/databases/${encodeURIComponent(
+      firebaseConfig.firestoreDatabaseId
+    )}/documents/news/${encodeURIComponent(cleanId)}${keyParam}`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4500);
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
 
     if (response.ok) {
       const docData: any = await response.json();
-      const fields = docData?.fields || {};
-      const title = extractFirestoreString(fields.title);
-      const summary = extractFirestoreString(fields.summary);
-      const content = extractFirestoreString(fields.content);
-      const primaryImage = extractFirestoreString(fields.imageUrl);
-      const fallbackGalleryImage = extractFirstArrayString(fields.additionalImages);
-      const imageUrl = primaryImage || fallbackGalleryImage || '/mpgbsim-official-logo.png';
-
-      if (title) {
-        const meta: ServerNewsMeta = {
-          id: cleanId,
-          title,
-          summary: summary || (content ? content.slice(0, 220) : ''),
-          content,
-          imageUrl,
-          category: extractFirestoreString(fields.category),
-          date: extractFirestoreString(fields.date),
-          author: extractFirestoreString(fields.author),
-          schoolName: extractFirestoreString(fields.schoolName),
-        };
-        newsCache.set(cleanId, { item: meta, expiresAt: Date.now() + 60_000 });
+      const meta = parseFirestoreNewsDoc(cleanId, docData?.fields);
+      if (meta) {
+        newsCache.set(cleanId, { item: meta, expiresAt: Date.now() + 5 * 60_000 });
+        saveDiskNewsCache();
         return meta;
       }
     }
-  } catch (err) {
-    // Fallback to default news if Firestore fetch times out or fails
+  } catch {
+    // Fallback to cached or default news if Firestore fetch times out
+  }
+
+  if (cached?.item) {
+    return cached.item;
   }
 
   if (DEFAULT_NEWS_FALLBACK[cleanId]) {
@@ -162,6 +255,66 @@ async function fetchNewsById(newsId: string): Promise<ServerNewsMeta | null> {
   }
 
   return null;
+}
+
+/**
+ * Converts any news image (including data:image/webp;base64,... which WhatsApp rejects)
+ * into a 1200x630 standard JPEG (< 200KB) for universal WhatsApp, Telegram & Facebook cards.
+ */
+async function buildOgJpegBuffer(newsId: string, imageUrl: string): Promise<Buffer | null> {
+  if (!imageUrl) return null;
+
+  const cachedJpeg = ogJpegCache.get(newsId);
+  if (cachedJpeg && cachedJpeg.expiresAt > Date.now()) {
+    return cachedJpeg.buffer;
+  }
+
+  let rawBuffer: Buffer | null = null;
+
+  try {
+    if (imageUrl.startsWith('data:image/')) {
+      const commaIdx = imageUrl.indexOf(',');
+      if (commaIdx !== -1) {
+        const base64Data = imageUrl.slice(commaIdx + 1).trim();
+        rawBuffer = Buffer.from(base64Data, 'base64');
+      }
+    } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+      const imgResp = await fetch(imageUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (imgResp.ok) {
+        const arrayBuf = await imgResp.arrayBuffer();
+        rawBuffer = Buffer.from(arrayBuf);
+      }
+    }
+
+    if (!rawBuffer || rawBuffer.length === 0) {
+      return null;
+    }
+
+    // Use sharp to convert WebP/PNG/JPEG into a 1200x630 progressive JPEG (< 200KB)
+    // matching the exact aspect ratio of the "Pratonton Kad Kongsi" card.
+    const jpegBuffer = await sharp(rawBuffer)
+      .resize(1200, 630, {
+        fit: 'cover',
+        position: 'attention',
+      })
+      .jpeg({
+        quality: 84,
+        mozjpeg: true,
+      })
+      .toBuffer();
+
+    ogJpegCache.set(newsId, {
+      buffer: jpegBuffer,
+      expiresAt: Date.now() + 15 * 60_000,
+    });
+    return jpegBuffer;
+  } catch (err) {
+    console.warn('Error converting OG image with sharp:', err);
+    return rawBuffer;
+  }
 }
 
 function escapeHtmlAttr(value: string): string {
@@ -186,8 +339,8 @@ function injectNewsOpenGraphHtml(html: string, news: ServerNewsMeta, origin: str
   const rawDesc = (news.summary || news.content || cleanTitle).replace(/\s+/g, ' ').trim();
   const shortDesc = rawDesc.length > 220 ? `${rawDesc.slice(0, 217)}...` : rawDesc;
 
-  const shareUrl = `${origin}/?berita=${encodeURIComponent(news.id)}`;
-  const ogImageUrl = `${origin}/api/og-image/${encodeURIComponent(news.id)}`;
+  const shareUrl = `${origin}/berita/${encodeURIComponent(news.id)}`;
+  const ogImageUrl = `${origin}/api/og-image/${encodeURIComponent(news.id)}.jpg`;
 
   const safeTitle = escapeHtmlAttr(fullTitle);
   const safeDesc = escapeHtmlAttr(shortDesc);
@@ -196,154 +349,155 @@ function injectNewsOpenGraphHtml(html: string, news: ServerNewsMeta, origin: str
 
   let updated = html;
 
-  // Replace <title>
-  updated = updated.replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle}</title>`);
-
-  // Replace primary meta tags
+  // 1. Remove all existing OpenGraph, Twitter, description, canonical, and logo preload tags
+  // (Handles both single-line and multi-line tags in index.html)
+  updated = updated.replace(/<title>[\s\S]*?<\/title>/gi, '');
+  updated = updated.replace(/<meta\s+[^>]*name=["'](?:title|description)["'][^>]*>/gi, '');
+  updated = updated.replace(/<meta\s+[^>]*property=["']og:[^"']+["'][^>]*>/gi, '');
+  updated = updated.replace(/<meta\s+[^>]*name=["']twitter:[^"']+["'][^>]*>/gi, '');
+  updated = updated.replace(/<link\s+[^>]*rel=["']canonical["'][^>]*>/gi, '');
   updated = updated.replace(
-    /<meta\s+name="title"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="title" content="${safeTitle}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="description" content="${safeDesc}" />`
-  );
-  updated = updated.replace(
-    /<link\s+rel="canonical"\s+href="[^"]*"\s*\/?>/i,
-    `<link rel="canonical" href="${safeUrl}" />`
+    /<link\s+[^>]*rel=["']preload["'][^>]*href=["'][^"']*mpgbsim-official-logo[^"']*["'][^>]*>/gi,
+    ''
   );
 
-  // Replace OpenGraph tags for WhatsApp, Telegram, Facebook
+  // 2. Replace logo references in JSON-LD structured data so crawlers never pick the site logo for news articles
   updated = updated.replace(
-    /<meta\s+property="og:type"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:type" content="article" />`
-  );
-  updated = updated.replace(
-    /<meta\s+property="og:url"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:url" content="${safeUrl}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+property="og:title"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:title" content="${safeTitle}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+property="og:description"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:description" content="${safeDesc}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+property="og:image"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:image" content="${safeImage}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+property="og:image:secure_url"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:image:secure_url" content="${safeImage}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+property="og:image:type"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:image:type" content="image/jpeg" />`
-  );
-  updated = updated.replace(
-    /<meta\s+property="og:image:alt"\s+content="[^"]*"\s*\/?>/i,
-    `<meta property="og:image:alt" content="${safeTitle}" />`
+    /https:\/\/www\.mpgbsim\.org\/mpgbsim-official-logo\.png/g,
+    ogImageUrl
   );
 
-  // Replace Twitter / Telegram large card tags
-  updated = updated.replace(
-    /<meta\s+name="twitter:url"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="twitter:url" content="${safeUrl}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+name="twitter:title"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="twitter:title" content="${safeTitle}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+name="twitter:description"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="twitter:description" content="${safeDesc}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="twitter:image" content="${safeImage}" />`
-  );
-  updated = updated.replace(
-    /<meta\s+name="twitter:image:alt"\s+content="[^"]*"\s*\/?>/i,
-    `<meta name="twitter:image:alt" content="${safeTitle}" />`
-  );
+  // 3. Inject news OpenGraph & Twitter large card tags right at the top of <head>
+  const ogBlock = `
+    <title>${safeTitle}</title>
+    <meta name="title" content="${safeTitle}" />
+    <meta name="description" content="${safeDesc}" />
+    <link rel="canonical" href="${safeUrl}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:locale" content="ms_MY" />
+    <meta property="og:site_name" content="MPGBSIM - Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia" />
+    <meta property="og:url" content="${safeUrl}" />
+    <meta property="og:title" content="${safeTitle}" />
+    <meta property="og:description" content="${safeDesc}" />
+    <meta property="og:image" content="${safeImage}" />
+    <meta property="og:image:secure_url" content="${safeImage}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${safeTitle}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="${safeUrl}" />
+    <meta name="twitter:title" content="${safeTitle}" />
+    <meta name="twitter:description" content="${safeDesc}" />
+    <meta name="twitter:image" content="${safeImage}" />
+    <meta name="twitter:image:alt" content="${safeTitle}" />`;
+
+  updated = updated.replace(/<head[^>]*>/i, (match) => `${match}${ogBlock}`);
 
   return updated;
 }
 
 async function startServer() {
+  loadDiskNewsCache();
+  preloadAllNewsFromFirestore();
+
   const app = express();
   const PORT = 3000;
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd =
+    process.env.NODE_ENV === 'production' ||
+    (!process.env.VITE_DEV && process.env.npm_lifecycle_event === 'start');
+
+  app.use(express.json({ limit: '12mb' }));
+
+  // 0. Client-to-server news cache sync endpoint so newly added/edited news or local items are immediately available for OG previews
+  app.post('/api/news-cache', (req, res) => {
+    try {
+      const payload = req.body?.news;
+      const list = Array.isArray(payload) ? payload : payload ? [payload] : [];
+      let count = 0;
+      for (const item of list) {
+        if (item && item.id && item.title) {
+          const cleanId = String(item.id).trim();
+          const existing = newsCache.get(cleanId)?.item;
+          const resolvedImageUrl =
+            item.imageUrl && String(item.imageUrl).trim() !== ''
+              ? String(item.imageUrl)
+              : existing?.imageUrl || '';
+          const meta: ServerNewsMeta = {
+            id: cleanId,
+            title: String(item.title),
+            summary: String(item.summary || item.content || '').slice(0, 260),
+            content: item.content ? String(item.content) : existing?.content,
+            imageUrl: resolvedImageUrl,
+            category: item.category || existing?.category,
+            date: item.date || existing?.date,
+            author: item.author || existing?.author,
+            schoolName: item.schoolName || existing?.schoolName,
+          };
+          newsCache.set(cleanId, { item: meta, expiresAt: Date.now() + 24 * 3600_000 });
+          if (item.imageUrl && item.imageUrl !== existing?.imageUrl) {
+            ogJpegCache.delete(cleanId);
+          }
+          count++;
+        }
+      }
+      if (count > 0) {
+        saveDiskNewsCache();
+      }
+      res.json({ ok: true, cached: count });
+    } catch (e) {
+      res.status(400).json({ ok: false });
+    }
+  });
 
   // 1. Dynamic OpenGraph Image endpoint for WhatsApp, Telegram & Facebook crawlers
-  // Converts Firestore base64 data:image URIs or remote URLs into a direct binary image response
-  app.get('/api/og-image/:newsId', async (req, res) => {
-    const rawId = (req.params.newsId || '').replace(/\.(jpg|jpeg|png|webp)$/i, '');
-    const news = await fetchNewsById(rawId);
+  // Converts Firestore WebP/PNG/JPEG base64 data URIs or remote URLs into a 1200x630 JPEG image response
+  const handleOgImageRequest = async (req: express.Request, res: express.Response) => {
+    const rawParam =
+      (req.params.newsId as string) ||
+      (req.query.id as string) ||
+      (req.query.berita as string) ||
+      '';
+    const cleanId = decodeURIComponent(rawParam).replace(/\.(jpg|jpeg|png|webp)$/i, '');
+    const news = await fetchNewsById(cleanId);
     const imageUrl = news?.imageUrl || '';
 
-    try {
-      // Case A: Base64 data URI stored in Firestore (e.g., data:image/jpeg;base64,...)
-      if (imageUrl.startsWith('data:image/')) {
-        const matches = imageUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
-        if (matches && matches[2]) {
-          const mimeType = matches[1] || 'image/jpeg';
-          const buffer = Buffer.from(matches[2], 'base64');
-          res.setHeader('Content-Type', mimeType);
-          res.setHeader('Content-Length', buffer.length.toString());
-          res.setHeader('Cache-Control', 'public, max-age=3600');
-          res.status(200).send(buffer);
-          return;
-        }
-      }
-
-      // Case B: External HTTP/HTTPS image URL
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const imgResp = await fetch(imageUrl, { signal: controller.signal });
-        clearTimeout(timeout);
-
-        if (imgResp.ok) {
-          const contentType = imgResp.headers.get('content-type') || 'image/jpeg';
-          const arrayBuf = await imgResp.arrayBuffer();
-          const buffer = Buffer.from(arrayBuf);
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Content-Length', buffer.length.toString());
-          res.setHeader('Cache-Control', 'public, max-age=3600');
-          res.status(200).send(buffer);
-          return;
-        } else {
-          res.redirect(302, imageUrl);
-          return;
-        }
-      }
-    } catch (err) {
-      if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-        res.redirect(302, imageUrl);
+    if (imageUrl) {
+      const jpegBuffer = await buildOgJpegBuffer(cleanId, imageUrl);
+      if (jpegBuffer && jpegBuffer.length > 0) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Content-Length', jpegBuffer.length.toString());
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.status(200).send(jpegBuffer);
         return;
       }
     }
 
-    // Case C: Fallback to official MPGBSIM logo
+    // Fallback to official MPGBSIM logo converted to 1200x630 JPEG if news has no image
     const fallbackLogoPath = path.resolve(
       __dirname,
       isProd ? 'dist/mpgbsim-official-logo.png' : 'public/mpgbsim-official-logo.png'
     );
     if (fs.existsSync(fallbackLogoPath)) {
       res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'public, max-age=300');
       res.sendFile(fallbackLogoPath);
     } else {
       res.status(404).end();
     }
-  });
+  };
+
+  app.get('/api/og-image/:newsId', handleOgImageRequest);
+  app.get('/api/og-image', handleOgImageRequest);
 
   // 2. JSON metadata endpoint for news preview inspection
   app.get('/api/news-meta/:newsId', async (req, res) => {
-    const news = await fetchNewsById(req.params.newsId);
+    const cleanId = decodeURIComponent(req.params.newsId || '').replace(
+      /\.(jpg|jpeg|png|webp)$/i,
+      ''
+    );
+    const news = await fetchNewsById(cleanId);
     if (!news) {
       res.status(404).json({ error: 'News not found' });
       return;
@@ -351,10 +505,10 @@ async function startServer() {
     const origin = getRequestOrigin(req);
     res.json({
       id: news.id,
-      title: `${news.title} | MPGBSIM`,
+      title: news.title.includes('MPGBSIM') ? news.title : `${news.title} | MPGBSIM`,
       description: news.summary,
-      shareUrl: `${origin}/?berita=${encodeURIComponent(news.id)}`,
-      ogImageUrl: `${origin}/api/og-image/${encodeURIComponent(news.id)}`,
+      shareUrl: `${origin}/berita/${encodeURIComponent(news.id)}`,
+      ogImageUrl: `${origin}/api/og-image/${encodeURIComponent(news.id)}.jpg`,
     });
   });
 
@@ -365,7 +519,7 @@ async function startServer() {
       appType: 'custom',
     });
 
-    // Intercept root or /berita/:id requests BEFORE vite middlewares if news param is present
+    // Intercept root or /berita/:newsId requests BEFORE vite middlewares if news param is present
     app.get(['/', '/index.html', '/berita/:newsId'], async (req, res, next) => {
       try {
         const newsId =
