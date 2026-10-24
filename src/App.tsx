@@ -154,6 +154,12 @@ function AppContent() {
                 },
               };
             });
+            setTimeout(() => {
+              const el = document.getElementById('berita');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 200);
           }
         })
         .catch(() => {});

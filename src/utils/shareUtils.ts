@@ -45,7 +45,7 @@ export async function syncNewsToServerCache(news: NewsItem | NewsItem[]): Promis
  */
 export function getNewsShareUrl(newsId: string): string {
   const cleanId = String(newsId || '').trim();
-  return `${getSiteOrigin()}/berita/${encodeURIComponent(cleanId)}`;
+  return `${getSiteOrigin()}/?berita=${encodeURIComponent(cleanId)}`;
 }
 
 /**
@@ -297,9 +297,10 @@ export function updateDocumentOpenGraphMeta(news: NewsItem | null): void {
     }
 
     try {
-      const targetPath = `/berita/${encodeURIComponent(news.id)}`;
-      if (window.location.pathname !== targetPath) {
-        window.history.replaceState({}, fullTitle, targetPath);
+      const targetQuery = `/?berita=${encodeURIComponent(news.id)}`;
+      const currentParam = new URLSearchParams(window.location.search).get('berita');
+      if (currentParam !== news.id && !window.location.pathname.startsWith('/berita/')) {
+        window.history.replaceState({}, fullTitle, targetQuery);
       }
     } catch {
       // Ignore URL update errors in constrained frames
