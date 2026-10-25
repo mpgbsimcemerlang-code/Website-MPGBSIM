@@ -3,6 +3,9 @@ import {
   Bot,
   Send,
   X,
+  Minus,
+  ChevronDown,
+  ChevronUp,
   RotateCcw,
   Maximize2,
   Minimize2,
@@ -155,6 +158,8 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
   const { viewMode, setViewMode } = useMemberPortal();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isLauncherCompact, setIsLauncherCompact] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -166,7 +171,8 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
   const [activeSentimentInfo, setActiveSentimentInfo] = useState<SentimentAnalysisResult>(() =>
     analyzeMursyidSentiment('Assalamualaikum')
   );
-  const [showAvatarStage, setShowAvatarStage] = useState<boolean>(true);
+  const [showAvatarStage, setShowAvatarStage] = useState<boolean>(false);
+  const [showQuickTopics, setShowQuickTopics] = useState<boolean>(true);
   const [autoVoiceEnabled, setAutoVoiceEnabled] = useState<boolean>(true);
   const [isVoiceSpeaking, setIsVoiceSpeaking] = useState<boolean>(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
@@ -212,15 +218,15 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
     () => ({
       id: 'welcome-mursyid',
       role: 'model',
-      text: `**Assalamualaikum warahmatullahi wabarakatuh & Salam Ukhuwah Sahabat Pendidik.**\n\nSaya **Mursyid AI**, rakan penasihat dan pembimbing maya rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.\n\nSaya sedia berborak, bertukar pandangan, dan membantu Tuan/Puan mengenai:\n• **Kepimpinan Rabbani & Falsafah Soleh wa Musleh** di sekolah Islam\n• **Menteri Pendidikan Terkini (YB Fadhlina Sidek) & Inisiatif KPM**\n• **Pelan Pembangunan Pendidikan Malaysia 2026–2035 & Kurikulum Persekolahan Baharu 2027**\n• **Isu Pendidikan Semasa, Beban Guru & Pemanfaatan AI dalam Bilik Darjah**\n• **Direktori Sekolah Ahli & PGB** *(maklumat sekolah, Guru Besar SRI I Musleh, Pengetua)*\n• **Portal Ahli PGB, e-Kad Digital & Pembayaran Yuran HerePay**\n\nBagaimana keadaan di sekolah hari ini? Ada sebarang perkara atau pandangan yang ingin kita bincangkan bersama?`,
+      text: `**Assalamualaikum & Salam Ukhuwah Sahabat Pendidik!** 👋\n\nSaya **Mursyid AI**, rakan pembimbing maya **MPGBSIM**.\n\nTuan/Puan boleh berbual santai atau bertanya tentang:\n• **Kepimpinan Rabbani & Soleh wa Musleh**\n• **Menteri Pendidikan (YB Fadhlina Sidek) & Pelan 2026–2035**\n• **Direktori Sekolah Ahli, PGB, Portal & Yuran HerePay**\n\nBagaimana keadaan di sekolah hari ini? Ada perkara yang ingin kita bincangkan?`,
       timestamp: new Date().toLocaleTimeString('ms-MY', {
         hour: '2-digit',
         minute: '2-digit',
       }),
       suggestedActions: [
         { label: 'Kepimpinan Rabbani', action: 'kepimpinan' },
-        { label: 'Direktori Sekolah Ahli', action: 'sekolah-ahli' },
-        { label: 'Buka Portal Ahli PGB', action: 'portal' },
+        { label: 'Sekolah Ahli', action: 'sekolah-ahli' },
+        { label: 'Portal PGB', action: 'portal' },
       ],
     }),
     []
@@ -235,6 +241,7 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
     const handleOpenChatbot = (e: Event) => {
       if (siteData.dashboardConfig?.enableAiChatbot === false) return;
       setIsOpen(true);
+      setIsMinimized(false);
       const customEvent = e as CustomEvent<{ prompt?: string }>;
       if (customEvent.detail?.prompt) {
         handleSendQuestion(customEvent.detail.prompt);
@@ -244,12 +251,24 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
     return () => window.removeEventListener('open-mursyid-ai', handleOpenChatbot);
   });
 
+  // Allow pressing Escape key to quickly minimize the chatbot window
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen || isMinimized) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMinimized(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isMinimized]);
+
+  useEffect(() => {
+    if (isOpen && !isMinimized) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       setTimeout(() => inputRef.current?.focus(), 150);
     }
-  }, [messages, isOpen, isLoading]);
+  }, [messages, isOpen, isMinimized, isLoading]);
 
   // Build structured live context string from siteData for Gemini grounding (includes ALL schools)
   const liveSiteContext = useMemo(() => {
@@ -1451,58 +1470,180 @@ ${schoolLines}
 
   return (
     <>
-      {/* Floating Launcher Button (Positioned above Admin / Live Chat button on bottom-right) */}
+      {/* 1. CLOSED STATE: Compact, User-Friendly Floating Launcher */}
       {!isOpen && (
-        <div className="fixed bottom-20 right-5 z-40 flex flex-col items-end gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(true);
-              setAvatarEmotion('waving');
-            }}
-            aria-label="Tanya Mursyid AI - Chatbot Rasmi MPGBSIM"
-            className="group flex items-center gap-3 pl-2.5 pr-4 py-2 rounded-2xl bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 hover:from-teal-800 hover:to-slate-800 text-white shadow-2xl border border-amber-400/60 hover:border-amber-300 transition-all duration-200 hover:scale-[1.03] cursor-pointer"
-          >
-            {/* Animated 3D Character Avatar (Waving & Blinking) */}
-            <div className="relative flex items-center justify-center shrink-0">
+        <div className="fixed bottom-20 right-4 z-40 flex items-center gap-1.5">
+          {isLauncherCompact ? (
+            /* Ultra-compact icon mode when user minimizes the launcher pill */
+            <button
+              type="button"
+              onClick={() => {
+                setIsLauncherCompact(false);
+                setIsOpen(true);
+                setIsMinimized(false);
+                setAvatarEmotion('waving');
+              }}
+              aria-label="Buka Mursyid AI"
+              title="Klik untuk berbual dengan Mursyid AI"
+              className="group relative flex items-center justify-center p-1.5 rounded-full bg-gradient-to-br from-teal-900 to-slate-900 text-white shadow-xl border-2 border-amber-400/70 hover:scale-105 transition-all cursor-pointer"
+            >
               <MursyidAnimatedCharacter size="xs" emotion="waving" />
-              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 z-20">
+              <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 z-20">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border border-slate-900" />
               </span>
-            </div>
+            </button>
+          ) : (
+            /* Standard compact floating pill with quick minimize-to-icon button */
+            <div className="flex items-center rounded-full bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white shadow-xl border border-amber-400/60 hover:border-amber-300 transition-all duration-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(true);
+                  setIsMinimized(false);
+                  setAvatarEmotion('waving');
+                }}
+                aria-label="Tanya Mursyid AI - Chatbot Rasmi MPGBSIM"
+                className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 cursor-pointer hover:opacity-95 transition"
+              >
+                <div className="relative flex items-center justify-center shrink-0">
+                  <MursyidAnimatedCharacter size="xs" emotion="waving" />
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 z-20">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border border-slate-900" />
+                  </span>
+                </div>
 
-            <div className="text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-extrabold tracking-tight text-white flex items-center gap-1">
-                  <span>Tanya Mursyid AI</span>
-                  <span className="inline-block animate-bounce text-xs">👋</span>
-                </span>
-                <span className="text-[10px] font-bold text-amber-300">
-                  · MPGBSIM
-                </span>
-              </div>
-              <p className="text-[11px] text-teal-200 leading-tight">
-                Watak 3D Beranimasi & Pintar
-              </p>
+                <div className="text-left">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-extrabold tracking-tight text-white">
+                      Mursyid AI
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-300">· 3D</span>
+                  </div>
+                  <p className="text-[10px] text-teal-200 leading-none">
+                    Tanya & Bual Santai
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLauncherCompact(true);
+                }}
+                title="Kecilkan butang ke ikon sahaja"
+                aria-label="Kecilkan butang"
+                className="pr-2.5 pl-1 py-2 text-teal-200/80 hover:text-amber-300 border-l border-teal-700/50 transition cursor-pointer"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
             </div>
-          </button>
+          )}
         </div>
       )}
 
-      {/* Chatbot Modal / Slide-over Window */}
-      {isOpen && (
+      {/* 2. MINIMIZED STATE: Sleek Floating Bar at Bottom-Right (1-Click Restore) */}
+      {isOpen && isMinimized && (
+        <div
+          aria-label="Bar Mursyid AI Dikecilkan"
+          className="fixed bottom-4 right-4 z-50 flex items-center gap-2.5 pl-2.5 pr-2 py-1.5 rounded-2xl bg-gradient-to-r from-slate-900 via-teal-950 to-teal-900 text-white shadow-2xl border border-amber-400/60 animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[calc(100vw-24px)]"
+        >
+          <button
+            type="button"
+            onClick={() => setIsMinimized(false)}
+            className="flex items-center gap-2.5 text-left cursor-pointer group min-w-0"
+            title="Klik untuk membuka semula tetingkap Mursyid AI"
+          >
+            <div className="relative shrink-0">
+              <MursyidAnimatedCharacter
+                size="xs"
+                emotion={avatarEmotion}
+                isSpeaking={isLoading || isVoiceSpeaking || avatarEmotion === 'speaking'}
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-slate-900 z-20" />
+            </div>
+
+            <div className="min-w-0 pr-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-extrabold text-white truncate">
+                  Mursyid AI
+                </span>
+                <span className="px-1.5 py-0.5 rounded-md bg-amber-400/20 text-amber-300 text-[9px] font-bold">
+                  Dikecilkan
+                </span>
+              </div>
+              <p className="text-[10px] text-teal-200 truncate">
+                {isVoiceSpeaking
+                  ? '🔊 Sedang bercakap... (Klik untuk buka)'
+                  : 'Klik untuk sambung berbual'}
+              </p>
+            </div>
+          </button>
+
+          <div className="flex items-center gap-1 shrink-0 border-l border-teal-800/70 pl-1.5">
+            {isVoiceSpeaking && (
+              <button
+                type="button"
+                onClick={() => {
+                  stopMursyidVoice();
+                  setIsVoiceSpeaking(false);
+                  setSpeakingMsgId(null);
+                }}
+                className="p-1.5 rounded-lg bg-rose-500/90 hover:bg-rose-600 text-white transition cursor-pointer"
+                title="Hentikan Suara"
+              >
+                <VolumeX className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsMinimized(false)}
+              className="px-2 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] flex items-center gap-1 transition cursor-pointer"
+              title="Buka Semula Tetingkap Sembang"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+              <span>Buka</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                stopMursyidVoice();
+                setIsVoiceSpeaking(false);
+                setSpeakingMsgId(null);
+                setIsMinimized(false);
+                setIsOpen(false);
+              }}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-rose-600/80 transition cursor-pointer"
+              title="Tutup Mursyid AI"
+              aria-label="Tutup Mursyid AI"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. OPEN STATE: Compact, Ergonomic & User-Friendly Chat Window */}
+      {isOpen && !isMinimized && (
         <aside
           aria-label="Tetingkap Sembang Mursyid AI MPGBSIM"
-          className={`fixed z-50 transition-all duration-200 flex flex-col bg-white border border-slate-200 shadow-2xl overflow-hidden ${
+          className={`fixed z-50 transition-all duration-200 flex flex-col bg-white border border-slate-200/90 shadow-2xl overflow-hidden ${
             isExpanded
-              ? 'inset-3 sm:inset-6 rounded-3xl'
-              : 'bottom-4 right-4 left-4 sm:left-auto sm:w-[440px] h-[670px] max-h-[90vh] rounded-3xl'
+              ? 'bottom-3 right-3 sm:bottom-4 sm:right-4 w-[calc(100vw-24px)] sm:w-[450px] h-[610px] max-h-[84vh] rounded-2xl'
+              : 'bottom-3 right-3 sm:bottom-4 sm:right-4 w-[calc(100vw-24px)] sm:w-[365px] h-[495px] max-h-[75vh] rounded-2xl'
           }`}
         >
-          {/* Header: Character Persona "Mursyid AI" */}
-          <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-teal-900 text-white px-5 py-3 flex items-center justify-between gap-3 border-b border-teal-800/60 shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
+          {/* Compact Top Header with Clear Minimize ("— Kecilkan") Button */}
+          <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-teal-900 text-white px-3.5 py-2.5 flex items-center justify-between gap-2 border-b border-teal-800/60 shrink-0">
+            <div
+              onClick={() => setShowAvatarStage((prev) => !prev)}
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
+              title="Klik untuk papar/sembunyi pentas penuh watak 3D Mursyid AI"
+            >
               <div className="relative flex items-center justify-center shrink-0">
                 <MursyidAnimatedCharacter
                   size="xs"
@@ -1510,30 +1651,29 @@ ${schoolLines}
                   isSpeaking={isLoading || isVoiceSpeaking || avatarEmotion === 'speaking'}
                 />
                 <span
-                  className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 z-20"
-                  title="Mursyid AI 3D Beranimasi Aktif"
+                  className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-slate-900 z-20"
+                  title="Mursyid AI 3D Aktif"
                 />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-extrabold text-white tracking-tight truncate">
-                    Mursyid AI 3D
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm font-extrabold text-white tracking-tight truncate">
+                    Mursyid AI
                   </h2>
-                  <span className="text-[11px] font-semibold text-amber-300 shrink-0">
-                    · Boleh Bercakap & Beremosi
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-800/80 text-amber-300 shrink-0">
+                    {activeSentimentInfo.sentimentCategory}
                   </span>
                 </div>
-                <p className="text-xs text-teal-200/90 truncate flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>
-                    {isVoiceSpeaking
-                      ? '🔊 Sedang Bercakap...'
-                      : `Emosi 3D: ${avatarEmotion.toUpperCase()}`}
+                <p className="text-[11px] text-teal-200/90 truncate flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="truncate">
+                    {isVoiceSpeaking ? '🔊 Sedang bercakap...' : 'Pembimbing Maya MPGBSIM'}
                   </span>
                 </p>
               </div>
             </div>
 
+            {/* Action Toolbar: Voice, Reset, Minimize (Prominent!), Size, Close */}
             <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
@@ -1545,51 +1685,61 @@ ${schoolLines}
                   }
                   setAutoVoiceEnabled((prev) => !prev);
                 }}
-                className={`px-2 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                className={`p-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
                   autoVoiceEnabled
-                    ? 'bg-amber-400 text-slate-950 shadow-xs'
+                    ? 'bg-amber-400 text-slate-950 shadow-2xs'
                     : 'bg-white/10 text-slate-300 hover:text-white'
                 }`}
                 title={
                   autoVoiceEnabled
-                    ? 'Suara Mursyid AI Aktif (Klik untuk senyapkan)'
-                    : 'Aktifkan Suara Mursyid AI'
+                    ? 'Suara Automatik ON (Klik untuk senyapkan)'
+                    : 'Suara Automatik OFF (Klik untuk aktifkan)'
                 }
+                aria-label="Togol Suara"
               >
                 {autoVoiceEnabled ? (
-                  <>
-                    <Volume2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Suara ON</span>
-                  </>
+                  <Volume2 className="w-3.5 h-3.5" />
                 ) : (
-                  <>
-                    <VolumeX className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Senyap</span>
-                  </>
+                  <VolumeX className="w-3.5 h-3.5" />
                 )}
               </button>
+
               <button
                 type="button"
                 onClick={handleResetChat}
-                className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
                 title="Mulakan Semula Perbualan"
                 aria-label="Mulakan Semula Perbualan"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
+
               <button
                 type="button"
                 onClick={() => setIsExpanded((prev) => !prev)}
-                className="hidden sm:flex p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
-                title={isExpanded ? 'Kecilkan Tetingkap' : 'Besarkan Tetingkap'}
-                aria-label={isExpanded ? 'Kecilkan Tetingkap' : 'Besarkan Tetingkap'}
+                className="hidden sm:flex p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                title={isExpanded ? 'Saiz Kompak' : 'Besarkan Sedikit'}
+                aria-label={isExpanded ? 'Saiz Kompak' : 'Besarkan Sedikit'}
               >
                 {isExpanded ? (
-                  <Minimize2 className="w-4 h-4" />
+                  <Minimize2 className="w-3.5 h-3.5" />
                 ) : (
-                  <Maximize2 className="w-4 h-4" />
+                  <Maximize2 className="w-3.5 h-3.5" />
                 )}
               </button>
+
+              {/* Prominent Minimize Button */}
+              <button
+                type="button"
+                onClick={() => setIsMinimized(true)}
+                className="px-2 py-1 rounded-lg bg-white/15 hover:bg-amber-400 text-white hover:text-slate-950 font-bold text-[10px] flex items-center gap-1 transition cursor-pointer"
+                title="Kecilkan tetingkap ke bar bawah (Minimize / Esc)"
+                aria-label="Kecilkan Tetingkap"
+              >
+                <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Kecilkan</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -1598,78 +1748,92 @@ ${schoolLines}
                   setSpeakingMsgId(null);
                   setIsOpen(false);
                 }}
-                className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-rose-600/80 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-rose-600/80 transition cursor-pointer"
                 title="Tutup Mursyid AI"
                 aria-label="Tutup Mursyid AI"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Pentas Karakter 3D Asal Mursyid AI (Interactive Emotion & Gesture Stage) */}
-          <div className="bg-gradient-to-b from-slate-950 via-teal-950 to-slate-900 px-4 py-2.5 border-b border-teal-800/40 flex flex-col items-center justify-center shrink-0">
-            <div className="w-full flex items-center justify-between text-[11px] font-bold text-amber-300 mb-1.5">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" style={{ animationDuration: '6s' }} />
-                <span>Watak 3D Asal Mursyid AI (Boleh Bercakap & Beremosi)</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowAvatarStage((prev) => !prev)}
-                className="text-[10px] text-teal-300 hover:text-white underline cursor-pointer"
-              >
-                {showAvatarStage ? 'Sembunyikan Pentas ▲' : 'Paparkan Watak 3D ▼'}
-              </button>
-            </div>
+          {/* Slim Control Strip: Toggle 3D Character Stage & Quick Questions */}
+          <div className="bg-slate-100 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setShowAvatarStage((prev) => !prev)}
+              className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                showAvatarStage
+                  ? 'bg-teal-900 text-amber-300 shadow-2xs'
+                  : 'bg-white hover:bg-teal-50 text-teal-900 border border-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              <span>{showAvatarStage ? 'Tutup Pentas 3D ▲' : 'Watak 3D & Emosi ▼'}</span>
+            </button>
 
-            {showAvatarStage && (
-              <div className="w-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
-                <MursyidAnimatedCharacter
-                  size={isExpanded ? 'lg' : 'md'}
-                  emotion={avatarEmotion}
-                  isSpeaking={isLoading || isVoiceSpeaking || avatarEmotion === 'speaking'}
-                  interactive={true}
-                  showEmotionBar={true}
-                  sentimentInfo={activeSentimentInfo}
-                  onEmotionChange={(newEmotion) => {
-                    setAvatarEmotion(newEmotion);
-                    const sampleMap: Record<MursyidEmotion, string> = {
-                      idle: '',
-                      neutral: '',
-                      happy: 'alhamdulillah gembira',
-                      serious: 'serius tegas disiplin',
-                      empathetic: 'sedih penat prihatin',
-                      thinking: 'analisis bagaimana',
-                      waving: 'assalamualaikum salam',
-                      inspiring: 'kepimpinan rabbani soleh wa musleh',
-                      speaking: '',
-                    };
-                    setActiveSentimentInfo(analyzeMursyidSentiment(sampleMap[newEmotion] || ''));
-                  }}
-                />
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowQuickTopics((prev) => !prev)}
+              className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer ${
+                showQuickTopics
+                  ? 'bg-teal-50 text-teal-900 border border-teal-200'
+                  : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200'
+              }`}
+            >
+              <MessageCircleQuestion className="w-3 h-3 text-teal-700" />
+              <span>Soalan Pantas</span>
+              {showQuickTopics ? (
+                <ChevronUp className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+            </button>
           </div>
 
-          {/* Quick Topic Filter Bar */}
-          <div className="bg-slate-50 border-b border-slate-200 px-4 py-2.5 shrink-0">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
-                <MessageCircleQuestion className="w-3.5 h-3.5 text-teal-700" />
-                <span>Soalan Pantas Mursyid AI:</span>
-              </span>
-              <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg">
+          {/* Collapsible 3D Character Stage (Only shown when toggled ON) */}
+          {showAvatarStage && (
+            <div className="bg-gradient-to-b from-slate-950 via-teal-950 to-slate-900 px-3 py-2 border-b border-teal-800/40 flex flex-col items-center justify-center shrink-0 animate-in fade-in duration-150">
+              <MursyidAnimatedCharacter
+                size="md"
+                emotion={avatarEmotion}
+                isSpeaking={isLoading || isVoiceSpeaking || avatarEmotion === 'speaking'}
+                interactive={true}
+                showEmotionBar={true}
+                sentimentInfo={activeSentimentInfo}
+                onEmotionChange={(newEmotion) => {
+                  setAvatarEmotion(newEmotion);
+                  const sampleMap: Record<MursyidEmotion, string> = {
+                    idle: '',
+                    neutral: '',
+                    happy: 'alhamdulillah gembira',
+                    serious: 'serius tegas disiplin',
+                    empathetic: 'sedih penat prihatin',
+                    thinking: 'analisis bagaimana',
+                    waving: 'assalamualaikum salam',
+                    inspiring: 'kepimpinan rabbani soleh wa musleh',
+                    speaking: '',
+                  };
+                  setActiveSentimentInfo(analyzeMursyidSentiment(sampleMap[newEmotion] || ''));
+                }}
+              />
+            </div>
+          )}
+
+          {/* Collapsible Quick Topic Bar (Single clean horizontal scroll row) */}
+          {showQuickTopics && (
+            <div className="bg-slate-50 border-b border-slate-200 px-3 py-2 shrink-0">
+              <div className="flex items-center gap-1 mb-1.5 overflow-x-auto no-scrollbar">
                 {(['Semua', 'Umum', 'Sekolah & Pimpinan', 'Portal & Yuran'] as const).map(
                   (cat) => (
                     <button
                       key={cat}
                       type="button"
                       onClick={() => setActiveCategory(cat)}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap transition cursor-pointer ${
                         activeCategory === cat
-                          ? 'bg-teal-900 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
+                          ? 'bg-teal-900 text-white'
+                          : 'bg-slate-200/70 text-slate-600 hover:text-slate-900'
                       }`}
                     >
                       {cat}
@@ -1677,25 +1841,28 @@ ${schoolLines}
                   )
                 )}
               </div>
-            </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {filteredQuestions.map((q) => (
-                <button
-                  key={q.id}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => handleSendQuestion(q.prompt)}
-                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-900 border border-slate-200 hover:border-teal-600/40 text-xs font-semibold whitespace-nowrap transition shadow-2xs cursor-pointer shrink-0 disabled:opacity-50"
-                >
-                  {q.label}
-                </button>
-              ))}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                {filteredQuestions.map((q) => (
+                  <button
+                    key={q.id}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => {
+                      setShowAvatarStage(false);
+                      handleSendQuestion(q.prompt);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-900 border border-slate-200 hover:border-teal-600/40 text-[11px] font-semibold whitespace-nowrap transition shadow-2xs cursor-pointer shrink-0 disabled:opacity-50"
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Conversation Messages Container */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 bg-slate-50/50">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 space-y-3 bg-slate-50/50">
             {messages.map((msg) => {
               const isBot = msg.role === 'model';
               return (
@@ -1703,9 +1870,9 @@ ${schoolLines}
                   key={msg.id}
                   className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}
                 >
-                  <div className="flex items-start gap-2.5 max-w-[92%] sm:max-w-[88%]">
+                  <div className="flex items-start gap-2 max-w-[94%] sm:max-w-[90%]">
                     {isBot && (
-                      <div className="w-9 h-9 rounded-xl border border-teal-800/30 bg-teal-900 overflow-hidden shrink-0 mt-0.5 shadow-xs">
+                      <div className="w-7 h-7 rounded-lg border border-teal-800/30 bg-teal-900 overflow-hidden shrink-0 mt-0.5 shadow-2xs">
                         <img
                           src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
                           alt="Mursyid AI"
@@ -1715,22 +1882,22 @@ ${schoolLines}
                     )}
 
                     <div
-                      className={`rounded-2xl px-4 py-3 text-xs sm:text-sm shadow-xs ${
+                      className={`rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-2xs ${
                         isBot
                           ? 'bg-white border border-slate-200 text-slate-700'
                           : 'bg-teal-900 text-white font-medium'
                       }`}
                     >
                       {isBot && (
-                        <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-slate-100 text-[11px] text-slate-400">
-                          <span className="font-bold text-teal-800">
-                            Mursyid AI · Pembimbing Maya MPGBSIM
+                        <div className="flex items-center justify-between gap-2 pb-1 mb-1 border-b border-slate-100 text-[10px] text-slate-400">
+                          <span className="font-bold text-teal-800 truncate">
+                            Mursyid AI
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
                               type="button"
                               onClick={() => handleToggleSpeakMessage(msg.id, msg.text)}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] transition cursor-pointer ${
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-[10px] transition cursor-pointer ${
                                 speakingMsgId === msg.id && isVoiceSpeaking
                                   ? 'bg-rose-500 text-white animate-pulse'
                                   : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
@@ -1739,29 +1906,24 @@ ${schoolLines}
                             >
                               {speakingMsgId === msg.id && isVoiceSpeaking ? (
                                 <>
-                                  <VolumeX className="w-3 h-3" />
-                                  <span>Henti Suara</span>
+                                  <VolumeX className="w-2.5 h-2.5" />
+                                  <span>Henti</span>
                                 </>
                               ) : (
                                 <>
-                                  <Volume2 className="w-3 h-3" />
-                                  <span>Dengar Suara</span>
+                                  <Volume2 className="w-2.5 h-2.5" />
+                                  <span>Suara</span>
                                 </>
                               )}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleCopyText(msg.id, msg.text)}
-                              className="inline-flex items-center gap-1 text-slate-400 hover:text-teal-700 transition cursor-pointer"
+                              className="inline-flex items-center gap-0.5 text-slate-400 hover:text-teal-700 transition cursor-pointer"
                               title="Salin Jawapan"
                             >
                               {copiedId === msg.id ? (
-                                <>
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                  <span className="text-[10px] text-emerald-600 font-semibold">
-                                    Disalin
-                                  </span>
-                                </>
+                                <Check className="w-3 h-3 text-emerald-600" />
                               ) : (
                                 <Copy className="w-3 h-3" />
                               )}
@@ -1770,7 +1932,7 @@ ${schoolLines}
                         </div>
                       )}
 
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {isBot ? renderFormattedMessage(msg.text) : <p>{msg.text}</p>}
                       </div>
 
@@ -1778,27 +1940,27 @@ ${schoolLines}
                       {isBot &&
                         msg.suggestedActions &&
                         msg.suggestedActions.length > 0 && (
-                          <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap gap-1.5">
+                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap gap-1">
                             {msg.suggestedActions.map((act) => (
                               <button
                                 key={act.label}
                                 type="button"
                                 onClick={() => handleActionNavigate(act.action)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-900 text-teal-900 hover:text-white text-[11px] font-bold transition cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-900 text-teal-900 hover:text-white text-[10px] font-bold transition cursor-pointer"
                               >
-                                {act.action === 'portal' && <BookOpen className="w-3 h-3" />}
-                                {act.action === 'sekolah-ahli' && <Building2 className="w-3 h-3" />}
-                                {act.action === 'bayar-yuran' && <CreditCard className="w-3 h-3" />}
-                                {act.action === 'kepimpinan' && <Users className="w-3 h-3" />}
+                                {act.action === 'portal' && <BookOpen className="w-2.5 h-2.5" />}
+                                {act.action === 'sekolah-ahli' && <Building2 className="w-2.5 h-2.5" />}
+                                {act.action === 'bayar-yuran' && <CreditCard className="w-2.5 h-2.5" />}
+                                {act.action === 'kepimpinan' && <Users className="w-2.5 h-2.5" />}
                                 <span>{act.label}</span>
-                                <ChevronRight className="w-3 h-3" />
+                                <ChevronRight className="w-2.5 h-2.5" />
                               </button>
                             ))}
                           </div>
                         )}
 
                       <div
-                        className={`mt-1.5 text-[10px] text-right ${
+                        className={`mt-1 text-[9px] text-right ${
                           isBot ? 'text-slate-400' : 'text-teal-200'
                         }`}
                       >
@@ -1811,22 +1973,22 @@ ${schoolLines}
             })}
 
             {isLoading && (
-              <div className="flex items-start gap-2.5">
-                <div className="w-9 h-9 rounded-xl border border-teal-800/30 bg-teal-900 overflow-hidden shrink-0 shadow-xs">
+              <div className="flex items-start gap-2">
+                <div className="w-7 h-7 rounded-lg border border-teal-800/30 bg-teal-900 overflow-hidden shrink-0 shadow-2xs">
                   <img
                     src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
                     alt="Mursyid AI"
                     className="w-full h-full object-cover object-top animate-pulse"
                   />
                 </div>
-                <div className="rounded-2xl px-4 py-3 bg-white border border-slate-200 text-xs text-slate-600 shadow-xs flex items-center gap-2">
+                <div className="rounded-2xl px-3.5 py-2.5 bg-white border border-slate-200 text-xs text-slate-600 shadow-2xs flex items-center gap-2">
                   <span className="flex gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-700 animate-bounce" />
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-700 animate-bounce [animation-delay:150ms]" />
                     <span className="w-1.5 h-1.5 rounded-full bg-teal-700 animate-bounce [animation-delay:300ms]" />
                   </span>
-                  <span className="font-medium text-slate-500">
-                    Mursyid AI sedang menyemak jawapan...
+                  <span className="font-medium text-slate-500 text-[11px]">
+                    Mursyid AI sedang menaip...
                   </span>
                 </div>
               </div>
@@ -1835,25 +1997,15 @@ ${schoolLines}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Form Footer with Live Sentiment Detection Bar & Voice Mic */}
+          {/* Compact Input Form Footer */}
           <form
-            onSubmit={handleFormSubmit}
-            className="p-3 bg-white border-t border-slate-200 shrink-0 space-y-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setShowAvatarStage(false);
+              handleSendQuestion(input);
+            }}
+            className="p-2.5 bg-white border-t border-slate-200 shrink-0"
           >
-            {/* Live Sentiment & Body Language Status Bar */}
-            <div className="flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px]">
-              <div className="flex items-center gap-1.5 font-bold text-teal-900 truncate">
-                <Smile className="w-3 h-3 text-teal-700 shrink-0" />
-                <span>Sentimen Dikesan:</span>
-                <span className="px-1.5 py-0.5 rounded bg-teal-900 text-amber-300 font-extrabold">
-                  {activeSentimentInfo.sentimentCategory}
-                </span>
-              </div>
-              <span className="text-slate-500 truncate hidden sm:inline">
-                {activeSentimentInfo.facialExpressionLabel}
-              </span>
-            </div>
-
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -1865,13 +2017,13 @@ ${schoolLines}
                     : 'Bercakap terus dengan Mursyid AI menggunakan mikrofon'
                 }
                 aria-label="Mikrofon Suara"
-                className={`p-2.5 rounded-xl font-bold transition cursor-pointer shrink-0 border ${
+                className={`p-2 rounded-xl font-bold transition cursor-pointer shrink-0 border ${
                   isListeningMic
                     ? 'bg-rose-600 text-white border-rose-600 animate-pulse'
                     : 'bg-slate-100 hover:bg-teal-50 text-teal-900 border-slate-200'
                 }`}
               >
-                {isListeningMic ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {isListeningMic ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
               </button>
 
               <input
@@ -1881,20 +2033,20 @@ ${schoolLines}
                 onChange={(e) => handleInputChange(e.target.value)}
                 placeholder={
                   isListeningMic
-                    ? 'Sila bercakap sekarang (Bahasa Melayu)...'
-                    : 'Taip atau tekan mikrofon untuk bercakap dengan Mursyid AI...'
+                    ? 'Sila bercakap sekarang...'
+                    : 'Tanya Mursyid AI...'
                 }
                 disabled={isLoading}
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-teal-700 outline-none transition disabled:opacity-60"
+                className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-teal-700 outline-none transition disabled:opacity-60"
               />
               <button
                 type="submit"
                 disabled={!input.trim() || isLoading}
                 aria-label="Hantar Soalan"
-                className="px-4 py-2.5 rounded-xl bg-teal-900 hover:bg-teal-800 disabled:bg-slate-200 text-amber-300 disabled:text-slate-400 font-bold text-xs sm:text-sm flex items-center gap-1.5 transition cursor-pointer disabled:cursor-not-allowed shrink-0"
+                className="px-3 py-2 rounded-xl bg-teal-900 hover:bg-teal-800 disabled:bg-slate-200 text-amber-300 disabled:text-slate-400 font-bold text-xs flex items-center gap-1 transition cursor-pointer disabled:cursor-not-allowed shrink-0"
               >
                 <span>Hantar</span>
-                <Send className="w-3.5 h-3.5" />
+                <Send className="w-3 h-3" />
               </button>
             </div>
           </form>

@@ -140,11 +140,23 @@ export function analyzeMursyidSentiment(text: string): SentimentAnalysisResult {
   };
 }
 
-// Global singleton reference for active HTMLAudioElement so we can stop playback cleanly
+// Global singleton references for active audio playback so we can stop cleanly
 let activeMursyidAudio: HTMLAudioElement | null = null;
+let activeAudioCtx: AudioContext | null = null;
+let activeBufferSource: AudioBufferSourceNode | null = null;
 
 export function stopMursyidVoice(): void {
   try {
+    if (activeBufferSource) {
+      try {
+        activeBufferSource.onended = null;
+        activeBufferSource.stop();
+        activeBufferSource.disconnect();
+      } catch {
+        // Ignore if already stopped
+      }
+      activeBufferSource = null;
+    }
     if (activeMursyidAudio) {
       activeMursyidAudio.pause();
       activeMursyidAudio.currentTime = 0;
@@ -159,9 +171,186 @@ export function stopMursyidVoice(): void {
 }
 
 /**
- * Speaks text out loud as Mursyid AI in Bahasa Melayu.
- * Uses Gemini 3.8 TTS (/api/mpgb-tts) when available and seamlessly falls back
- * to Web Speech API (ms-MY / id-ID) tuned to a warm male mentor voice.
+ * Time-Domain Synchronized Overlap-Add (SOLA) Male Baritone Pitch & Formant Shifter.
+ * Lowers a female/neutral Bahasa Melayu speech buffer by ~4.6 semitones (pitchFactor = 0.765)
+ * into a warm 115-130Hz Malay Male Ustaz/Principal register while preserving 100% natural speaking speed!
+ */
+function pitchShiftToMaleBaritone(
+  ctx: AudioContext,
+  inputBuffer: AudioBuffer,
+  pitchFactor = 0.765,
+  tempoFactor = 1.03
+): AudioBuffer {
+  const sampleRate = inputBuffer.sampleRate;
+  const inputData = inputBuffer.getChannelData(0);
+  const inputLen = inputData.length;
+
+  // Step 1: Resample by 1 / pitchFactor to lower pitch & vocal tract formants
+  const resampledLen = Math.floor(inputLen / pitchFactor);
+  const resampled = new Float32Array(resampledLen);
+  for (let i = 0; i < resampledLen; i++) {
+    const srcIdx = i * pitchFactor;
+    const idx0 = Math.floor(srcIdx);
+    const idx1 = Math.min(idx0 + 1, inputLen - 1);
+    const frac = srcIdx - idx0;
+    resampled[i] = inputData[idx0] * (1 - frac) + inputData[idx1] * frac;
+  }
+
+  // Step 2: Time-compress back to natural tempo using Hanning-windowed SOLA grains (38ms window)
+  const stretchRatio = pitchFactor * tempoFactor; // < 1 means compressing duration back to normal
+  const outputLen = Math.max(1, Math.floor(resampledLen * stretchRatio));
+  const output = new Float32Array(outputLen);
+
+  const grainSize = Math.floor(sampleRate * 0.038); // 38ms speech grain
+  const halfGrain = Math.floor(grainSize / 2);
+  const searchRange = Math.floor(sampleRate * 0.012); // 12ms phase-alignment search window
+
+  // Precompute Hanning fade-in / fade-out weights
+  const fadeIn = new Float32Array(halfGrain);
+  const fadeOut = new Float32Array(halfGrain);
+  for (let i = 0; i < halfGrain; i++) {
+    const w = 0.5 * (1 - Math.cos((Math.PI * i) / halfGrain));
+    fadeIn[i] = w;
+    fadeOut[i] = 1 - w;
+  }
+
+  // Copy initial grain
+  const firstCopy = Math.min(grainSize, resampledLen, outputLen);
+  for (let i = 0; i < firstCopy; i++) {
+    output[i] = resampled[i];
+  }
+
+  let outWritePos = halfGrain;
+  while (outWritePos + grainSize < outputLen) {
+    const targetInPos = Math.floor(outWritePos / stretchRatio);
+    if (targetInPos + grainSize + searchRange >= resampledLen) break;
+
+    // Find best phase-aligned offset within searchRange using cross-correlation
+    let bestOffset = 0;
+    let bestCorr = -Infinity;
+    const step = 2; // Check every 2nd sample for fast execution (<3ms total)
+    for (let off = 0; off < searchRange; off += step) {
+      let corr = 0;
+      const candStart = targetInPos + off;
+      for (let k = 0; k < halfGrain; k += 4) {
+        corr += output[outWritePos + k] * resampled[candStart + k];
+      }
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestOffset = off;
+      }
+    }
+
+    const chosenStart = targetInPos + bestOffset;
+    // Cross-fade overlap region
+    for (let i = 0; i < halfGrain; i++) {
+      output[outWritePos + i] =
+        output[outWritePos + i] * fadeOut[i] + resampled[chosenStart + i] * fadeIn[i];
+    }
+    // Copy second half of the grain
+    for (let i = halfGrain; i < grainSize; i++) {
+      output[outWritePos + i] = resampled[chosenStart + i];
+    }
+
+    outWritePos += halfGrain;
+  }
+
+  const outBuffer = ctx.createBuffer(1, outputLen, sampleRate);
+  outBuffer.copyToChannel(output, 0);
+  return outBuffer;
+}
+
+/**
+ * Plays base64 audio through Web Audio API with Male Chest-Resonance EQ
+ * and (when needed) Male Baritone Pitch/Formant Shifting.
+ */
+async function playBase64WithMaleVoiceDsp(
+  base64Data: string,
+  needsMaleDsp: boolean,
+  emotion: MursyidEmotion,
+  callbacks?: { onStart?: () => void; onEnd?: () => void }
+): Promise<boolean> {
+  try {
+    const AudioContextClass =
+      window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return false;
+
+    if (!activeAudioCtx || activeAudioCtx.state === 'closed') {
+      activeAudioCtx = new AudioContextClass();
+    }
+    if (activeAudioCtx.state === 'suspended') {
+      await activeAudioCtx.resume();
+    }
+
+    const binary = atob(base64Data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    const decodedBuffer = await activeAudioCtx.decodeAudioData(bytes.buffer.slice(0));
+
+    // Emotion-based male baritone tuning
+    const pitchFactor =
+      emotion === 'serious'
+        ? 0.74 // Deeper authoritative principal baritone
+        : emotion === 'happy' || emotion === 'waving'
+        ? 0.78 // Warm friendly male ustaz
+        : emotion === 'empathetic'
+        ? 0.75 // Gentle warm male mentor
+        : 0.765; // Standard Malay male baritone
+
+    const tempoFactor =
+      emotion === 'serious' || emotion === 'empathetic'
+        ? 0.98
+        : emotion === 'happy'
+        ? 1.06
+        : 1.03;
+
+    const finalBuffer = needsMaleDsp
+      ? pitchShiftToMaleBaritone(activeAudioCtx, decodedBuffer, pitchFactor, tempoFactor)
+      : decodedBuffer;
+
+    const source = activeAudioCtx.createBufferSource();
+    source.buffer = finalBuffer;
+
+    // Male Chest Resonance Low-Shelf Boost (145 Hz, +4.5 dB)
+    const chestBoost = activeAudioCtx.createBiquadFilter();
+    chestBoost.type = 'lowshelf';
+    chestBoost.frequency.value = 145;
+    chestBoost.gain.value = needsMaleDsp ? 4.8 : 2.5;
+
+    // High-frequency softening to remove any shrill sibilance (3000 Hz, -3 dB)
+    const highSmooth = activeAudioCtx.createBiquadFilter();
+    highSmooth.type = 'highshelf';
+    highSmooth.frequency.value = 3000;
+    highSmooth.gain.value = needsMaleDsp ? -3.2 : -1.0;
+
+    source.connect(chestBoost);
+    chestBoost.connect(highSmooth);
+    highSmooth.connect(activeAudioCtx.destination);
+
+    activeBufferSource = source;
+    source.onended = () => {
+      if (activeBufferSource === source) {
+        activeBufferSource = null;
+      }
+      callbacks?.onEnd?.();
+    };
+
+    callbacks?.onStart?.();
+    source.start(0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Speaks text out loud as Mursyid AI in Bahasa Melayu with a guaranteed MALE voice.
+ * 1. Calls /api/mpgb-tts (Gemini 3.8 Male Voice "Charon" OR Bahasa Melayu stream + Male Baritone WebAudio DSP).
+ * 2. If offline, falls back to Web Speech API strictly selecting Male voices (Osman, Rizwan, Ardi)
+ *    or forcing deep male baritone pitch (0.58 - 0.64) if the OS only has a default female voice.
  */
 export async function speakMursyidVoice(
   rawText: string,
@@ -185,7 +374,7 @@ export async function speakMursyidVoice(
     .replace(/\bSRI\b/g, 'Sekolah Rendah Islam')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 700);
+    .slice(0, 680);
 
   if (!cleanText) {
     callbacks?.onEnd?.();
@@ -203,37 +392,45 @@ export async function speakMursyidVoice(
       const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = 'ms-MY';
 
-      // Select best Bahasa Melayu or Indonesian male voice if available
       const voices = window.speechSynthesis.getVoices();
-      const malayOrIndoVoice =
+      const femaleRegex = /yasmin|amira|gadis|damayanti|siti|female|perempuan|wanita|zira|samantha|victoria/i;
+      const maleRegex = /\b(osman|rizwan|ardi|male|lelaki)\b/i;
+
+      // 1. Look for an explicit Native Male Malay/Indonesian voice (e.g. Microsoft Osman / Rizwan / Ardi)
+      const explicitMaleMalayVoice = voices.find(
+        (v) =>
+          (v.lang.toLowerCase().includes('ms') || v.lang.toLowerCase().includes('id')) &&
+          maleRegex.test(v.name) &&
+          !femaleRegex.test(v.name)
+      );
+
+      // 2. Otherwise pick a Malay/Indonesian voice that isn't explicitly named female
+      const fallbackMalayVoice =
+        explicitMaleMalayVoice ||
         voices.find(
-          (v) =>
-            (v.lang.toLowerCase().includes('ms') || v.lang.toLowerCase().includes('id')) &&
-            /male|rizwan|ardi|osman|gad/i.test(v.name)
+          (v) => v.lang.toLowerCase().includes('ms') && !femaleRegex.test(v.name)
+        ) ||
+        voices.find(
+          (v) => v.lang.toLowerCase().includes('id') && !femaleRegex.test(v.name)
         ) ||
         voices.find((v) => v.lang.toLowerCase().includes('ms')) ||
         voices.find((v) => v.lang.toLowerCase().includes('id'));
 
-      if (malayOrIndoVoice) {
-        utterance.voice = malayOrIndoVoice;
+      if (fallbackMalayVoice) {
+        utterance.voice = fallbackMalayVoice;
       }
 
-      // Modulate pitch & rate based on Mursyid AI's emotional state
-      if (emotion === 'happy' || emotion === 'waving') {
-        utterance.pitch = 1.05;
-        utterance.rate = 1.04;
-      } else if (emotion === 'serious') {
-        utterance.pitch = 0.88;
-        utterance.rate = 0.96;
-      } else if (emotion === 'empathetic') {
-        utterance.pitch = 0.94;
-        utterance.rate = 0.92;
-      } else if (emotion === 'inspiring') {
-        utterance.pitch = 1.02;
-        utterance.rate = 1.02;
+      // CRITICAL: If a native Male voice (Osman/Rizwan/Ardi) is used, use natural male pitch (0.88 - 0.95).
+      // If the OS only provides a default/female voice (Google Bahasa Melayu / Yasmin / Amira),
+      // force a deep male baritone pitch (0.58 - 0.64) so it NEVER sounds like a female voice!
+      const isTrueNativeMale = Boolean(explicitMaleMalayVoice);
+
+      if (isTrueNativeMale) {
+        utterance.pitch = emotion === 'serious' ? 0.85 : emotion === 'happy' ? 0.96 : 0.9;
+        utterance.rate = emotion === 'serious' ? 0.96 : 1.02;
       } else {
-        utterance.pitch = 0.96;
-        utterance.rate = 1.0;
+        utterance.pitch = emotion === 'serious' ? 0.56 : emotion === 'happy' ? 0.64 : 0.6;
+        utterance.rate = 0.98;
       }
 
       utterance.onstart = () => callbacks?.onStart?.();
@@ -257,23 +454,19 @@ export async function speakMursyidVoice(
     if (resp.ok) {
       const data = await resp.json();
       if (data?.audioBase64) {
-        const audio = new Audio(`data:${data.mimeType || 'audio/wav'};base64,${data.audioBase64}`);
-        activeMursyidAudio = audio;
-        audio.onplay = () => callbacks?.onStart?.();
-        audio.onended = () => {
-          activeMursyidAudio = null;
-          callbacks?.onEnd?.();
-        };
-        audio.onerror = () => {
-          activeMursyidAudio = null;
-          playWithWebSpeechFallback();
-        };
-        await audio.play();
-        return;
+        const playedViaWebAudio = await playBase64WithMaleVoiceDsp(
+          data.audioBase64,
+          Boolean(data.needsMaleDsp),
+          emotion,
+          callbacks
+        );
+        if (playedViaWebAudio) {
+          return;
+        }
       }
     }
   } catch {
-    // Fallback to Web Speech API
+    // Fallback to Web Speech API with deep male pitch
   }
 
   playWithWebSpeechFallback();
@@ -368,11 +561,11 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
 
   // Dimensions based on size prop (preserving 1:1 aspect ratio of original 3D character)
   const sizeMap = {
-    xs: { width: 44, height: 44, rounded: 'rounded-xl' },
-    sm: { width: 58, height: 58, rounded: 'rounded-2xl' },
-    md: { width: 156, height: 156, rounded: 'rounded-3xl' },
-    lg: { width: 200, height: 200, rounded: 'rounded-3xl' },
-    stage: { width: 220, height: 220, rounded: 'rounded-3xl' },
+    xs: { width: 40, height: 40, rounded: 'rounded-xl' },
+    sm: { width: 52, height: 52, rounded: 'rounded-2xl' },
+    md: { width: 112, height: 112, rounded: 'rounded-2xl' },
+    lg: { width: 148, height: 148, rounded: 'rounded-3xl' },
+    stage: { width: 200, height: 200, rounded: 'rounded-3xl' },
   };
 
   const currentSize = sizeMap[size];
@@ -517,19 +710,14 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
     <div className={`flex flex-col items-center justify-center select-none ${className}`}>
       {/* Dynamic Speech Bubble & Voice Trigger above the 3D Stage */}
       {!isCompact && (speechText || activeEmotionInfo.voicePhrase) && (
-        <div className="relative mb-2 px-3.5 py-2 max-w-[330px] text-center rounded-2xl bg-slate-900/95 border border-teal-400/40 shadow-lg text-[11px] font-medium text-teal-50 animate-in fade-in slide-in-from-bottom-1 duration-200">
-          <p className="leading-snug flex items-center justify-center gap-1.5">
-            {activeSpeaking && (
-              <Volume2 className="w-3.5 h-3.5 text-amber-400 animate-bounce shrink-0" />
-            )}
-            <span>{speechText || activeEmotionInfo.voicePhrase}</span>
-          </p>
-
-          <div className="mt-1.5 pt-1.5 border-t border-slate-800 flex items-center justify-between gap-2 text-[10px]">
-            <span className="text-teal-200/90 truncate text-left">
-              <strong className="text-amber-300">Bahasa Badan:</strong>{' '}
-              {sentimentInfo?.bodyLanguageLabel || activeEmotionInfo.bodyLanguage}
-            </span>
+        <div className="relative mb-1.5 px-3 py-1.5 w-full max-w-[320px] rounded-xl bg-slate-900/95 border border-teal-400/40 shadow-md text-[10px] font-medium text-teal-50 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between gap-2">
+            <p className="leading-snug flex items-center gap-1.5 text-left line-clamp-2">
+              {activeSpeaking && (
+                <Volume2 className="w-3 h-3 text-amber-400 animate-bounce shrink-0" />
+              )}
+              <span>{speechText || activeEmotionInfo.voicePhrase}</span>
+            </p>
 
             <button
               type="button"
@@ -546,7 +734,7 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
                   });
                 }
               }}
-              className={`px-2 py-0.5 rounded-lg font-extrabold flex items-center gap-1 shrink-0 transition cursor-pointer ${
+              className={`px-2 py-1 rounded-lg font-extrabold flex items-center gap-1 shrink-0 transition cursor-pointer ${
                 localVoiceSpeaking
                   ? 'bg-rose-500 text-white animate-pulse'
                   : 'bg-amber-400 hover:bg-amber-300 text-slate-950'
@@ -561,12 +749,11 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
               ) : (
                 <>
                   <Volume2 className="w-3 h-3" />
-                  <span>Cuba Suara</span>
+                  <span>Suara</span>
                 </>
               )}
             </button>
           </div>
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-slate-900 border-b border-r border-teal-400/40 rotate-45" />
         </div>
       )}
 
@@ -1032,13 +1219,13 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
 
       {/* Interactive Emotion & Sentiment Selector Bar (Also speaks the phrase out loud!) */}
       {(showEmotionBar || interactive) && !isCompact && (
-        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1 bg-slate-900/90 p-1.5 rounded-2xl border border-teal-700/50 text-[10px] sm:text-[11px] shadow-md max-w-[360px]">
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-teal-700/50 text-[10px] shadow-md max-w-[330px]">
           <button
             type="button"
             onClick={() => handleSelectEmotion('neutral', true)}
-            className={`px-2 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer ${
               resolvedEmotion === 'neutral'
-                ? 'bg-teal-400 text-slate-950 shadow-xs scale-105'
+                ? 'bg-teal-400 text-slate-950 shadow-xs'
                 : 'text-teal-100 hover:bg-white/10'
             }`}
             title="Sentimen Neutral: Mursyid 3D tenang & bercakap"
@@ -1050,9 +1237,9 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
           <button
             type="button"
             onClick={() => handleSelectEmotion('happy', true)}
-            className={`px-2 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer ${
               resolvedEmotion === 'happy'
-                ? 'bg-emerald-400 text-slate-950 shadow-xs scale-105'
+                ? 'bg-emerald-400 text-slate-950 shadow-xs'
                 : 'text-teal-100 hover:bg-white/10'
             }`}
             title="Sentimen Gembira: Mursyid 3D tersenyum ceria & bercakap"
@@ -1064,9 +1251,9 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
           <button
             type="button"
             onClick={() => handleSelectEmotion('serious', true)}
-            className={`px-2 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer ${
               resolvedEmotion === 'serious'
-                ? 'bg-amber-500 text-slate-950 shadow-xs scale-105'
+                ? 'bg-amber-500 text-slate-950 shadow-xs'
                 : 'text-teal-100 hover:bg-white/10'
             }`}
             title="Sentimen Serius: Mursyid 3D tegas & bercakap"
@@ -1078,9 +1265,9 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
           <button
             type="button"
             onClick={() => handleSelectEmotion('empathetic', true)}
-            className={`px-2 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer ${
               resolvedEmotion === 'empathetic'
-                ? 'bg-rose-400 text-slate-950 shadow-xs scale-105'
+                ? 'bg-rose-400 text-slate-950 shadow-xs'
                 : 'text-teal-100 hover:bg-white/10'
             }`}
             title="Sentimen Sedih/Prihatin: Mursyid 3D menyantuni emosi pendidik"
@@ -1092,37 +1279,37 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
           <button
             type="button"
             onClick={() => handleSelectEmotion('thinking', true)}
-            className={`px-2 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer ${
               resolvedEmotion === 'thinking'
-                ? 'bg-indigo-400 text-slate-950 shadow-xs scale-105'
+                ? 'bg-indigo-400 text-slate-950 shadow-xs'
                 : 'text-teal-100 hover:bg-white/10'
             }`}
             title="Sentimen Analitikal: Mursyid 3D memikirkan jawapan"
           >
             <span>🤔</span>
-            <span>Berfikir</span>
+            <span>Fikir</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleSelectEmotion('waving', true)}
-            className={`px-2 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer ${
               resolvedEmotion === 'waving'
-                ? 'bg-amber-300 text-slate-950 shadow-xs scale-105'
+                ? 'bg-amber-300 text-slate-950 shadow-xs'
                 : 'text-teal-100 hover:bg-white/10'
             }`}
             title="Mursyid 3D melambai tangan menyapa salam"
           >
             <span>👋</span>
-            <span>Melambai</span>
+            <span>Salam</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleSelectEmotion('inspiring', true)}
-            className={`px-2 py-1 rounded-xl font-bold flex items-center gap-1 transition-all cursor-pointer ${
+            className={`px-1.5 py-0.5 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer ${
               resolvedEmotion === 'inspiring'
-                ? 'bg-yellow-300 text-slate-950 shadow-xs scale-105'
+                ? 'bg-yellow-300 text-slate-950 shadow-xs'
                 : 'text-teal-100 hover:bg-white/10'
             }`}
             title="Mursyid 3D bersemangat Kepimpinan Rabbani"

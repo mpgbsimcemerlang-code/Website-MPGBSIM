@@ -681,7 +681,71 @@ PANDUAN MENJAWAB:
   app.post('/api/mpgb-chat', handleChatRequest);
   app.post('/api/chat', handleChatRequest);
 
-  // 4. Server-side Gemini TTS Endpoint ("Suara Mursyid AI - Bahasa Melayu")
+  // Helper to split long Malay text into natural sentence chunks <= 175 chars
+  const splitMalayTextIntoChunks = (text: string, maxLen = 175): string[] => {
+    const sentences = text
+      .split(/(?<=[.!?।;:])\s+|\n+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const chunks: string[] = [];
+    let current = '';
+
+    for (const sentence of sentences) {
+      if ((current + ' ' + sentence).trim().length <= maxLen) {
+        current = (current + ' ' + sentence).trim();
+      } else {
+        if (current) chunks.push(current);
+        if (sentence.length <= maxLen) {
+          current = sentence;
+        } else {
+          const words = sentence.split(/\s+/);
+          let sub = '';
+          for (const w of words) {
+            if ((sub + ' ' + w).trim().length <= maxLen) {
+              sub = (sub + ' ' + w).trim();
+            } else {
+              if (sub) chunks.push(sub);
+              sub = w;
+            }
+          }
+          current = sub;
+        }
+      }
+    }
+    if (current) chunks.push(current);
+    return chunks.slice(0, 5);
+  };
+
+  const fetchMalayTtsBuffer = async (cleanText: string): Promise<string> => {
+    try {
+      const chunks = splitMalayTextIntoChunks(cleanText, 175);
+      const buffers: Buffer[] = [];
+
+      for (const chunk of chunks) {
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ms&client=tw-ob&q=${encodeURIComponent(
+          chunk
+        )}`;
+        const resp = await fetch(url, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          },
+        });
+        if (resp.ok) {
+          const arrBuf = await resp.arrayBuffer();
+          buffers.push(Buffer.from(arrBuf));
+        }
+      }
+
+      if (buffers.length === 0) return '';
+      return Buffer.concat(buffers).toString('base64');
+    } catch {
+      return '';
+    }
+  };
+
+  // 4. Server-side Gemini TTS + Male Malay Voice Endpoint ("Suara Lelaki Melayu Mursyid AI")
   app.post('/api/mpgb-tts', async (req, res) => {
     try {
       const rawText = String(req.body?.text || '').trim();
@@ -691,80 +755,112 @@ PANDUAN MENJAWAB:
         return;
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey || Date.now() < geminiCreditDepletedUntil) {
-        res.status(200).json({ audioBase64: '', fallback: true });
-        return;
-      }
-
       // Clean markdown symbols and keep speech concise & natural
       const cleanSpeechText = rawText
         .replace(/\*\*/g, '')
         .replace(/[*#_`~>•]/g, ' ')
-        .replace(/https?:\/\/\S+/g, '')
+        .replace(/https?:\/\/\S+/g, 'pautan rasmi')
+        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+        .replace(/\bMPGBSIM\b/g, 'M P G B S I M')
+        .replace(/\bPGB\b/g, 'Pengetua dan Guru Besar')
+        .replace(/\bKPM\b/g, 'K P M')
+        .replace(/\bSRI\b/g, 'Sekolah Rendah Islam')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 750);
+        .slice(0, 680);
 
-      const styleByEmotion: Record<string, string> = {
-        happy: 'Warm, cheerful, friendly Malaysian Malay male educator and mentor',
-        waving: 'Welcoming, polite, warm Malaysian Malay male voice greeting a colleague',
-        serious: 'Authoritative, calm, composed, firm Malaysian Malay school principal',
-        empathetic: 'Gentle, compassionate, comforting, empathetic Malaysian Malay mentor',
-        inspiring: 'Inspiring, passionate, visionary Malaysian Malay Islamic education leader',
-        thinking: 'Thoughtful, articulate, analytical Malaysian Malay advisor',
-        neutral: 'Natural, clear, friendly Malaysian Malay male educator',
-      };
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (apiKey && Date.now() >= geminiCreditDepletedUntil) {
+        try {
+          const styleByEmotion: Record<string, string> = {
+            happy:
+              'Deep male Malaysian Malay ustaz and educator voice, warm, cheerful, friendly baritone',
+            waving:
+              'Deep male Malaysian Malay ustaz voice, welcoming, polite, warm baritone greeting',
+            serious:
+              'Deep authoritative male Malaysian Malay school principal, calm, composed, firm baritone',
+            empathetic:
+              'Deep gentle male Malaysian Malay mentor, compassionate, comforting baritone',
+            inspiring:
+              'Deep inspiring male Malaysian Malay Islamic leader, passionate, visionary baritone',
+            thinking:
+              'Deep thoughtful male Malaysian Malay advisor, articulate baritone',
+            neutral:
+              'Deep natural male Malaysian Malay educator and mentor, clear baritone voice',
+          };
 
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
-      });
+          const ai = new GoogleGenAI({
+            apiKey,
+            httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+          });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash-lite-tts',
-        contents: [
-          {
-            role: 'user',
-            parts: [
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.8-flash-lite-tts',
+            contents: [
               {
-                text: cleanSpeechText,
-                speechMetadata: {
-                  style: styleByEmotion[emotion] || styleByEmotion.neutral,
-                },
-              } as any,
+                role: 'user',
+                parts: [
+                  {
+                    text: cleanSpeechText,
+                    speechMetadata: {
+                      style: styleByEmotion[emotion] || styleByEmotion.neutral,
+                    },
+                  } as any,
+                ],
+              },
             ],
-          },
-        ],
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Charon' },
+            config: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: 'Charon' },
+                },
+              },
             },
-          },
-        },
-      });
+          });
 
-      const base64Audio =
-        response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+          const base64Audio =
+            response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
 
-      res.status(200).json({
-        audioBase64: base64Audio,
-        mimeType: 'audio/wav',
-        fallback: !base64Audio,
-      });
-    } catch (err: any) {
-      const errMsg = String(err?.message || err || '');
-      if (
-        err?.status === 402 ||
-        err?.status === 429 ||
-        errMsg.includes('402') ||
-        errMsg.includes('RESOURCE_EXHAUSTED') ||
-        errMsg.includes('prepayment credits')
-      ) {
-        geminiCreditDepletedUntil = Date.now() + 10 * 60_000;
+          if (base64Audio) {
+            res.status(200).json({
+              audioBase64: base64Audio,
+              mimeType: 'audio/wav',
+              voiceSource: 'gemini-male',
+              needsMaleDsp: false,
+              fallback: false,
+            });
+            return;
+          }
+        } catch (err: any) {
+          const errMsg = String(err?.message || err || '');
+          if (
+            err?.status === 402 ||
+            err?.status === 429 ||
+            errMsg.includes('402') ||
+            errMsg.includes('RESOURCE_EXHAUSTED') ||
+            errMsg.includes('prepayment credits')
+          ) {
+            geminiCreditDepletedUntil = Date.now() + 10 * 60_000;
+          }
+        }
       }
+
+      // Fallback: Fetch Bahasa Melayu audio buffer so client WebAudio DSP renders a deep Male Malay Baritone voice
+      const mp3Base64 = await fetchMalayTtsBuffer(cleanSpeechText);
+      if (mp3Base64) {
+        res.status(200).json({
+          audioBase64: mp3Base64,
+          mimeType: 'audio/mpeg',
+          voiceSource: 'malay-neural-dsp',
+          needsMaleDsp: true,
+          fallback: false,
+        });
+        return;
+      }
+
+      res.status(200).json({ audioBase64: '', fallback: true });
+    } catch {
       res.status(200).json({ audioBase64: '', fallback: true });
     }
   });
