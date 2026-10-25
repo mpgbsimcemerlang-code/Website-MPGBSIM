@@ -29,6 +29,7 @@ import {
   Activity,
   Cake,
   Bot,
+  CreditCard,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { useMemberPortal } from '../context/MemberPortalContext';
@@ -41,6 +42,7 @@ import { AdminProgramAttendanceManagement } from './admin/AdminProgramAttendance
 import { AdminBestPracticeManagement } from './admin/AdminBestPracticeManagement';
 import { AdminSchoolManagement } from './admin/AdminSchoolManagement';
 import { AdminApplicationManagement } from './admin/AdminApplicationManagement';
+import { AdminFeeManagement } from './admin/AdminFeeManagement';
 import { AdminMediaManagement } from './admin/AdminMediaManagement';
 import { AdminSiteSettings } from './admin/AdminSiteSettings';
 import { AdminLeadershipManagement } from './admin/AdminLeadershipManagement';
@@ -81,7 +83,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
     purgeMockData,
     updateDashboardConfig,
   } = useAdminContent();
-  const { resetAllPgbActivityLogs } = useMemberPortal();
+  const { resetAllPgbActivityLogs, feePayments = [] } = useMemberPortal();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isResettingLogs, setIsResettingLogs] = useState(false);
@@ -177,6 +179,16 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           icon: UserCheck,
           count: pendingCount > 0 ? `${pendingCount} Baru` : (applications.length || 0),
           isHighlight: pendingCount > 0,
+        },
+        {
+          id: 'yuran-bendahari',
+          label: 'Kewangan & Rekod Yuran (Bendahari)',
+          icon: CreditCard,
+          count:
+            feePayments.filter((p) => p.status === 'DALAM_SEMAKAN').length > 0
+              ? `${feePayments.filter((p) => p.status === 'DALAM_SEMAKAN').length} Semak`
+              : `${feePayments.length} Rekod`,
+          isHighlight: feePayments.filter((p) => p.status === 'DALAM_SEMAKAN').length > 0,
         },
         {
           id: 'sekolah-ahli',
@@ -531,6 +543,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
             {activeTab === 'permohonan-keahlian' && (
               <AdminApplicationManagement onNavigateToSchools={() => setActiveTab('sekolah-ahli')} />
             )}
+            {activeTab === 'yuran-bendahari' && <AdminFeeManagement />}
             {activeTab === 'sekolah-ahli' && <AdminSchoolManagement />}
             {activeTab === 'alumni-pgb' && (
               <AdminAlumniManagement

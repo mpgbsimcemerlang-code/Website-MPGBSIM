@@ -205,6 +205,46 @@ const FEE_PLANS: FeePlan[] = [
   },
 ];
 
+const compressImageFile = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    // If not an image, fall back to standard reader
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 1200;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = () => {
+        resolve(e.target?.result as string);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 export const PortalFeePayment: React.FC = () => {
   const { currentUser, feePayments, recordFeePayment, currentRole, registeredSchools } = useMemberPortal();
   const { siteData } = useAdminContent();
@@ -275,6 +315,14 @@ export const PortalFeePayment: React.FC = () => {
   const [formMethod, setFormMethod] = useState<string>('HerePay (FPX)');
   const [formNotes, setFormNotes] = useState<string>('');
   const [receiptPreview, setReceiptPreview] = useState<string>('');
+  const [proofFileName, setProofFileName] = useState<string>('');
+
+  // Dynamic fee categories from Admin CMS
+  const customFeeCategories = useMemo(() => {
+    return (siteData?.feeCategories || []).filter(
+      (c) => c.isActive !== false && !FEE_PLANS.some((p) => p.category === c.code)
+    );
+  }, [siteData?.feeCategories]);
 
   // Copy helpers
   const handleCopyLink = () => {
@@ -317,18 +365,22 @@ LAMAN RASMI: https://www.mpgbsim.org/`;
     setFormAmount(target.amount);
     setFormNotes(`Pembayaran ${target.name} [${target.clause}] bagi Sesi 2026/2027`);
     setFormRef(`HP-MPGB-${Math.floor(100000 + Math.random() * 900000)}`);
+    setReceiptPreview('');
+    setProofFileName('');
     setSubmitSuccess(null);
     setIsRecordModalOpen(true);
   };
 
-  const handleReceiptFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setReceiptPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setProofFileName(file.name);
+      try {
+        const compressed = await compressImageFile(file);
+        setReceiptPreview(compressed);
+      } catch (err) {
+        console.error('Error reading/compressing proof file:', err);
+      }
     }
   };
 
@@ -340,8 +392,11 @@ LAMAN RASMI: https://www.mpgbsim.org/`;
     setIsSubmitting(true);
 
     const matchedPlan = FEE_PLANS.find((p) => p.category === formCategory);
+    const matchedCustom = siteData?.feeCategories?.find((c) => c.code === formCategory);
     const categoryLabel = matchedPlan
       ? `${matchedPlan.name} — ${matchedPlan.clause}`
+      : matchedCustom
+      ? `${matchedCustom.name} — ${matchedCustom.clause || 'MPGBSIM'}`
       : 'Yuran Keahlian MPGBSIM (Fasal 6)';
 
     try {
@@ -359,17 +414,20 @@ LAMAN RASMI: https://www.mpgbsim.org/`;
         paymentMethod: formMethod,
         transactionRef: formRef.trim(),
         paymentDate: formDate,
-        status: 'BERJAYA',
+        status: 'DALAM_SEMAKAN', // Menunggu semakan oleh Bendahari MPGBSIM
         academicSession: '2026/2027',
         gateway: formMethod.includes('HerePay') ? 'HerePay' : 'Manual',
         gatewayUrl: OFFICIAL_HEREPAY_URL,
         notes: formNotes,
         receiptUrl: receiptPreview || undefined,
+        paymentProofUrl: receiptPreview || undefined,
+        proofFileName: proofFileName || (receiptPreview ? 'slip_bayaran.jpg' : undefined),
+        proofUploadedAt: receiptPreview ? new Date().toISOString() : undefined,
         verifiedBy: 'Bendahari MPGBSIM',
         verifiedAt: new Date().toISOString(),
       });
 
-      setSubmitSuccess('Rekod pembayaran yuran berjaya disimpan dan resit rasmi telah dijana.');
+      setSubmitSuccess('Bukti pembayaran yuran berjaya dihantar kepada Bendahari MPGBSIM untuk pengesahan.');
       setTimeout(() => {
         setIsRecordModalOpen(false);
         setReceiptToView(newPayment);
@@ -1129,6 +1187,12 @@ LAMAN RASMI: https://www.mpgbsim.org/`;
                     if (plan) {
                       setFormAmount(plan.amount);
                       setFormNotes(`Pembayaran ${plan.name} [${plan.clause}] bagi Sesi 2026/2027`);
+                    } else {
+                      const custom = siteData?.feeCategories?.find((c) => c.code === cat);
+                      if (custom) {
+                        setFormAmount(custom.amount);
+                        setFormNotes(`Pembayaran ${custom.name} [${custom.clause || 'MPGBSIM'}] bagi Sesi ${custom.academicSession || '2026/2027'}`);
+                      }
                     }
                   }}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-medium focus:ring-2 focus:ring-teal-500 outline-none bg-slate-50/50"
@@ -1156,6 +1220,15 @@ LAMAN RASMI: https://www.mpgbsim.org/`;
                     ))}
                     <option value="LAIN_LAIN">Lain-lain Pembayaran Diluluskan Pejabat Pengerusi</option>
                   </optgroup>
+                  {customFeeCategories.length > 0 && (
+                    <optgroup label="Kategori Tambahan / Terkini (Admin CMS)">
+                      {customFeeCategories.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name} — RM {c.amount} ({c.clause || 'Khas'})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
@@ -1440,6 +1513,41 @@ LAMAN RASMI: https://www.mpgbsim.org/`;
                   </tfoot>
                 </table>
               </div>
+
+              {/* Bukti Bayaran / Slip Transaksi Terlampir */}
+              {(receiptToView.paymentProofUrl || receiptToView.receiptUrl) && (
+                <div className="p-3.5 rounded-2xl border border-teal-200 bg-teal-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={receiptToView.paymentProofUrl || receiptToView.receiptUrl}
+                      alt="Bukti Bayaran"
+                      className="w-16 h-16 object-cover rounded-xl border border-teal-200 shadow-xs cursor-pointer hover:opacity-90 shrink-0"
+                      onClick={() => window.open(receiptToView.paymentProofUrl || receiptToView.receiptUrl, '_blank')}
+                      title="Klik untuk lihat imej penuh"
+                    />
+                    <div>
+                      <span className="text-[10px] text-teal-800 font-bold uppercase tracking-wider block">
+                        Bukti Bayaran Terlampir
+                      </span>
+                      <p className="font-semibold text-slate-800 text-xs">
+                        {receiptToView.proofFileName || 'slip_pembayaran.jpg'}
+                      </p>
+                      {receiptToView.proofUploadedAt && (
+                        <p className="text-slate-400 text-[10px]">
+                          Dimuat naik: {receiptToView.proofUploadedAt.split('T')[0]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open(receiptToView.paymentProofUrl || receiptToView.receiptUrl, '_blank')}
+                    className="px-3 py-1.5 rounded-lg bg-teal-800 text-white font-bold text-[11px] hover:bg-teal-900 transition cursor-pointer shrink-0"
+                  >
+                    Buka Slip Penuh ↗
+                  </button>
+                </div>
+              )}
 
               {/* Authentication & Signature Footer */}
               <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">

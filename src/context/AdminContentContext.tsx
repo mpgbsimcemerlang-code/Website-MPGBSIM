@@ -19,8 +19,10 @@ import {
   BirthdaySettingsConfig,
   ProgramCertificateConfig,
   MembershipCertificateConfig,
+  FeeCategoryItem,
 } from '../types';
 import { DEFAULT_BIRTHDAY_SETTINGS } from '../utils/birthdayUtils';
+import { DEFAULT_FEE_CATEGORIES } from '../data/defaultFeeCategories';
 
 import {
   persistSiteContent,
@@ -167,6 +169,7 @@ export interface SiteContentState {
   birthdaySettings?: BirthdaySettingsConfig;
   programCertificateConfig?: ProgramCertificateConfig;
   membershipCertificateConfig?: MembershipCertificateConfig;
+  feeCategories?: FeeCategoryItem[];
 }
 
 export interface AdminUser {
@@ -315,6 +318,11 @@ interface AdminContentContextType {
   updateExamItem: (id: string, item: Partial<ExamCalendarItem>) => Promise<void>;
   deleteExamItem: (id: string) => Promise<void>;
   resetExamCalendarToDefault: () => Promise<void>;
+  // Fee Categories Management
+  addFeeCategory: (category: FeeCategoryItem) => Promise<void>;
+  updateFeeCategory: (id: string, updates: Partial<FeeCategoryItem>) => Promise<void>;
+  deleteFeeCategory: (id: string) => Promise<void>;
+  resetFeeCategoriesToDefault: () => Promise<void>;
   purgeMockData: () => void;
   resetAllContent: () => void;
 }
@@ -1915,6 +1923,11 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         initialSync?.membershipCertificateConfig ||
         prev?.membershipCertificateConfig ||
         DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+      feeCategories:
+        (cachedCms?.feeCategories?.length ? cachedCms.feeCategories : null) ||
+        (initialSync?.feeCategories?.length ? initialSync.feeCategories : null) ||
+        prev?.feeCategories ||
+        DEFAULT_FEE_CATEGORIES,
     };
   };
 
@@ -2355,6 +2368,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
               membershipCertificateConfig: d.membershipCertificateConfig
                 ? { ...DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG, ...prev.membershipCertificateConfig, ...d.membershipCertificateConfig }
                 : prev.membershipCertificateConfig || DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+              feeCategories:
+                Array.isArray(d.feeCategories) && d.feeCategories.length > 0
+                  ? d.feeCategories
+                  : prev.feeCategories || DEFAULT_FEE_CATEGORIES,
             }));
             clearFirestoreQuotaBreaker();
             setIsReadOnlyMode(false);
@@ -3130,6 +3147,7 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
           birthdaySettings: siteData.birthdaySettings || DEFAULT_BIRTHDAY_SETTINGS,
           programCertificateConfig: siteData.programCertificateConfig || DEFAULT_PROGRAM_CERTIFICATE_CONFIG,
           membershipCertificateConfig: siteData.membershipCertificateConfig || DEFAULT_MEMBERSHIP_CERTIFICATE_CONFIG,
+          feeCategories: siteData.feeCategories || DEFAULT_FEE_CATEGORIES,
           updatedAt: new Date().toISOString(),
         },
         { merge: true }
@@ -5659,6 +5677,59 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
     saveToIndexedDB('site_content_v3', null).catch(() => {});
   };
 
+  const addFeeCategory = async (category: FeeCategoryItem): Promise<void> => {
+    let nextList: FeeCategoryItem[] = [];
+    setSiteData((prev) => {
+      const current = prev.feeCategories || DEFAULT_FEE_CATEGORIES;
+      nextList = [...current.filter((c) => c.id !== category.id), category];
+      cacheFirestoreCollection('feeCategories', nextList);
+      return { ...prev, feeCategories: nextList };
+    });
+    await saveCmsContentToFirestore({ feeCategories: nextList });
+    try {
+      window.dispatchEvent(new Event('mpgbsim_fee_categories_updated'));
+    } catch {}
+  };
+
+  const updateFeeCategory = async (id: string, updates: Partial<FeeCategoryItem>): Promise<void> => {
+    let nextList: FeeCategoryItem[] = [];
+    setSiteData((prev) => {
+      const current = prev.feeCategories || DEFAULT_FEE_CATEGORIES;
+      nextList = current.map((c) => (c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c));
+      cacheFirestoreCollection('feeCategories', nextList);
+      return { ...prev, feeCategories: nextList };
+    });
+    await saveCmsContentToFirestore({ feeCategories: nextList });
+    try {
+      window.dispatchEvent(new Event('mpgbsim_fee_categories_updated'));
+    } catch {}
+  };
+
+  const deleteFeeCategory = async (id: string): Promise<void> => {
+    let nextList: FeeCategoryItem[] = [];
+    setSiteData((prev) => {
+      const current = prev.feeCategories || DEFAULT_FEE_CATEGORIES;
+      nextList = current.filter((c) => c.id !== id);
+      cacheFirestoreCollection('feeCategories', nextList);
+      return { ...prev, feeCategories: nextList };
+    });
+    await saveCmsContentToFirestore({ feeCategories: nextList });
+    try {
+      window.dispatchEvent(new Event('mpgbsim_fee_categories_updated'));
+    } catch {}
+  };
+
+  const resetFeeCategoriesToDefault = async (): Promise<void> => {
+    setSiteData((prev) => {
+      cacheFirestoreCollection('feeCategories', DEFAULT_FEE_CATEGORIES);
+      return { ...prev, feeCategories: DEFAULT_FEE_CATEGORIES };
+    });
+    await saveCmsContentToFirestore({ feeCategories: DEFAULT_FEE_CATEGORIES });
+    try {
+      window.dispatchEvent(new Event('mpgbsim_fee_categories_updated'));
+    } catch {}
+  };
+
   return (
     <AdminContentContext.Provider
       value={{
@@ -5749,6 +5820,10 @@ export const AdminContentProvider: React.FC<{ children: ReactNode }> = ({ childr
         updateExamItem,
         deleteExamItem,
         resetExamCalendarToDefault,
+        addFeeCategory,
+        updateFeeCategory,
+        deleteFeeCategory,
+        resetFeeCategoriesToDefault,
         purgeMockData,
         resetAllContent,
       }}

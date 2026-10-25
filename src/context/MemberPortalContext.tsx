@@ -270,7 +270,14 @@ interface MemberPortalContextType {
   ) => Promise<FeePaymentRecord>;
   updateFeePaymentStatus: (
     id: string,
-    status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN'
+    status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN',
+    notes?: string,
+    verifiedBy?: string
+  ) => Promise<void>;
+  updateFeePaymentProof: (
+    id: string,
+    proofUrl: string,
+    proofFileName?: string
   ) => Promise<void>;
   deleteFeePayment: (id: string) => Promise<void>;
 
@@ -4015,16 +4022,27 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
 
   const updateFeePaymentStatus = async (
     id: string,
-    status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN'
+    status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN',
+    notes?: string,
+    verifiedByCustom?: string
   ): Promise<void> => {
     await ensureFirebaseAuth();
+    const verifier =
+      verifiedByCustom ||
+      (currentUser?.fullName ? `${currentUser.fullName} (Bendahari MPGBSIM)` : 'Bendahari Kehormat MPGBSIM');
+
+    const updatePayload: any = {
+      status,
+      updatedAt: new Date().toISOString(),
+      verifiedAt: status === 'BERJAYA' ? new Date().toISOString() : undefined,
+      verifiedBy: status === 'BERJAYA' ? verifier : undefined,
+    };
+    if (notes !== undefined) {
+      updatePayload.notes = notes;
+    }
+
     try {
-      await updateDoc(doc(db, 'feePayments', id), {
-        status,
-        updatedAt: new Date().toISOString(),
-        verifiedAt: status === 'BERJAYA' ? new Date().toISOString() : undefined,
-        verifiedBy: status === 'BERJAYA' ? (currentUser?.fullName || 'Bendahari Kehormat MPGBSIM') : undefined,
-      });
+      await updateDoc(doc(db, 'feePayments', id), updatePayload);
     } catch (err) {
       console.warn('Update fee payment status error:', err);
     }
@@ -4034,10 +4052,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         p.id === id
           ? {
               ...p,
-              status,
-              updatedAt: new Date().toISOString(),
-              verifiedAt: status === 'BERJAYA' ? new Date().toISOString() : p.verifiedAt,
-              verifiedBy: status === 'BERJAYA' ? (currentUser?.fullName || 'Bendahari Kehormat MPGBSIM') : p.verifiedBy,
+              ...updatePayload,
             }
           : p
       );
@@ -4046,6 +4061,34 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     });
 
     recordAuditLog('Status Yuran Dikemas Kini', `Status bayaran #${id} ditukar kepada ${status}.`);
+  };
+
+  const updateFeePaymentProof = async (
+    id: string,
+    proofUrl: string,
+    proofFileName?: string
+  ): Promise<void> => {
+    await ensureFirebaseAuth();
+    const updates = {
+      paymentProofUrl: proofUrl,
+      receiptUrl: proofUrl,
+      proofFileName: proofFileName || 'bukti-pembayaran.jpg',
+      proofUploadedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await updateDoc(doc(db, 'feePayments', id), updates);
+    } catch (err) {
+      console.warn('Update fee payment proof error:', err);
+    }
+
+    setFeePayments((prev) => {
+      const updated = prev.map((p) => (p.id === id ? { ...p, ...updates } : p));
+      safeLocalStorageSet('mpgbsim_fee_payments', JSON.stringify(updated));
+      return updated;
+    });
+
+    recordAuditLog('Bukti Yuran Dimuat Naik', `Bukti bayaran untuk rekod #${id} berjaya dimuat naik.`);
   };
 
   const deleteFeePayment = async (id: string): Promise<void> => {
@@ -4177,6 +4220,7 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         feePayments,
         recordFeePayment,
         updateFeePaymentStatus,
+        updateFeePaymentProof,
         deleteFeePayment,
         isSearchOpen,
         setIsSearchOpen,

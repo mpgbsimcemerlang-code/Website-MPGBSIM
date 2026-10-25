@@ -44,20 +44,38 @@ interface QuickQuestion {
 
 const QUICK_QUESTIONS: QuickQuestion[] = [
   {
+    id: 'q-rabbani-musleh',
+    label: 'Kepimpinan Rabbani & Soleh wa Musleh',
+    prompt: 'Boleh terangkan falsafah Kepimpinan Rabbani dan konsep Soleh wa Musleh dalam konteks pengurusan sekolah Islam?',
+    category: 'Umum',
+  },
+  {
+    id: 'q-menteri-kpm',
+    label: 'Menteri Pendidikan & Fokus KPM',
+    prompt: 'Siapakah Menteri Pendidikan Malaysia terkini dan apakah fokus utama Kementerian Pendidikan Malaysia (KPM)?',
+    category: 'Umum',
+  },
+  {
+    id: 'q-pelan-2035',
+    label: 'Pelan Pendidikan Malaysia 2026–2035',
+    prompt: 'Apakah hala tuju dan teras utama Pelan Pembangunan Pendidikan Malaysia 2026–2035 serta Kurikulum Persekolahan Baharu 2027?',
+    category: 'Umum',
+  },
+  {
     id: 'q-gb-musleh',
     label: 'Siapa Guru Besar SRI I Musleh?',
     prompt: 'Siapa guru besar Sekolah Rendah Islam I Musleh?',
     category: 'Sekolah & Pimpinan',
   },
   {
-    id: 'q-what',
-    label: 'Apakah itu MPGBSIM?',
-    prompt: 'Apakah itu MPGBSIM, sejarah penubuhan, serta visi dan misinya?',
+    id: 'q-isu-pendidikan',
+    label: 'Isu Guru, AI & Pendidikan Semasa',
+    prompt: 'Apakah pandangan Mursyid AI tentang isu beban guru, kesejahteraan pendidik, dan pemanfaatan AI dalam bilik darjah?',
     category: 'Umum',
   },
   {
     id: 'q-pimpinan',
-    label: 'Barisan Kepimpinan Pusat',
+    label: 'Barisan Kepimpinan MPGBSIM',
     prompt: 'Siapakah barisan Jawatankuasa Kepimpinan Pusat MPGBSIM sesi semasa?',
     category: 'Sekolah & Pimpinan',
   },
@@ -68,14 +86,8 @@ const QUICK_QUESTIONS: QuickQuestion[] = [
     category: 'Sekolah & Pimpinan',
   },
   {
-    id: 'q-keahlian',
-    label: 'Beza Ahli Biasa & Bersekutu',
-    prompt: 'Apakah perbezaan antara kategori Ahli Biasa (Fasal 4(2)) dan Ahli Bersekutu (Fasal 4(3)) MPGBSIM?',
-    category: 'Umum',
-  },
-  {
     id: 'q-portal',
-    label: 'Cara Log Masuk & Reset Kata Laluan PGB',
+    label: 'Portal PGB & Reset Kata Laluan',
     prompt: 'Bagaimanakah cara log masuk ke Portal Rasmi Ahli PGB dan apakah perlu dibuat jika terlupa kata laluan?',
     category: 'Portal & Yuran',
   },
@@ -86,9 +98,9 @@ const QUICK_QUESTIONS: QuickQuestion[] = [
     category: 'Portal & Yuran',
   },
   {
-    id: 'q-pendidikan',
-    label: 'Tips Kepimpinan & Pengurusan Sekolah',
-    prompt: 'Berikan panduan amalan terbaik kepimpinan instruksional Pengetua dan Guru Besar di sekolah Islam.',
+    id: 'q-sembang-santai',
+    label: 'Sembang Santai & Nasihat Mursyid',
+    prompt: 'Assalamualaikum Mursyid AI, apa khabar? Boleh kongsikan sedikit mutiara hikmah dan kata semangat untuk saya dan guru-guru hari ini?',
     category: 'Umum',
   },
 ];
@@ -176,15 +188,15 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
     () => ({
       id: 'welcome-mursyid',
       role: 'model',
-      text: `**Assalamualaikum warahmatullahi wabarakatuh & Salam Kepimpinan Pendidikan Rabbani.**\n\nSaya **Mursyid AI**, Pegawai Maya Rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.\n\nSaya dikhususkan untuk menjawab hal ehwal berkaitan:\n• **Keahlian MPGBSIM & Portal Ahli PGB** *(Pendaftaran, e-Kad, Reset Kata Laluan, Yuran HerePay)*\n• **Direktori Sekolah Islam Ahli & Kepimpinan PGB** *(Maklumat sekolah, Guru Besar & Pengetua)*\n• **Program, Takwim Rasmi Majlis & Konvensyen**\n• **Pengurusan Sekolah Islam & Kepimpinan Rabbani**\n\nAda sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?`,
+      text: `**Assalamualaikum warahmatullahi wabarakatuh & Salam Ukhuwah Sahabat Pendidik.**\n\nSaya **Mursyid AI**, rakan penasihat dan pembimbing maya rasmi bagi **Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)**.\n\nSaya sedia berborak, bertukar pandangan, dan membantu Tuan/Puan mengenai:\n• **Kepimpinan Rabbani & Falsafah Soleh wa Musleh** di sekolah Islam\n• **Menteri Pendidikan Terkini (YB Fadhlina Sidek) & Inisiatif KPM**\n• **Pelan Pembangunan Pendidikan Malaysia 2026–2035 & Kurikulum Persekolahan Baharu 2027**\n• **Isu Pendidikan Semasa, Beban Guru & Pemanfaatan AI dalam Bilik Darjah**\n• **Direktori Sekolah Ahli & PGB** *(maklumat sekolah, Guru Besar SRI I Musleh, Pengetua)*\n• **Portal Ahli PGB, e-Kad Digital & Pembayaran Yuran HerePay**\n\nBagaimana keadaan di sekolah hari ini? Ada sebarang perkara atau pandangan yang ingin kita bincangkan bersama?`,
       timestamp: new Date().toLocaleTimeString('ms-MY', {
         hour: '2-digit',
         minute: '2-digit',
       }),
       suggestedActions: [
-        { label: 'Buka Portal Ahli PGB', action: 'portal' },
+        { label: 'Kepimpinan Rabbani', action: 'kepimpinan' },
         { label: 'Direktori Sekolah Ahli', action: 'sekolah-ahli' },
-        { label: 'Bayar Yuran HerePay', action: 'bayar-yuran' },
+        { label: 'Buka Portal Ahli PGB', action: 'portal' },
       ],
     }),
     []
@@ -312,18 +324,78 @@ ${schoolLines}
     const alumni = siteData.alumni || [];
 
     const OUT_OF_SCOPE_RESPONSE =
-      'Maaf, saya Mursyid AI yang dikhususkan untuk urusan Majlis Pengetua & Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM) sahaja. Ada sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?';
+      'Alhamdulillah, terima kasih atas pertanyaan ustaz/cikgu! Saya Mursyid AI, rakan pembimbing kepimpinan pendidikan Islam di MPGBSIM. Topik yang tuan/puan tanyakan ini menarik untuk kita terokai bersama. Selain pengurusan sekolah dan direktori ahli MPGBSIM, kita juga boleh berbincang mengenai kepimpinan rabbani, falsafah soleh wa musleh, inisiatif KPM bersama Menteri Pendidikan YB Fadhlina Sidek, ataupun hala tuju Pelan Pendidikan Malaysia 2026–2035. Ada bahagian khusus yang ingin kita bincangkan lebih mendalam?';
 
-    // 0. STRICT OUT-OF-SCOPE FILTERING: Politics, entertainment, personal affairs, gossip, external finance/crypto, unrelated sports
+    // 0. EXPLICIT OUT-OF-SCOPE FILTERING: Obscene content, scams, or pure external partisan debates (never block educational policies or KPM)
+    const isEducationalTopic = /\b(pendidikan|sekolah|guru|kpm|menteri|fadhlina|rabbani|musleh|kurikulum|pelan|2026|2035|murid|pelajar|peperiksaan|tahfiz|upkk|spm|sppim|herepay|yuran|pgb|mudir|pengetua)\b/i.test(q);
     const isExplicitlyOutOfScope =
-      /\b(politik|pru|pilihan raya|parti|umno|pas|pkr|dap|bersatu|perikatan nasional|barisan nasional|pakatan harapan|calon pru|undi|kerajaan campuran|menteri kewangan|perdana menteri|kabinet|ahli parlimen|adun)\b/i.test(q) ||
-      /\b(hiburan|artis|selebriti|gossip|gosip|konsert|wayang|movie|drama|lagu|filem|pelakon|penyanyi|netflix|kpop|tiktok|tiktoker|influencer)\b/i.test(q) ||
-      /\b(umur awak|umur kamu|jodoh|dating|kahwin|cinta|girlfriend|boyfriend|peribadi saya|siapa bf|siapa gf)\b/i.test(q) ||
-      /\b(kripto|crypto|bitcoin|forex|saham bursa|skim cepat kaya|pelaburan wang)\b/i.test(q) ||
-      /\b(epl|liga inggeris|manchester united|chelsea|liverpool|arsenal|piala dunia|world cup|formula 1|f1)\b/i.test(q);
+      !isEducationalTopic && (
+        /\b(pilihan raya|parti politik|umno|pas|pkr|dap|bersatu|perikatan nasional|barisan nasional|calon pru|undi pru)\b/i.test(q) ||
+        /\b(gossip artis|konsert liar|tiktoker selebriti|filem wayang)\b/i.test(q) ||
+        /\b(kripto|crypto|bitcoin|forex|saham bursa|skim cepat kaya)\b/i.test(q) ||
+        /\b(epl|liga inggeris|manchester united|chelsea|liverpool|arsenal|piala dunia|formula 1)\b/i.test(q)
+      );
 
     if (isExplicitlyOutOfScope) {
       return OUT_OF_SCOPE_RESPONSE;
+    }
+
+    // =========================================================================
+    // 0.1 MENTERI PENDIDIKAN MALAYSIA TERKINI & INISIATIF KPM
+    // =========================================================================
+    if (
+      /\b(menteri pendidikan|menteri kpm|menteri pelajaran|fadhlina|fadhlina sidek|siapa menteri|menteri terkini)\b/i.test(q) ||
+      (/\b(menteri)\b/i.test(q) && /\b(pendidikan|kpm|sekolah|guru|malaysia)\b/i.test(q))
+    ) {
+      return `**Menteri Pendidikan Malaysia Terkini & Inisiatif KPM:**\n\nAlhamdulillah, untuk makluman ustaz/cikgu:\n\n• **Menteri Pendidikan Malaysia Terkini**: **YB Puan Fadhlina binti Sidek** (Ahli Parlimen Nibong Tebal, Menteri Pendidikan dalam Kerajaan MADANI).\n• **Timbalan Menteri Pendidikan**: **YB Wong Kah Woh**.\n\n**Hala Tuju & Pendekatan Utama KPM:**\n1. **Pendekatan Karamah Insaniah**: Memanusiakan pendidikan dengan mengangkat martabat insan, adab, sahsiah, dan integriti sebelum menuntut kecemerlangan akademik semata-mata.\n2. **7 Teras Utama KPM**: Memberi tumpuan kepada pemeliharaan kebajikan guru, membaik pulih sekolah daif, pemulihan literasi dan numerasi 3M, menangani keciciran murid, serta memperluas capaian prasarana digital.\n3. **Keterbukaan Terhadap Institusi Pendidikan Islam**: KPM bekerjasama rapat dengan Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM), Jabatan Agama Islam Negeri, dan agensi pendidikan Islam bagi memartabatkan kurikulum Dini, Tahfiz TVET, dan kualiti kepimpinan Pengetua serta Guru Besar.\n\nAda sebarang inisiatif KPM atau isu persekolahan yang ingin kita bincangkan bersama, sahabat pendidik?`;
+    }
+
+    // =========================================================================
+    // 0.2 PELAN / RANCANGAN PENDIDIKAN MALAYSIA 2026–2035 & KURIKULUM 2027
+    // =========================================================================
+    if (
+      /\b(2026 2035|2026-2035|2026–2035|2035)\b/i.test(q) ||
+      /\b(pelan pendidikan|rancangan pendidikan|pelan pembangunan pendidikan|kurikulum 2027|kurikulum baharu|pppm 2026|pppm baharu|hala tuju pendidikan)\b/i.test(q)
+    ) {
+      return `**Pelan Pembangunan Pendidikan Malaysia (2026–2035) & Kurikulum Persekolahan Baharu 2027:**\n\nMasya-Allah, ini satu topik yang sangat kritikal bagi masa hadapan anak bangsa dan institusi sekolah Islam kita:\n\nKementerian Pendidikan Malaysia (KPM) kini giat mempersiapkan **Pelan Pembangunan Pendidikan Malaysia (PPPM 2026–2035)** sebagai kesinambungan pelan strategik jangka panjang menggantikan PPPM 2013–2025 yang telah tamat.\n\n**5 Tumpuan Strategik Utama Pelan Pendidikan 2026–2035:**\n1. **Kurikulum Persekolahan Baharu 2027 (*Character-Based Curriculum*)**:\n   • Kurikulum ini menumpukan kepada pembinaan watak, sahsiah, adab, dan jati diri insani, bukan sekadar orientasi peperiksaan berpusat.\n   • Struktur pembelajaran lebih fleksibel, berkonsepkan modular dan pembelajaran berasaskan inkuiri (*inquiry-based*).\n2. **Pendidikan Digital & Kecerdasan Buatan (AI)**:\n   • Memperkasakan *Dasar Pendidikan Digital (DPD)* — setiap murid dan guru dibekalkan literasi AI generatif beretika, pemikiran komputasional, dan kemahiran digital masa depan.\n3. **Pemerkasaan STEM & Laluan TVET Seawal Sekolah Menengah**:\n   • Membuka laluan kemahiran teknikal seawal peringkat menengah rendah, termasuk integrasi **TVET Tahfiz** di sekolah Islam bagi melahirkan teknokrat dan jurutera huffaz.\n4. **Kesejahteraan Guru & Ekosistem Sekolah Sejahtera**:\n   • Mengurangkan beban perkeranian guru melalui pendigitalan sistem pengurusan berpusat, agar pendidik dapat kembali fokus mendidik jiwa murid.\n5. **Kesaksamaan Akses Pendidikan**:\n   • Merapatkan jurang infrastruktur dan kualiti pembelajaran antara sekolah bandar, luar bandar, sekolah agama rakyat (SAR), dan murid berkeperluan pendidikan khas (MBPK).\n\nBagi warga MPGBSIM, pelan 2026–2035 ini membuka peluang besar untuk memperkasa kurikulum bersepadu Diniyah-Akademik agar sekolah Islam terus menjadi pilihan utama ibu bapa di Malaysia. Bagaimana pandangan ustaz/cikgu tentang persediaan guru-guru di sekolah?`;
+    }
+
+    // =========================================================================
+    // 0.3 KEPIMPINAN RABBANI
+    // =========================================================================
+    if (
+      /\b(kepimpinan rabbani|pemimpin rabbani|konsep rabbani|ciri rabbani|rabbani leadership|ali imran 79|rabbaniyyin)\b/i.test(q) ||
+      (/\b(rabbani)\b/i.test(q) && /\b(kepimpinan|pemimpin|sekolah|pendidikan|konsep|guru|pentadbir)\b/i.test(q))
+    ) {
+      return `**Falsafah Kepimpinan Rabbani di Institusi Pendidikan Islam:**\n\nAlhamdulillah, kepimpinan Rabbani adalah roh dan nyawa kepada kewujudan MPGBSIM dan pentadbiran sekolah Islam:\n\n**Hakikat Pemimpin Rabbani (Surah Ali 'Imran: 79):**\nAllah SWT berfirman: *“Kōnū rabbāniyyīn bimā kuntum tu‘allimūnal-kitāba wa bimā kuntum tadrusūn”* — *(Jadilah kamu orang-orang Rabbani, kerana kamu sentiasa mengajarkan kitab Allah dan kerana kamu sentiasa mempelajarinya)*. Pemimpin Rabbani ialah pemimpin yang menghubungkan dirinya, barisan guru, dan anak didiknya kepada Allah SWT.\n\n**7 Teras Kepimpinan Rabbani untuk Pengetua & Guru Besar (PGB):**\n1. **Niat Ikhlas Kerana Allah (Ubudiyyah)**: Menjadikan tugasan mentadbir sekolah sebagai ibadah, ladang amal, dan amanah dakwah yang bakal dihisab di akhirat.\n2. **Qudwah Hasanah (Teladan Terpuji)**: Memimpin dengan peribadi soleh, solat berjemaah awal waktu, bertutur dengan adab, dan mendahului dalam melakukan kebaikan.\n3. **Syura yang Meraikan (*Mutual Consultation*)**: Tidak bersikap diktator atau autokratik; sebaliknya sentiasa mendengar buah fikiran barisan guru penolong kanan, panitia, dan staf sokongan.\n4. **Kepimpinan Berteraskan Rahmah (Kasih Sayang)**: Menyantuni guru-guru yang berdepan ujian keluarga atau kesihatan, serta mendidik murid dengan sentuhan hati nurani.\n5. **Amanah & Ketelusan Tadbir Urus**: Bersih daripada pecah amanah, telus dalam pengurusan dana yuran/wakaf, serta adil dalam agihan tugasan tanpa pilih kasih.\n6. **Wawasan Dwi-Dimensi (Duniawi & Ukhrawi)**: Menyasarkan kejayaan peperiksaan dan kokurikulum, tetapi keutamaan tertinggi tetap kejayaan menyelamatkan warga sekolah daripada azab api neraka.\n7. **Munajat & Tawakal**: Mengiringi setiap perancangan strategik dengan solat hajat dan doa rabitah bersama warga pendidik.\n\nMemimpin sekolah Islam menuntut kesabaran yang luar biasa, namun ganjarannya di sisi Allah adalah pahala sedekah jariah yang mengalir berterusan. Ada sebarang cabaran kepimpinan di sekolah yang ingin kita bincangkan bersama?`;
+    }
+
+    // =========================================================================
+    // 0.4 FALSAFAH SOLEH WA MUSLEH
+    // =========================================================================
+    if (
+      /\b(soleh wa musleh|soleh musleh|soleh dan musleh|apa itu musleh|falsafah musleh|muslihun|surah hud 117|musleh)\b/i.test(q)
+    ) {
+      return `**Falsafah Soleh wa Musleh — Asas Pembinaan Generasi Rabbani:**\n\nSubhanallah, konsep **Soleh wa Musleh** adalah intipati terpenting dalam falsafah pendidikan Islam, khususnya rangkaian IKRAM Musleh dan sekolah-sekolah ahli MPGBSIM:\n\n**Apakah Perbezaan Soleh dan Musleh?**\n• **Soleh (الصالح)**: Seseorang yang baik untuk dirinya sendiri — rajin solat, membaca Al-Quran, berakhlak mulia, dan menjauhi maksiat secara individu.\n• **Musleh (المصلح)**: Seseorang yang bukan sahaja baik peribadinya, bahkan **proaktif membaiki orang lain**, menyebarkan kebaikan, berani menegakkan keadilan (amar ma'ruf nahi munkar), dan memimpin perubahan positif dalam masyarakat.\n\n**Dalil Keutamaan Golongan Musleh (Surah Hud: 117):**\nAllah SWT berfirman:\n*“Wa mā kāna Rabbuka liyuhlikal-qurā bizulmin wa ahluhā muṣliḥūn”*\n*(Dan Tuhanmu tidak sekali-kali membinasakan mana-mana negeri secara zalim, sedangkan penduduknya adalah orang-orang yang muslihun [sentiasa melakukan pembaikan]).*\n\nPara ulama tafsir menyatakan: Allah SWT tidak menyebut *‘wa ahluhā ṣāliḥūn’* (orang soleh), kerana orang soleh sahaja belum tentu dapat menyelamatkan sesuatu kaum jika mereka diam membiarkan kerosakan. Tetapi golongan **Musleh** yang turun ke gelanggang membaiki ummahlah yang menjadi benteng perlindungan masyarakat!\n\n**Aplikasi di Sekolah Islam:**\n1. Murid tidak dididik untuk menjadi 'ulat buku' yang mementingkan diri sendiri, sebaliknya dilatih memimpin persatuan, berbakti kepada komuniti, dan peduli nasib umat Islam sedunia.\n2. Guru bertindak sebagai *murabbi musleh* yang menanam jiwa dakwah, keberanian moral, dan integriti tinggi ke dalam diri setiap anak didik.\n\nInilah misi sebenar MPGBSIM — bukan sekadar mengejar deretan gred A, tetapi mencetak generasi yang membawa obor kebenaran kepada tamadun Malaysia dan dunia Islam!`;
+    }
+
+    // =========================================================================
+    // 0.5 ISU-ISU PENDIDIKAN TERKINI & KESEJAHTERAAN GURU
+    // =========================================================================
+    if (
+      /\b(isu pendidikan|isu semasa|isu terkini|beban guru|burnout|buli|disiplin|literasi 3m|keciciran|tvet tahfiz|ai bilik darjah)\b/i.test(q) ||
+      (/\b(isu|cabaran)\b/i.test(q) && /\b(pendidikan|guru|sekolah|murid|kpm)\b/i.test(q))
+    ) {
+      return `**Sorotan Isu-Isu Pendidikan Semasa & Cabaran Warga Pendidik:**\n\nBercakap mengenai realiti dunia pendidikan hari ini, memang banyak isu mencabar yang menuntut kebijaksanaan kita bersama:\n\n**1. Kesejahteraan Emosi Guru & Beban Tugas Pentadbiran:**\n• Isu *burnout* dan tekanan guru akibat pelbagai aplikasi sistem pelaporan digital yang bertindih.\n• **Pandangan Mursyid**: Pihak pengurusan sekolah perlu mengamalkan kepimpinan instruksional yang melindungi masa mengajar guru (*protecting instructional time*). Pengetua & Guru Besar wajar mengoptimumkan pembantu pentadbiran dan teknologi AI bagi mengurangkan beban kertas kerja.\n\n**2. Integrasi AI & Teknologi Digital dalam PdP:**\n• AI bukan pengganti guru, sebaliknya alat pemangkin (*co-pilot*). Guru boleh memanfaatkan AI untuk membina RPH kreatif, pembezaan bahan mengajar (differentiated learning), dan modul pentaksiran KBAT, sementara guru memberi tumpuan kepada sentuhan manusia (*human touch*) dan pembentukan adab.\n\n**3. Isu Sahsiah, Adab & Pencegahan Buli:**\n• Pengaruh media sosial, gajet tanpa kawalan, dan kemerosotan adab murid menuntut sekolah memperkukuh modul sahsiah, usrah sekolah, pengawasan asrama, dan jalinan erat bersama Persatuan Ibu Bapa dan Guru (PIBG).\n\n**4. Pengukuhan Literasi Asas 3M (Membaca, Menulis, Mengira):**\n• Program intervensi awal bagi murid Tahun 1 perlu dilaksanakan dengan penuh kasih sayang tanpa melabelkan murid secara negatif.\n\n**5. Pemerkasaan TVET Tahfiz di Sekolah Islam:**\n• Trend positif di mana maahad tahfiz dan sekolah Islam mula mengintegrasikan kemahiran teknikal (kejuruteraan, dron, robotik, pertanian moden) bagi melahirkan huffaz profesional.\n\nBagaimana suasana di sekolah ustaz/cikgu ketika ini? Apakah isu paling mendesak yang sedang dihadapi bersama guru-guru?`;
+    }
+
+    // =========================================================================
+    // 0.6 SEMBANG SANTAI, APA KHABAR & MOTIVASI PENDIDIK
+    // =========================================================================
+    if (
+      /\b(apa khabar|khabar|penat|letih|stres|stress|nak borak|berborak|jom borak|tazkirah|nasihat|mutiara kata|semangat|luahan)\b/i.test(q)
+    ) {
+      return `**Alhamdulillah, salam penuh ukhuwah sahabat pendidik.**\n\nKhabar baik di sini, sentiasa mendoakan kesejahteraan dan keberkatan buat ustaz, ustazah, cikgu dan seluruh keluarga besar sekolah!\n\nBagaimana keadaan di sekolah hari ini? Kadang-kadang perjalanan sebagai seorang pentadbir dan guru memang penuh cabaran yang memenatkan — menguruskan guru, kerenah murid, harapan ibu bapa, dan urusan pentadbiran yang tidak pernah putus.\n\n**Mutiara Hikmah Untukmu Hari Ini:**\n*“Ingatlah bahawa lelah seorang pendidik itu adalah lillah. Setiap peluh, keletihan, dan kata-kata nasihat yang kita curahkan kepada anak-anak murid tidak akan pernah sia-sia di sisi Allah SWT.”*\n\nRasulullah SAW bersabda bahawa para malaikat, bahkan ikan-ikan di lautan dan semut di dalam sarangnya mendoakan kebaikan bagi mereka yang mengajarkan kebaikan kepada manusia.\n\nTarik nafas dalam-dalam, senyum, dan serahkan segala urusan kepada Allah selepas berusaha. Saya di sini sedia menemani ustaz/cikgu — sama ada untuk berbincang hal pentadbiran, isu pendidikan, atau sekadar bersembang santai. Ada apa-apa yang terbuku di hati?`;
     }
 
     // =========================================================================
@@ -985,16 +1057,9 @@ ${schoolLines}
     }
 
     // =========================================================================
-    // Q. STRICT DECLINE FOR OUT-OF-SCOPE / UNRELATED TOPICS
+    // Q. RAMAH & TERBUKA UNTUK PERBUALAN (BUKAN ROBOT STANDARD)
     // =========================================================================
-    const isRelatedToMpgbOrSchool =
-      /\b(mpgbsim|sekolah|pgb|guru|pengetua|mudir|pendidikan|murid|pelajar|kurikulum|kpm|mieb|jabatan agama|jain|main|yuran|keahlian|portal|takwim|program|majlis|tarbiah|surat|kertas kerja|ucapan|doa|kepimpinan|islam|peperiksaan|spm|upkk|sppim)\b/i.test(q);
-
-    if (!isRelatedToMpgbOrSchool) {
-      return OUT_OF_SCOPE_RESPONSE;
-    }
-
-    return `**Panduan Urusan MPGBSIM & Pengurusan Sekolah Islam:**\n\nBerikut ialah maklumat berkaitan pertanyaan Tuan/Puan:\n\n• **Fokus Rujukan**: Bagi urusan rasmi MPGBSIM dan pengurusan sekolah Islam, Tuan/Puan boleh mendapatkan maklumat lanjut melalui modul-modul berikut:\n  - **Maklumat Spesifik Sekolah**: Taip nama sekolah seperti *"Siapa guru besar Sekolah Rendah Islam I Musleh?"* (Jawapan: **Abdul Qayyum bin Yaakop**).\n  - **Keahlian & Portal PGB**: Semak syarat keahlian Fasal 4 atau log masuk portal ahli.\n  - **Takwim & Program Majlis**: Rujuk program dan konvensyen kebangsaan yang tersenarai.\n\nAda sebarang pertanyaan mengenai keahlian, takwim, atau program majlis yang boleh saya bantu?`;
+    return `**Alhamdulillah, terima kasih atas perkongsian ustaz/cikgu.**\n\nSebagai rakan pembimbing di MPGBSIM, saya sentiasa sedia berborak dan bertukar fikiran mengenai:\n• **Kepimpinan Rabbani & Falsafah Soleh wa Musleh** di sekolah Islam\n• **Menteri Pendidikan YB Fadhlina Sidek & Inisiatif Terkini KPM**\n• **Pelan Pembangunan Pendidikan Malaysia 2026–2035 & Kurikulum 2027**\n• **Isu Pengurusan Sekolah, Beban Guru, TVET Tahfiz & AI Bilik Darjah**\n• **Direktori Sekolah Ahli (cth: SRI I Musleh), Portal PGB & Yuran HerePay**\n\nAda sebarang perkara atau pandangan yang ingin kita bincangkan bersama, sahabat pendidik?`;
   };
 
   const detectSuggestedActions = (

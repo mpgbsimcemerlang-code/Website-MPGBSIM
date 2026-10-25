@@ -579,7 +579,30 @@ export type FeeCategory =
   | 'YURAN_PENDAFTARAN_BARU'
   | 'YURAN_KONVENSYEN_KPSI'
   | 'SUMBANGAN_DANA_WAKAF'
-  | 'LAIN_LAIN';
+  | 'LAIN_LAIN'
+  | (string & {});
+
+export interface FeeCategoryItem {
+  id: string;
+  code: string;
+  name: string;
+  shortName: string;
+  amount: number;
+  membershipType: 'Semua' | 'Ahli Biasa' | 'Ahli Bersekutu' | 'Lain-lain';
+  enrollmentCriteria?: string;
+  description?: string;
+  clause?: string;
+  academicSession?: string;
+  badge?: string;
+  badgeColor?: string;
+  gatewayUrl?: string;
+  features?: string[];
+  isActive: boolean;
+  order?: number;
+  isCustom?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export interface FeePaymentRecord {
   id: string;
@@ -598,12 +621,16 @@ export interface FeePaymentRecord {
   paymentDate: string;
   status: 'BERJAYA' | 'DALAM_SEMAKAN' | 'DIBATALKAN';
   receiptUrl?: string;
+  paymentProofUrl?: string; // Bukti bayaran / slip transaksi / screenshot DuitNow
+  proofFileName?: string;
+  proofUploadedAt?: string;
   notes?: string;
   academicSession: string;
   gateway: 'HerePay' | 'Manual';
   gatewayUrl?: string;
   verifiedBy?: string;
   verifiedAt?: string;
+  rejectionReason?: string;
   createdAt: string;
   updatedAt?: string;
 }
