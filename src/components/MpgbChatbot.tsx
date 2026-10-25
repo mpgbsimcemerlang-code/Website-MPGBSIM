@@ -14,6 +14,12 @@ import {
   Copy,
   Check,
   MessageCircleQuestion,
+  Sparkles,
+  Smile,
+  Volume2,
+  VolumeX,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import {
   useAdminContent,
@@ -23,6 +29,14 @@ import {
 import { useMemberPortal } from '../context/MemberPortalContext';
 import { MPGBSIM_FAQ_LIST } from './FAQSection';
 import { MemberSchool, LeaderProfile } from '../types';
+import {
+  MursyidAnimatedCharacter,
+  MursyidEmotion,
+  analyzeMursyidSentiment,
+  SentimentAnalysisResult,
+  speakMursyidVoice,
+  stopMursyidVoice,
+} from './MursyidAnimatedCharacter';
 
 export interface ChatMessage {
   id: string;
@@ -148,6 +162,16 @@ export const MpgbChatbot: React.FC<MpgbChatbotProps> = ({
   const [activeCategory, setActiveCategory] = useState<
     'Semua' | 'Umum' | 'Sekolah & Pimpinan' | 'Portal & Yuran'
   >('Semua');
+  const [avatarEmotion, setAvatarEmotion] = useState<MursyidEmotion>('waving');
+  const [activeSentimentInfo, setActiveSentimentInfo] = useState<SentimentAnalysisResult>(() =>
+    analyzeMursyidSentiment('Assalamualaikum')
+  );
+  const [showAvatarStage, setShowAvatarStage] = useState<boolean>(true);
+  const [autoVoiceEnabled, setAutoVoiceEnabled] = useState<boolean>(true);
+  const [isVoiceSpeaking, setIsVoiceSpeaking] = useState<boolean>(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [isListeningMic, setIsListeningMic] = useState<boolean>(false);
+  const recognitionRef = useRef<any>(null);
 
   // Merge live schools with default schools so key schools like SEKOLAH RENDAH ISLAM I MUSLEH are always present
   const allSchools: MemberSchool[] = useMemo(() => {
@@ -1099,9 +1123,19 @@ ${schoolLines}
       }),
     };
 
+    // Analyze user input sentiment immediately so Mursyid AI reacts to the user's tone
+    const userSentiment = analyzeMursyidSentiment(trimmed);
+    setActiveSentimentInfo(userSentiment);
+
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
+    // If user input is serious or empathetic, immediately adopt that posture; otherwise enter thinking state
+    setAvatarEmotion(
+      userSentiment.emotion === 'serious' || userSentiment.emotion === 'empathetic'
+        ? userSentiment.emotion
+        : 'thinking'
+    );
 
     try {
       const historyPayload = messages
@@ -1132,8 +1166,16 @@ ${schoolLines}
         replyText = buildLocalFallbackAnswer(trimmed);
       }
 
+      // Determine final state-based emotion prioritizing user input sentiment + reply context
+      const combinedSentiment =
+        userSentiment.emotion !== 'neutral'
+          ? userSentiment
+          : analyzeMursyidSentiment(`${trimmed} ${replyText}`);
+      setActiveSentimentInfo(combinedSentiment);
+
+      const newBotMsgId = `bot-${Date.now()}`;
       const botMsg: ChatMessage = {
-        id: `bot-${Date.now()}`,
+        id: newBotMsgId,
         role: 'model',
         text: replyText,
         timestamp: new Date().toLocaleTimeString('ms-MY', {
@@ -1144,10 +1186,35 @@ ${schoolLines}
       };
 
       setMessages((prev) => [...prev, botMsg]);
+
+      if (autoVoiceEnabled) {
+        setAvatarEmotion('speaking');
+        setSpeakingMsgId(newBotMsgId);
+        speakMursyidVoice(replyText, combinedSentiment.emotion, {
+          onStart: () => setIsVoiceSpeaking(true),
+          onEnd: () => {
+            setIsVoiceSpeaking(false);
+            setSpeakingMsgId(null);
+            setAvatarEmotion(combinedSentiment.emotion);
+          },
+        });
+      } else {
+        setAvatarEmotion('speaking');
+        setTimeout(() => {
+          setAvatarEmotion(combinedSentiment.emotion);
+        }, 2400);
+      }
     } catch {
       const fallbackReply = buildLocalFallbackAnswer(trimmed);
+      const fallbackSentiment =
+        userSentiment.emotion !== 'neutral'
+          ? userSentiment
+          : analyzeMursyidSentiment(`${trimmed} ${fallbackReply}`);
+      setActiveSentimentInfo(fallbackSentiment);
+
+      const newBotMsgId = `bot-${Date.now()}`;
       const botMsg: ChatMessage = {
-        id: `bot-${Date.now()}`,
+        id: newBotMsgId,
         role: 'model',
         text: fallbackReply,
         timestamp: new Date().toLocaleTimeString('ms-MY', {
@@ -1157,8 +1224,115 @@ ${schoolLines}
         suggestedActions: detectSuggestedActions(`${trimmed} ${fallbackReply}`),
       };
       setMessages((prev) => [...prev, botMsg]);
+
+      if (autoVoiceEnabled) {
+        setAvatarEmotion('speaking');
+        setSpeakingMsgId(newBotMsgId);
+        speakMursyidVoice(fallbackReply, fallbackSentiment.emotion, {
+          onStart: () => setIsVoiceSpeaking(true),
+          onEnd: () => {
+            setIsVoiceSpeaking(false);
+            setSpeakingMsgId(null);
+            setAvatarEmotion(fallbackSentiment.emotion);
+          },
+        });
+      } else {
+        setAvatarEmotion('speaking');
+        setTimeout(() => {
+          setAvatarEmotion(fallbackSentiment.emotion);
+        }, 2400);
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Speak or stop a specific message bubble
+  const handleToggleSpeakMessage = (msgId: string, text: string) => {
+    if (speakingMsgId === msgId && isVoiceSpeaking) {
+      stopMursyidVoice();
+      setIsVoiceSpeaking(false);
+      setSpeakingMsgId(null);
+      setAvatarEmotion(activeSentimentInfo.emotion);
+      return;
+    }
+
+    const msgSentiment = analyzeMursyidSentiment(text);
+    setActiveSentimentInfo(msgSentiment);
+    setAvatarEmotion('speaking');
+    setSpeakingMsgId(msgId);
+    speakMursyidVoice(text, msgSentiment.emotion, {
+      onStart: () => setIsVoiceSpeaking(true),
+      onEnd: () => {
+        setIsVoiceSpeaking(false);
+        setSpeakingMsgId(null);
+        setAvatarEmotion(msgSentiment.emotion);
+      },
+    });
+  };
+
+  // Toggle microphone Speech-to-Text (Bahasa Melayu) so user can talk to Mursyid AI
+  const handleToggleMicInput = () => {
+    if (isListeningMic) {
+      recognitionRef.current?.stop?.();
+      setIsListeningMic(false);
+      return;
+    }
+
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      handleInputChange('Assalamualaikum Mursyid AI, apa khabar hari ini?');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.lang = 'ms-MY';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognitionRef.current = recognition;
+
+      recognition.onstart = () => {
+        stopMursyidVoice();
+        setIsListeningMic(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        handleInputChange(transcript);
+      };
+
+      recognition.onend = () => {
+        setIsListeningMic(false);
+      };
+
+      recognition.onerror = () => {
+        setIsListeningMic(false);
+      };
+
+      recognition.start();
+    } catch {
+      setIsListeningMic(false);
+    }
+  };
+
+  // Real-time input sentiment handler: updates Mursyid AI's facial expression & body language as user types
+  const handleInputChange = (val: string) => {
+    setInput(val);
+    if (!isLoading && !isVoiceSpeaking) {
+      if (val.trim().length >= 3) {
+        const liveSentiment = analyzeMursyidSentiment(val);
+        setActiveSentimentInfo(liveSentiment);
+        setAvatarEmotion(liveSentiment.emotion);
+      } else if (val.trim().length === 0) {
+        const neutralState = analyzeMursyidSentiment('');
+        setActiveSentimentInfo(neutralState);
+        setAvatarEmotion('neutral');
+      }
     }
   };
 
@@ -1168,6 +1342,12 @@ ${schoolLines}
   };
 
   const handleResetChat = () => {
+    stopMursyidVoice();
+    setIsVoiceSpeaking(false);
+    setSpeakingMsgId(null);
+    const initialSentiment = analyzeMursyidSentiment('Assalamualaikum');
+    setActiveSentimentInfo(initialSentiment);
+    setAvatarEmotion('waving');
     setMessages([
       {
         ...initialGreeting,
@@ -1276,18 +1456,17 @@ ${schoolLines}
         <div className="fixed bottom-20 right-5 z-40 flex flex-col items-end gap-2">
           <button
             type="button"
-            onClick={() => setIsOpen(true)}
+            onClick={() => {
+              setIsOpen(true);
+              setAvatarEmotion('waving');
+            }}
             aria-label="Tanya Mursyid AI - Chatbot Rasmi MPGBSIM"
             className="group flex items-center gap-3 pl-2.5 pr-4 py-2 rounded-2xl bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 hover:from-teal-800 hover:to-slate-800 text-white shadow-2xl border border-amber-400/60 hover:border-amber-300 transition-all duration-200 hover:scale-[1.03] cursor-pointer"
           >
-            {/* Character Avatar Image */}
-            <div className="relative w-12 h-12 rounded-xl bg-amber-400/20 border-2 border-amber-400/80 flex items-center justify-center shadow-md shrink-0 overflow-visible">
-              <img
-                src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
-                alt="Karakter Mursyid AI - Chatbot Pintar MPGBSIM"
-                className="w-full h-full rounded-[10px] object-cover object-top"
-              />
-              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            {/* Animated 3D Character Avatar (Waving & Blinking) */}
+            <div className="relative flex items-center justify-center shrink-0">
+              <MursyidAnimatedCharacter size="xs" emotion="waving" />
+              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 z-20">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900" />
               </span>
@@ -1295,15 +1474,16 @@ ${schoolLines}
 
             <div className="text-left">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-extrabold tracking-tight text-white">
-                  Tanya Mursyid AI
+                <span className="text-xs sm:text-sm font-extrabold tracking-tight text-white flex items-center gap-1">
+                  <span>Tanya Mursyid AI</span>
+                  <span className="inline-block animate-bounce text-xs">👋</span>
                 </span>
                 <span className="text-[10px] font-bold text-amber-300">
                   · MPGBSIM
                 </span>
               </div>
               <p className="text-[11px] text-teal-200 leading-tight">
-                Pembantu Pintar Serba Boleh
+                Watak 3D Beranimasi & Pintar
               </p>
             </div>
           </button>
@@ -1317,39 +1497,77 @@ ${schoolLines}
           className={`fixed z-50 transition-all duration-200 flex flex-col bg-white border border-slate-200 shadow-2xl overflow-hidden ${
             isExpanded
               ? 'inset-3 sm:inset-6 rounded-3xl'
-              : 'bottom-4 right-4 left-4 sm:left-auto sm:w-[430px] h-[640px] max-h-[88vh] rounded-3xl'
+              : 'bottom-4 right-4 left-4 sm:left-auto sm:w-[440px] h-[670px] max-h-[90vh] rounded-3xl'
           }`}
         >
           {/* Header: Character Persona "Mursyid AI" */}
-          <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-teal-900 text-white px-5 py-4 flex items-center justify-between gap-3 border-b border-teal-800/60 shrink-0">
+          <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-teal-900 text-white px-5 py-3 flex items-center justify-between gap-3 border-b border-teal-800/60 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="relative w-12 h-12 rounded-2xl bg-amber-400/20 border-2 border-amber-400/80 flex items-center justify-center shadow-md shrink-0">
-                <img
-                  src="/assets/aistudio/Gemini_Generated_Image_nyb83tnyb83tnyb8_b2aa451c.jpeg"
-                  alt="Mursyid AI - Chatbot Pintar MPGBSIM"
-                  className="w-full h-full rounded-[14px] object-cover object-top"
+              <div className="relative flex items-center justify-center shrink-0">
+                <MursyidAnimatedCharacter
+                  size="xs"
+                  emotion={avatarEmotion}
+                  isSpeaking={isLoading || isVoiceSpeaking || avatarEmotion === 'speaking'}
                 />
                 <span
-                  className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900"
-                  title="Mursyid AI Aktif"
+                  className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 z-20"
+                  title="Mursyid AI 3D Beranimasi Aktif"
                 />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h2 className="text-base font-extrabold text-white tracking-tight truncate">
-                    Mursyid AI
+                    Mursyid AI 3D
                   </h2>
                   <span className="text-[11px] font-semibold text-amber-300 shrink-0">
-                    · Pembantu Pintar MPGBSIM
+                    · Boleh Bercakap & Beremosi
                   </span>
                 </div>
-                <p className="text-xs text-teal-200/90 truncate">
-                  Jawab Semua Soalan: Sekolah Ahli, PGB, Pendidikan & Umum
+                <p className="text-xs text-teal-200/90 truncate flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>
+                    {isVoiceSpeaking
+                      ? '🔊 Sedang Bercakap...'
+                      : `Emosi 3D: ${avatarEmotion.toUpperCase()}`}
+                  </span>
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (autoVoiceEnabled) {
+                    stopMursyidVoice();
+                    setIsVoiceSpeaking(false);
+                    setSpeakingMsgId(null);
+                  }
+                  setAutoVoiceEnabled((prev) => !prev);
+                }}
+                className={`px-2 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                  autoVoiceEnabled
+                    ? 'bg-amber-400 text-slate-950 shadow-xs'
+                    : 'bg-white/10 text-slate-300 hover:text-white'
+                }`}
+                title={
+                  autoVoiceEnabled
+                    ? 'Suara Mursyid AI Aktif (Klik untuk senyapkan)'
+                    : 'Aktifkan Suara Mursyid AI'
+                }
+              >
+                {autoVoiceEnabled ? (
+                  <>
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Suara ON</span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Senyap</span>
+                  </>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={handleResetChat}
@@ -1374,7 +1592,12 @@ ${schoolLines}
               </button>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  stopMursyidVoice();
+                  setIsVoiceSpeaking(false);
+                  setSpeakingMsgId(null);
+                  setIsOpen(false);
+                }}
                 className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-rose-600/80 transition cursor-pointer"
                 title="Tutup Mursyid AI"
                 aria-label="Tutup Mursyid AI"
@@ -1382,6 +1605,51 @@ ${schoolLines}
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+
+          {/* Pentas Karakter 3D Asal Mursyid AI (Interactive Emotion & Gesture Stage) */}
+          <div className="bg-gradient-to-b from-slate-950 via-teal-950 to-slate-900 px-4 py-2.5 border-b border-teal-800/40 flex flex-col items-center justify-center shrink-0">
+            <div className="w-full flex items-center justify-between text-[11px] font-bold text-amber-300 mb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" style={{ animationDuration: '6s' }} />
+                <span>Watak 3D Asal Mursyid AI (Boleh Bercakap & Beremosi)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAvatarStage((prev) => !prev)}
+                className="text-[10px] text-teal-300 hover:text-white underline cursor-pointer"
+              >
+                {showAvatarStage ? 'Sembunyikan Pentas ▲' : 'Paparkan Watak 3D ▼'}
+              </button>
+            </div>
+
+            {showAvatarStage && (
+              <div className="w-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+                <MursyidAnimatedCharacter
+                  size={isExpanded ? 'lg' : 'md'}
+                  emotion={avatarEmotion}
+                  isSpeaking={isLoading || isVoiceSpeaking || avatarEmotion === 'speaking'}
+                  interactive={true}
+                  showEmotionBar={true}
+                  sentimentInfo={activeSentimentInfo}
+                  onEmotionChange={(newEmotion) => {
+                    setAvatarEmotion(newEmotion);
+                    const sampleMap: Record<MursyidEmotion, string> = {
+                      idle: '',
+                      neutral: '',
+                      happy: 'alhamdulillah gembira',
+                      serious: 'serius tegas disiplin',
+                      empathetic: 'sedih penat prihatin',
+                      thinking: 'analisis bagaimana',
+                      waving: 'assalamualaikum salam',
+                      inspiring: 'kepimpinan rabbani soleh wa musleh',
+                      speaking: '',
+                    };
+                    setActiveSentimentInfo(analyzeMursyidSentiment(sampleMap[newEmotion] || ''));
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Quick Topic Filter Bar */}
@@ -1456,25 +1724,49 @@ ${schoolLines}
                       {isBot && (
                         <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-slate-100 text-[11px] text-slate-400">
                           <span className="font-bold text-teal-800">
-                            Mursyid AI · Pembantu Pintar MPGBSIM
+                            Mursyid AI · Pembimbing Maya MPGBSIM
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(msg.id, msg.text)}
-                            className="inline-flex items-center gap-1 text-slate-400 hover:text-teal-700 transition cursor-pointer"
-                            title="Salin Jawapan"
-                          >
-                            {copiedId === msg.id ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-600" />
-                                <span className="text-[10px] text-emerald-600 font-semibold">
-                                  Disalin
-                                </span>
-                              </>
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSpeakMessage(msg.id, msg.text)}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] transition cursor-pointer ${
+                                speakingMsgId === msg.id && isVoiceSpeaking
+                                  ? 'bg-rose-500 text-white animate-pulse'
+                                  : 'bg-amber-100 hover:bg-amber-200 text-amber-900'
+                              }`}
+                              title="Dengar Mursyid AI membacakan jawapan ini"
+                            >
+                              {speakingMsgId === msg.id && isVoiceSpeaking ? (
+                                <>
+                                  <VolumeX className="w-3 h-3" />
+                                  <span>Henti Suara</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Volume2 className="w-3 h-3" />
+                                  <span>Dengar Suara</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyText(msg.id, msg.text)}
+                              className="inline-flex items-center gap-1 text-slate-400 hover:text-teal-700 transition cursor-pointer"
+                              title="Salin Jawapan"
+                            >
+                              {copiedId === msg.id ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span className="text-[10px] text-emerald-600 font-semibold">
+                                    Disalin
+                                  </span>
+                                </>
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
                         </div>
                       )}
 
@@ -1543,20 +1835,57 @@ ${schoolLines}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Form Footer */}
+          {/* Input Form Footer with Live Sentiment Detection Bar & Voice Mic */}
           <form
             onSubmit={handleFormSubmit}
-            className="p-3.5 bg-white border-t border-slate-200 shrink-0"
+            className="p-3 bg-white border-t border-slate-200 shrink-0 space-y-2"
           >
-            <div className="flex items-center gap-2">
+            {/* Live Sentiment & Body Language Status Bar */}
+            <div className="flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px]">
+              <div className="flex items-center gap-1.5 font-bold text-teal-900 truncate">
+                <Smile className="w-3 h-3 text-teal-700 shrink-0" />
+                <span>Sentimen Dikesan:</span>
+                <span className="px-1.5 py-0.5 rounded bg-teal-900 text-amber-300 font-extrabold">
+                  {activeSentimentInfo.sentimentCategory}
+                </span>
+              </div>
+              <span className="text-slate-500 truncate hidden sm:inline">
+                {activeSentimentInfo.facialExpressionLabel}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleToggleMicInput}
+                disabled={isLoading}
+                title={
+                  isListeningMic
+                    ? 'Sedang mendengar suara anda... (Klik untuk berhenti)'
+                    : 'Bercakap terus dengan Mursyid AI menggunakan mikrofon'
+                }
+                aria-label="Mikrofon Suara"
+                className={`p-2.5 rounded-xl font-bold transition cursor-pointer shrink-0 border ${
+                  isListeningMic
+                    ? 'bg-rose-600 text-white border-rose-600 animate-pulse'
+                    : 'bg-slate-100 hover:bg-teal-50 text-teal-900 border-slate-200'
+                }`}
+              >
+                {isListeningMic ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Tanya apa sahaja soalan (cth: Siapa Guru Besar SRI I Musleh?)..."
+                onChange={(e) => handleInputChange(e.target.value)}
+                placeholder={
+                  isListeningMic
+                    ? 'Sila bercakap sekarang (Bahasa Melayu)...'
+                    : 'Taip atau tekan mikrofon untuk bercakap dengan Mursyid AI...'
+                }
                 disabled={isLoading}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-teal-700 outline-none transition disabled:opacity-60"
+                className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-teal-700 outline-none transition disabled:opacity-60"
               />
               <button
                 type="submit"

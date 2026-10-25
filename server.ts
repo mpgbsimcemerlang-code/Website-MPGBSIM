@@ -681,6 +681,94 @@ PANDUAN MENJAWAB:
   app.post('/api/mpgb-chat', handleChatRequest);
   app.post('/api/chat', handleChatRequest);
 
+  // 4. Server-side Gemini TTS Endpoint ("Suara Mursyid AI - Bahasa Melayu")
+  app.post('/api/mpgb-tts', async (req, res) => {
+    try {
+      const rawText = String(req.body?.text || '').trim();
+      const emotion = String(req.body?.emotion || 'neutral').trim();
+      if (!rawText) {
+        res.status(400).json({ error: 'Tiada teks untuk dituturkan.' });
+        return;
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || Date.now() < geminiCreditDepletedUntil) {
+        res.status(200).json({ audioBase64: '', fallback: true });
+        return;
+      }
+
+      // Clean markdown symbols and keep speech concise & natural
+      const cleanSpeechText = rawText
+        .replace(/\*\*/g, '')
+        .replace(/[*#_`~>•]/g, ' ')
+        .replace(/https?:\/\/\S+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 750);
+
+      const styleByEmotion: Record<string, string> = {
+        happy: 'Warm, cheerful, friendly Malaysian Malay male educator and mentor',
+        waving: 'Welcoming, polite, warm Malaysian Malay male voice greeting a colleague',
+        serious: 'Authoritative, calm, composed, firm Malaysian Malay school principal',
+        empathetic: 'Gentle, compassionate, comforting, empathetic Malaysian Malay mentor',
+        inspiring: 'Inspiring, passionate, visionary Malaysian Malay Islamic education leader',
+        thinking: 'Thoughtful, articulate, analytical Malaysian Malay advisor',
+        neutral: 'Natural, clear, friendly Malaysian Malay male educator',
+      };
+
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+      });
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash-lite-tts',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: cleanSpeechText,
+                speechMetadata: {
+                  style: styleByEmotion[emotion] || styleByEmotion.neutral,
+                },
+              } as any,
+            ],
+          },
+        ],
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Charon' },
+            },
+          },
+        },
+      });
+
+      const base64Audio =
+        response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+
+      res.status(200).json({
+        audioBase64: base64Audio,
+        mimeType: 'audio/wav',
+        fallback: !base64Audio,
+      });
+    } catch (err: any) {
+      const errMsg = String(err?.message || err || '');
+      if (
+        err?.status === 402 ||
+        err?.status === 429 ||
+        errMsg.includes('402') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('prepayment credits')
+      ) {
+        geminiCreditDepletedUntil = Date.now() + 10 * 60_000;
+      }
+      res.status(200).json({ audioBase64: '', fallback: true });
+    }
+  });
+
   if (!isProd) {
     const disableHmr = process.env.DISABLE_HMR === 'true';
     const vitePromise = import('vite').then(({ createServer: createViteServer }) =>
