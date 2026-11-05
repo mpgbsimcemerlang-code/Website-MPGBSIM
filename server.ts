@@ -722,20 +722,38 @@ PANDUAN MENJAWAB:
       const chunks = splitMalayTextIntoChunks(cleanText, 175);
       const buffers: Buffer[] = [];
 
+      // Try client=gtx endpoint first (open translation API that works reliably on Vercel datacenter IPs)
+      const ttsUrls = [
+        (c: string) => `https://translate.google.com/translate_tts?ie=UTF-8&tl=ms&client=gtx&q=${encodeURIComponent(c)}`,
+        (c: string) => `https://translate.google.co.id/translate_tts?ie=UTF-8&tl=ms&client=gtx&q=${encodeURIComponent(c)}`,
+        (c: string) => `https://translate.google.com/translate_tts?ie=UTF-8&tl=ms&client=tw-ob&q=${encodeURIComponent(c)}`,
+      ];
+
       for (const chunk of chunks) {
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ms&client=tw-ob&q=${encodeURIComponent(
-          chunk
-        )}`;
-        const resp = await fetch(url, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          },
-        });
-        if (resp.ok) {
-          const arrBuf = await resp.arrayBuffer();
-          buffers.push(Buffer.from(arrBuf));
+        let chunkFetched = false;
+        for (const getUrl of ttsUrls) {
+          try {
+            const url = getUrl(chunk);
+            const resp = await fetch(url, {
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Referer': 'https://translate.google.com/',
+              },
+            });
+            if (resp.ok) {
+              const arrBuf = await resp.arrayBuffer();
+              if (arrBuf.byteLength > 200) {
+                buffers.push(Buffer.from(arrBuf));
+                chunkFetched = true;
+                break;
+              }
+            }
+          } catch {
+            // Try next URL mirror
+          }
         }
+        if (!chunkFetched) break;
       }
 
       if (buffers.length === 0) return '';
@@ -750,12 +768,14 @@ PANDUAN MENJAWAB:
     try {
       const rawText = String(req.body?.text || '').trim();
       const emotion = String(req.body?.emotion || 'neutral').trim();
+      const voiceOption = String(req.body?.voiceOption || 'fenrir').toLowerCase().trim();
+
       if (!rawText) {
         res.status(400).json({ error: 'Tiada teks untuk dituturkan.' });
         return;
       }
 
-      // Clean markdown symbols and keep speech concise & natural
+      // Clean markdown symbols, expand abbreviations & keep speech concise & natural
       const cleanSpeechText = rawText
         .replace(/\*\*/g, '')
         .replace(/[*#_`~>•]/g, ' ')
@@ -765,55 +785,67 @@ PANDUAN MENJAWAB:
         .replace(/\bPGB\b/g, 'Pengetua dan Guru Besar')
         .replace(/\bKPM\b/g, 'K P M')
         .replace(/\bSRI\b/g, 'Sekolah Rendah Islam')
+        .replace(/\bSMA\b/g, 'Sekolah Menengah Agama')
+        .replace(/\bSMKA\b/g, 'Sekolah Menengah Kebangsaan Agama')
+        .replace(/\bYB\b/g, 'Yang Berhormat')
+        .replace(/\bAI\b/g, 'A I')
         .replace(/\s+/g, ' ')
         .trim()
         .slice(0, 680);
 
+      // If user selected 'local-deep', bypass Gemini prebuilt TTS directly to local neural DSP baritone stream
+      if (voiceOption === 'local-deep') {
+        const mp3Base64 = await fetchMalayTtsBuffer(cleanSpeechText);
+        if (mp3Base64) {
+          res.status(200).json({
+            audioBase64: mp3Base64,
+            mimeType: 'audio/mpeg',
+            voiceSource: 'malay-neural-dsp',
+            needsMaleDsp: true,
+            voiceOption: 'local-deep',
+            fallback: false,
+          });
+          return;
+        }
+      }
+
       const apiKey = process.env.GEMINI_API_KEY;
       if (apiKey && Date.now() >= geminiCreditDepletedUntil) {
         try {
-          const styleByEmotion: Record<string, string> = {
-            happy:
-              'Deep male Malaysian Malay ustaz and educator voice, warm, cheerful, friendly baritone',
-            waving:
-              'Deep male Malaysian Malay ustaz voice, welcoming, polite, warm baritone greeting',
-            serious:
-              'Deep authoritative male Malaysian Malay school principal, calm, composed, firm baritone',
-            empathetic:
-              'Deep gentle male Malaysian Malay mentor, compassionate, comforting baritone',
-            inspiring:
-              'Deep inspiring male Malaysian Malay Islamic leader, passionate, visionary baritone',
-            thinking:
-              'Deep thoughtful male Malaysian Malay advisor, articulate baritone',
-            neutral:
-              'Deep natural male Malaysian Malay educator and mentor, clear baritone voice',
+          const styleByVoice: Record<string, string> = {
+            fenrir: 'ANDA ADALAH PENUTUR JATI BAHASA MELAYU MALAYSIA (Malaysian Malay Native Speaker). Suara lelaki Melayu matang (35-45 tahun), bertutur dengan SEBUTAN JATI BAHASA MELAYU MALAYSIA YANG TULEN (Pelat Malaysia, JANGAN ADA PELAT INGGERIS/MAT SALLEH). Nada warm, rich, medium-low pitch, mesra, tenang, beradab seperti Guru Besar atau Ustaz Malaysia berpengalaman. Bersahaja, bernafas secara natural, tidak kaku seperti robot, dan mesra berbual.',
+            charon: 'ANDA ADALAH PENUTUR JATI BAHASA MELAYU MALAYSIA. Suara pembimbing lelaki Melayu yang tenang, sabar, dan mesra. Sebutan Bahasa Melayu Malaysia tulen, santai, penuh hikmah, tanpa sebarang pelat asing atau Inggeris.',
+            puck: 'ANDA ADALAH PENUTUR JATI BAHASA MELAYU MALAYSIA. Suara pendidik muda Melayu yang ceria, bersemangat, dan mesra. Sebutan Bahasa Melayu Malaysia standard yang jelas, natural dan hidup.',
+            'local-deep': 'Penutur jati Bahasa Melayu Malaysia, sebutan mesra, tenang dan natural.',
           };
+
+          // Select Gemini voiceName matching requested persona
+          const mappedGeminiVoice =
+            voiceOption === 'charon'
+              ? 'Charon'
+              : voiceOption === 'puck'
+              ? 'Puck'
+              : 'Fenrir';
+
+          const voiceStyle = styleByVoice[voiceOption] || styleByVoice.fenrir;
 
           const ai = new GoogleGenAI({
             apiKey,
             httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
           });
 
+          // Supported Gemini TTS model IDs: 'gemini-2.5-flash-preview-tts' or 'gemini-3.8-flash-tts'
+          const GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+
           const response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash-lite-tts',
-            contents: [
-              {
-                role: 'user',
-                parts: [
-                  {
-                    text: cleanSpeechText,
-                    speechMetadata: {
-                      style: styleByEmotion[emotion] || styleByEmotion.neutral,
-                    },
-                  } as any,
-                ],
-              },
-            ],
+            model: GEMINI_TTS_MODEL,
+            contents: cleanSpeechText,
             config: {
+              systemInstruction: voiceStyle,
               responseModalities: ['AUDIO'],
               speechConfig: {
                 voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: 'Charon' },
+                  prebuiltVoiceConfig: { voiceName: mappedGeminiVoice },
                 },
               },
             },
@@ -826,7 +858,8 @@ PANDUAN MENJAWAB:
             res.status(200).json({
               audioBase64: base64Audio,
               mimeType: 'audio/wav',
-              voiceSource: 'gemini-male',
+              voiceSource: `gemini-natural-${mappedGeminiVoice.toLowerCase()}`,
+              voiceOption,
               needsMaleDsp: false,
               fallback: false,
             });
@@ -846,20 +879,13 @@ PANDUAN MENJAWAB:
         }
       }
 
-      // Fallback: Fetch Bahasa Melayu audio buffer so client WebAudio DSP renders a deep Male Malay Baritone voice
-      const mp3Base64 = await fetchMalayTtsBuffer(cleanSpeechText);
-      if (mp3Base64) {
-        res.status(200).json({
-          audioBase64: mp3Base64,
-          mimeType: 'audio/mpeg',
-          voiceSource: 'malay-neural-dsp',
-          needsMaleDsp: true,
-          fallback: false,
-        });
-        return;
-      }
-
-      res.status(200).json({ audioBase64: '', fallback: true });
+      // Fallback to client Web Speech synthesis with male pitch
+      res.status(200).json({
+        audioBase64: '',
+        fallback: true,
+        voiceOption,
+        reason: Date.now() < geminiCreditDepletedUntil ? 'prepayment_credits_depleted' : 'unavailable',
+      });
     } catch {
       res.status(200).json({ audioBase64: '', fallback: true });
     }

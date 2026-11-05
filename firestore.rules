@@ -94,10 +94,10 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // 11. Audit Logs (Immutable audit trail)
+    // 11. Audit Logs (Audit trail & PGB activity points)
     match /auditLogs/{logId} {
-      allow read, create: if true;
-      allow update, delete: if false;
+      allow read, create, delete: if true;
+      allow update: if false;
     }
 
     // 12. Settings

@@ -357,6 +357,15 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
     fetchLivePortalActivity();
   }, []);
 
+  // Listen for reset events from anywhere in the app to clear remoteLogs and reset points immediately
+  useEffect(() => {
+    const handleResetEvent = () => {
+      setRemoteLogs([]);
+    };
+    window.addEventListener('mpgbsim_audit_logs_reset', handleResetEvent);
+    return () => window.removeEventListener('mpgbsim_audit_logs_reset', handleResetEvent);
+  }, []);
+
   // Official Registered Member Schools (Strictly synced & deduplicated with Direktori Ahli = 53 schools)
   const directorySchools = useMemo<MemberSchool[]>(() => {
     const rawSource =
@@ -373,6 +382,11 @@ export const AdminActivePortalUsersDashboard: React.FC = () => {
 
   // Merge local + remote audit logs and filter out non-directory mock/admin-only noise
   const allMergedLogs = useMemo(() => {
+    const isReset = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true';
+    if (isReset && (!auditLogs || auditLogs.length === 0)) {
+      return [];
+    }
+
     const map = new Map<string, AuditLogItem>();
     const addClean = (l: AuditLogItem) => {
       if (!l || !l.action) return;

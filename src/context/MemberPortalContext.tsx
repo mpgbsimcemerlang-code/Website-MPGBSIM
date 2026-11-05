@@ -707,18 +707,14 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => {
     try {
       const isReset = typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true';
-      const saved = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
       if (isReset) {
-        if (saved) {
-          const parsed: AuditLogItem[] = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
-        }
         return [];
       }
+      const saved = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
       if (saved) {
         const parsed: AuditLogItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed
+        if (Array.isArray(parsed)) {
+          return parsed
             .filter(
               (l) =>
                 l.schoolCode !== 'MPGB-0042' &&
@@ -730,13 +726,6 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
                 ? { ...l, schoolCode: 'JAIM/SAS(M)130', membershipNo: 'MPGB-2026-JAIM/SAS(M)130' }
                 : l
             );
-          const existingIds = new Set(cleaned.map((c) => c.id));
-          INITIAL_AUDIT_LOGS.forEach((initLog) => {
-            if (!existingIds.has(initLog.id)) {
-              cleaned.push(initLog);
-            }
-          });
-          return cleaned;
         }
       }
     } catch (e) {
@@ -1509,9 +1498,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
               return merged.slice(0, 500);
             });
           } else {
-            if (typeof window !== 'undefined' && localStorage.getItem('mpgbsim_audit_logs_reset') === 'true') {
-              setAuditLogs([]);
-            }
+            // Collection is empty in Firestore (e.g. after admin reset all logs)
+            setAuditLogs([]);
+            safeLocalStorageSet(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
           }
         },
         (err) => handlePortalListenerError('auditLogs', err)
@@ -1934,6 +1923,11 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
         (resolvedSchoolCode ? `MPGB-2026-${resolvedSchoolCode}` : 'MPGB-AHLI'),
       category: meta?.category || inferActivityCategory(action),
     };
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('mpgbsim_audit_logs_reset');
+      } catch {}
+    }
     setAuditLogs((prev) => [newLog, ...prev.filter((l) => l.id !== newLog.id)].slice(0, 500));
 
     if (!isFirestoreQuotaExceeded()) {
@@ -4125,8 +4119,10 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     try {
-      localStorage.setItem('mpgbsim_audit_logs_reset', 'true');
-      safeLocalStorageSet(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('mpgbsim_audit_logs_reset', 'true');
+        safeLocalStorageSet(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
+      }
     } catch (e) {}
 
     setAuditLogs([]);
@@ -4149,6 +4145,9 @@ export const MemberPortalProvider: React.FC<{ children: ReactNode }> = ({ childr
   useEffect(() => {
     const handleReset = () => {
       setAuditLogs([]);
+      try {
+        safeLocalStorageSet(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify([]));
+      } catch {}
     };
     window.addEventListener('mpgbsim_audit_logs_reset', handleReset);
     return () => window.removeEventListener('mpgbsim_audit_logs_reset', handleReset);

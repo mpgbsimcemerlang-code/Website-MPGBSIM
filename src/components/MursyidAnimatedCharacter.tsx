@@ -178,14 +178,14 @@ export function stopMursyidVoice(): void {
 function pitchShiftToMaleBaritone(
   ctx: AudioContext,
   inputBuffer: AudioBuffer,
-  pitchFactor = 0.765,
-  tempoFactor = 1.03
+  pitchFactor = 0.88,
+  tempoFactor = 1.08
 ): AudioBuffer {
   const sampleRate = inputBuffer.sampleRate;
   const inputData = inputBuffer.getChannelData(0);
   const inputLen = inputData.length;
 
-  // Step 1: Resample by 1 / pitchFactor to lower pitch & vocal tract formants
+  // Step 1: Clean pitch & formant resampling
   const resampledLen = Math.floor(inputLen / pitchFactor);
   const resampled = new Float32Array(resampledLen);
   for (let i = 0; i < resampledLen; i++) {
@@ -196,16 +196,15 @@ function pitchShiftToMaleBaritone(
     resampled[i] = inputData[idx0] * (1 - frac) + inputData[idx1] * frac;
   }
 
-  // Step 2: Time-compress back to natural tempo using Hanning-windowed SOLA grains (38ms window)
-  const stretchRatio = pitchFactor * tempoFactor; // < 1 means compressing duration back to normal
+  // Step 2: Time-compression with 24ms grain window for fluid, natural speed without phase cancellation artifacts
+  const stretchRatio = pitchFactor * tempoFactor;
   const outputLen = Math.max(1, Math.floor(resampledLen * stretchRatio));
   const output = new Float32Array(outputLen);
 
-  const grainSize = Math.floor(sampleRate * 0.038); // 38ms speech grain
+  const grainSize = Math.floor(sampleRate * 0.024); // 24ms grain (crisp & clear)
   const halfGrain = Math.floor(grainSize / 2);
-  const searchRange = Math.floor(sampleRate * 0.012); // 12ms phase-alignment search window
+  const searchRange = Math.floor(sampleRate * 0.008); // 8ms phase search
 
-  // Precompute Hanning fade-in / fade-out weights
   const fadeIn = new Float32Array(halfGrain);
   const fadeOut = new Float32Array(halfGrain);
   for (let i = 0; i < halfGrain; i++) {
@@ -214,7 +213,6 @@ function pitchShiftToMaleBaritone(
     fadeOut[i] = 1 - w;
   }
 
-  // Copy initial grain
   const firstCopy = Math.min(grainSize, resampledLen, outputLen);
   for (let i = 0; i < firstCopy; i++) {
     output[i] = resampled[i];
@@ -225,11 +223,9 @@ function pitchShiftToMaleBaritone(
     const targetInPos = Math.floor(outWritePos / stretchRatio);
     if (targetInPos + grainSize + searchRange >= resampledLen) break;
 
-    // Find best phase-aligned offset within searchRange using cross-correlation
     let bestOffset = 0;
     let bestCorr = -Infinity;
-    const step = 2; // Check every 2nd sample for fast execution (<3ms total)
-    for (let off = 0; off < searchRange; off += step) {
+    for (let off = 0; off < searchRange; off += 2) {
       let corr = 0;
       const candStart = targetInPos + off;
       for (let k = 0; k < halfGrain; k += 4) {
@@ -242,12 +238,10 @@ function pitchShiftToMaleBaritone(
     }
 
     const chosenStart = targetInPos + bestOffset;
-    // Cross-fade overlap region
     for (let i = 0; i < halfGrain; i++) {
       output[outWritePos + i] =
         output[outWritePos + i] * fadeOut[i] + resampled[chosenStart + i] * fadeIn[i];
     }
-    // Copy second half of the grain
     for (let i = halfGrain; i < grainSize; i++) {
       output[outWritePos + i] = resampled[chosenStart + i];
     }
@@ -261,14 +255,16 @@ function pitchShiftToMaleBaritone(
 }
 
 /**
- * Plays base64 audio through Web Audio API with Male Chest-Resonance EQ
- * and (when needed) Male Baritone Pitch/Formant Shifting.
+ * Plays base64 audio through Web Audio API with natural, clear voice tone
+ * and fluid, conversational ChatGPT-style playback speed control.
  */
 async function playBase64WithMaleVoiceDsp(
   base64Data: string,
   needsMaleDsp: boolean,
   emotion: MursyidEmotion,
-  callbacks?: { onStart?: () => void; onEnd?: () => void }
+  voiceOption: MaleVoiceOption = 'fenrir',
+  callbacks?: { onStart?: () => void; onEnd?: () => void },
+  speedMultiplier: number = getSavedSpeechSpeed()
 ): Promise<boolean> {
   try {
     const AudioContextClass =
@@ -290,45 +286,22 @@ async function playBase64WithMaleVoiceDsp(
 
     const decodedBuffer = await activeAudioCtx.decodeAudioData(bytes.buffer.slice(0));
 
-    // Emotion-based male baritone tuning
-    const pitchFactor =
-      emotion === 'serious'
-        ? 0.74 // Deeper authoritative principal baritone
-        : emotion === 'happy' || emotion === 'waving'
-        ? 0.78 // Warm friendly male ustaz
-        : emotion === 'empathetic'
-        ? 0.75 // Gentle warm male mentor
-        : 0.765; // Standard Malay male baritone
-
-    const tempoFactor =
-      emotion === 'serious' || emotion === 'empathetic'
-        ? 0.98
-        : emotion === 'happy'
-        ? 1.06
-        : 1.03;
-
-    const finalBuffer = needsMaleDsp
-      ? pitchShiftToMaleBaritone(activeAudioCtx, decodedBuffer, pitchFactor, tempoFactor)
-      : decodedBuffer;
-
     const source = activeAudioCtx.createBufferSource();
-    source.buffer = finalBuffer;
+    source.buffer = decodedBuffer;
 
-    // Male Chest Resonance Low-Shelf Boost (145 Hz, +4.5 dB)
-    const chestBoost = activeAudioCtx.createBiquadFilter();
-    chestBoost.type = 'lowshelf';
-    chestBoost.frequency.value = 145;
-    chestBoost.gain.value = needsMaleDsp ? 4.8 : 2.5;
+    // Apply fluid conversational playback rate with user speed control multiplier (0.5x - 2.0x)
+    const clampedMultiplier = Math.min(2.0, Math.max(0.5, speedMultiplier));
+    source.playbackRate.value = clampedMultiplier;
 
-    // High-frequency softening to remove any shrill sibilance (3000 Hz, -3 dB)
-    const highSmooth = activeAudioCtx.createBiquadFilter();
-    highSmooth.type = 'highshelf';
-    highSmooth.frequency.value = 3000;
-    highSmooth.gain.value = needsMaleDsp ? -3.2 : -1.0;
+    // Natural, warm, medium-low vocal EQ for a 35-45yo Malaysian male educator persona
+    const vocalWarmth = activeAudioCtx.createBiquadFilter();
+    vocalWarmth.type = 'peaking';
+    vocalWarmth.frequency.value = 260; // Warm medium-low chest resonance
+    vocalWarmth.Q.value = 1.1;
+    vocalWarmth.gain.value = 1.8; // Gentle warmth & clarity
 
-    source.connect(chestBoost);
-    chestBoost.connect(highSmooth);
-    highSmooth.connect(activeAudioCtx.destination);
+    source.connect(vocalWarmth);
+    vocalWarmth.connect(activeAudioCtx.destination);
 
     activeBufferSource = source;
     source.onended = () => {
@@ -346,11 +319,93 @@ async function playBase64WithMaleVoiceDsp(
   }
 }
 
+export type MaleVoiceOption = 'fenrir' | 'charon' | 'puck' | 'local-deep';
+
+export interface MaleVoiceInfo {
+  id: MaleVoiceOption;
+  name: string;
+  subTitle: string;
+  tag: string;
+  description: string;
+  previewPhrase: string;
+}
+
+export const MALE_VOICE_OPTIONS: MaleVoiceInfo[] = [
+  {
+    id: 'fenrir',
+    name: 'Fenrir',
+    subTitle: 'Pendidik Matang 35–45 Tahun (Default)',
+    tag: 'Warm Medium-Low (Melayu MY)',
+    description: 'Suara lelaki Melayu matang (35–45 tahun) yang mesra, bersahaja, tenang, pintar & meyakinkan.',
+    previewPhrase: 'Assalamualaikum sahabat, saya Mursyid AI. Mari kita bincangkan hal pentadbiran sekolah secara santai dan jelas.',
+  },
+  {
+    id: 'charon',
+    name: 'Charon',
+    subTitle: 'Ustaz Santai & Tenang',
+    tag: 'Suara Santai Rabbani',
+    description: 'Suara pembimbing penyayang, santai dan tenang dengan penyampaian bermaklumat.',
+    previewPhrase: 'Salam ukhuwah sahabat pendidik, mari kita berbual secara santai dan tenang.',
+  },
+  {
+    id: 'puck',
+    name: 'Puck',
+    subTitle: 'Pendidik Muda & Ceria',
+    tag: 'Suara Muda Bersemangat',
+    description: 'Suara pendidik muda yang dinamik, ceria, meyakinkan dan bersemangat.',
+    previewPhrase: 'Alhamdulillah, semangat wahai sahabat pendidik untuk mendidik generasi Rabbani!',
+  },
+  {
+    id: 'local-deep',
+    name: 'Tempatan Normal',
+    subTitle: 'Suara Tempatan Natural',
+    tag: 'Suara Melayu Jelas',
+    description: 'Suara Bahasa Melayu Malaysia tempatan yang jelas dan semula jadi.',
+    previewPhrase: 'Ini ialah tataan suara Bahasa Melayu Malaysia tempatan yang jelas dan semula jadi.',
+  },
+];
+
+export function getSavedMaleVoicePersona(): MaleVoiceOption {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const saved = window.localStorage.getItem('mursyid_male_voice_persona') as MaleVoiceOption;
+    if (saved && MALE_VOICE_OPTIONS.some((v) => v.id === saved)) {
+      return saved;
+    }
+  }
+  return 'fenrir';
+}
+
+export function saveMaleVoicePersona(voice: MaleVoiceOption): void {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.setItem('mursyid_male_voice_persona', voice);
+  }
+}
+
+export function getSavedSpeechSpeed(): number {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const saved = window.localStorage.getItem('mursyid_speech_speed');
+    if (saved) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 2.0) {
+        return parsed;
+      }
+    }
+  }
+  return 1.0;
+}
+
+export function saveSpeechSpeed(speed: number): void {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const clamped = Math.min(2.0, Math.max(0.5, speed));
+    window.localStorage.setItem('mursyid_speech_speed', clamped.toString());
+  }
+}
+
 /**
- * Speaks text out loud as Mursyid AI in Bahasa Melayu with a guaranteed MALE voice.
- * 1. Calls /api/mpgb-tts (Gemini 3.8 Male Voice "Charon" OR Bahasa Melayu stream + Male Baritone WebAudio DSP).
- * 2. If offline, falls back to Web Speech API strictly selecting Male voices (Osman, Rizwan, Ardi)
- *    or forcing deep male baritone pitch (0.58 - 0.64) if the OS only has a default female voice.
+ * Speaks text out loud as Mursyid AI in Bahasa Melayu with natural voice tone and speed control.
+ * 1. Calls /api/mpgb-tts with chosen voiceOption ('fenrir', 'charon', 'puck', 'local-deep').
+ * 2. Applies speed multiplier (0.5x to 2.0x).
+ * 3. Falls back to Web Speech API at standard pitch (1.0).
  */
 export async function speakMursyidVoice(
   rawText: string,
@@ -358,11 +413,18 @@ export async function speakMursyidVoice(
   callbacks?: {
     onStart?: () => void;
     onEnd?: () => void;
-  }
+  },
+  requestedVoiceOption?: MaleVoiceOption,
+  requestedSpeechSpeed?: number
 ): Promise<void> {
   stopMursyidVoice();
 
-  // Clean markdown, emojis, and URLs for natural Malay pronunciation
+  const activeVoicePersona = requestedVoiceOption || getSavedMaleVoicePersona();
+  const activeSpeedMultiplier =
+    typeof requestedSpeechSpeed === 'number' ? requestedSpeechSpeed : getSavedSpeechSpeed();
+  const clampedSpeed = Math.min(2.0, Math.max(0.5, activeSpeedMultiplier));
+
+  // Clean markdown, emojis, URLs, and expand abbreviations for natural Malay speech cadence
   const cleanText = (rawText || '')
     .replace(/\*\*/g, '')
     .replace(/[*#_`~>•]/g, ' ')
@@ -372,6 +434,11 @@ export async function speakMursyidVoice(
     .replace(/\bPGB\b/g, 'Pengetua dan Guru Besar')
     .replace(/\bKPM\b/g, 'K P M')
     .replace(/\bSRI\b/g, 'Sekolah Rendah Islam')
+    .replace(/\bSMA\b/g, 'Sekolah Menengah Agama')
+    .replace(/\bSMKA\b/g, 'Sekolah Menengah Kebangsaan Agama')
+    .replace(/\bYB\b/g, 'Yang Berhormat')
+    .replace(/\bAI\b/g, 'A I')
+    .replace(/\b(assalamualaikum|salam ukhuwah|sahabat pendidik|ustaz|cikgu)\b/gi, '$1, ')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 680);
@@ -393,45 +460,41 @@ export async function speakMursyidVoice(
       utterance.lang = 'ms-MY';
 
       const voices = window.speechSynthesis.getVoices();
-      const femaleRegex = /yasmin|amira|gadis|damayanti|siti|female|perempuan|wanita|zira|samantha|victoria/i;
-      const maleRegex = /\b(osman|rizwan|ardi|male|lelaki)\b/i;
+      const femaleRegex = /yasmin|amira|gadis|damayanti|siti|female|perempuan|wanita|zira|samantha|victoria|helena|monika|salimah|nurul|fiona|karen|tessa|moira|veena/i;
+      const maleMalayRegex = /\b(osman|rizwan|ardi|budi|indra|faizal|amir|adam|daniel|zainal|ahmad|ibrahim|lokman|faiz|hafiz|male|lelaki|pria)\b/i;
 
-      // 1. Look for an explicit Native Male Malay/Indonesian voice (e.g. Microsoft Osman / Rizwan / Ardi)
+      // 1. Strictly look for a verified Native Male Malay/Indonesian voice
       const explicitMaleMalayVoice = voices.find(
         (v) =>
-          (v.lang.toLowerCase().includes('ms') || v.lang.toLowerCase().includes('id')) &&
-          maleRegex.test(v.name) &&
+          (v.lang.toLowerCase().startsWith('ms') || v.lang.toLowerCase().startsWith('id')) &&
+          maleMalayRegex.test(v.name) &&
           !femaleRegex.test(v.name)
       );
 
-      // 2. Otherwise pick a Malay/Indonesian voice that isn't explicitly named female
-      const fallbackMalayVoice =
-        explicitMaleMalayVoice ||
-        voices.find(
-          (v) => v.lang.toLowerCase().includes('ms') && !femaleRegex.test(v.name)
-        ) ||
-        voices.find(
-          (v) => v.lang.toLowerCase().includes('id') && !femaleRegex.test(v.name)
-        ) ||
-        voices.find((v) => v.lang.toLowerCase().includes('ms')) ||
-        voices.find((v) => v.lang.toLowerCase().includes('id'));
-
-      if (fallbackMalayVoice) {
-        utterance.voice = fallbackMalayVoice;
+      // If no verified native male Malay voice exists on the client device:
+      if (!explicitMaleMalayVoice) {
+        console.warn(
+          'Suara lelaki Bahasa Melayu tidak ditemui dalam sistem pelayar ini. Audio luar pelat dibatalkan untuk mengekalkan keaslian.'
+        );
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('mursyid-voice-notice', {
+              detail: {
+                message:
+                  'Suara penutur jati lelaki Bahasa Melayu tidak tersedia pada pelayar ini (kredit Gemini TTS perlu ditambah nilai). Teks jawapan lengkap sedia dibaca.',
+              },
+            })
+          );
+        }
+        callbacks?.onEnd?.();
+        return;
       }
 
-      // CRITICAL: If a native Male voice (Osman/Rizwan/Ardi) is used, use natural male pitch (0.88 - 0.95).
-      // If the OS only provides a default/female voice (Google Bahasa Melayu / Yasmin / Amira),
-      // force a deep male baritone pitch (0.58 - 0.64) so it NEVER sounds like a female voice!
-      const isTrueNativeMale = Boolean(explicitMaleMalayVoice);
+      utterance.voice = explicitMaleMalayVoice;
 
-      if (isTrueNativeMale) {
-        utterance.pitch = emotion === 'serious' ? 0.85 : emotion === 'happy' ? 0.96 : 0.9;
-        utterance.rate = emotion === 'serious' ? 0.96 : 1.02;
-      } else {
-        utterance.pitch = emotion === 'serious' ? 0.56 : emotion === 'happy' ? 0.64 : 0.6;
-        utterance.rate = 0.98;
-      }
+      // Enforce natural mature male pitch (0.88) and user speed control rate (0.5x - 2.0x)
+      utterance.pitch = 0.88;
+      utterance.rate = clampedSpeed;
 
       utterance.onstart = () => callbacks?.onStart?.();
       utterance.onend = () => callbacks?.onEnd?.();
@@ -448,7 +511,11 @@ export async function speakMursyidVoice(
     const resp = await fetch('/api/mpgb-tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: cleanText, emotion }),
+      body: JSON.stringify({
+        text: cleanText,
+        emotion,
+        voiceOption: activeVoicePersona,
+      }),
     });
 
     if (resp.ok) {
@@ -458,7 +525,9 @@ export async function speakMursyidVoice(
           data.audioBase64,
           Boolean(data.needsMaleDsp),
           emotion,
-          callbacks
+          activeVoicePersona,
+          callbacks,
+          clampedSpeed
         );
         if (playedViaWebAudio) {
           return;
@@ -502,6 +571,22 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
   const [blink, setBlink] = useState(false);
   const [talkingCycle, setTalkingCycle] = useState(0);
   const [localVoiceSpeaking, setLocalVoiceSpeaking] = useState(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
+
+  // Listen for voice status/fallback notices
+  useEffect(() => {
+    const handleVoiceNotice = (e: any) => {
+      const msg = e?.detail?.message;
+      if (msg) {
+        setVoiceNotice(msg);
+        setTimeout(() => setVoiceNotice(null), 7000);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mursyid-voice-notice', handleVoiceNotice);
+      return () => window.removeEventListener('mursyid-voice-notice', handleVoiceNotice);
+    }
+  }, []);
 
   // Sync with prop
   useEffect(() => {
@@ -708,6 +793,14 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
 
   return (
     <div className={`flex flex-col items-center justify-center select-none ${className}`}>
+      {/* Voice Status / Fallback Notice Banner */}
+      {!isCompact && voiceNotice && (
+        <div className="relative mb-1.5 px-3 py-1.5 w-full max-w-[320px] rounded-xl bg-amber-950/95 border border-amber-400/80 shadow-md text-[9.5px] font-medium text-amber-200 animate-in fade-in duration-200 flex items-start gap-1.5">
+          <span className="shrink-0 text-amber-300">⚠️</span>
+          <span className="leading-tight">{voiceNotice}</span>
+        </div>
+      )}
+
       {/* Dynamic Speech Bubble & Voice Trigger above the 3D Stage */}
       {!isCompact && (speechText || activeEmotionInfo.voicePhrase) && (
         <div className="relative mb-1.5 px-3 py-1.5 w-full max-w-[320px] rounded-xl bg-slate-900/95 border border-teal-400/40 shadow-md text-[10px] font-medium text-teal-50 animate-in fade-in duration-200">
@@ -1320,6 +1413,11 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
         </div>
       )}
 
+      {/* Embedded Male Voice Persona Selector Bar */}
+      {(showEmotionBar || interactive) && !isCompact && (
+        <MursyidMaleVoiceSelector className="mt-1.5 w-full max-w-[330px]" />
+      )}
+
       {/* Keyframe animations for the State-Based 2.5D/3D Character Rig */}
       <style>{`
         /* Body Posture States */
@@ -1547,3 +1645,274 @@ export const MursyidAnimatedCharacter: React.FC<MursyidAnimatedCharacterProps> =
     </div>
   );
 };
+
+export interface MursyidMaleVoiceSelectorProps {
+  className?: string;
+  onVoiceSelected?: (voice: MaleVoiceOption) => void;
+  onSpeedSelected?: (speed: number) => void;
+}
+
+export const MursyidMaleVoiceSelector: React.FC<MursyidMaleVoiceSelectorProps> = ({
+  className = '',
+  onVoiceSelected,
+  onSpeedSelected,
+}) => {
+  const [activeVoice, setActiveVoice] = useState<MaleVoiceOption>(() =>
+    getSavedMaleVoicePersona()
+  );
+  const [speechSpeed, setSpeechSpeed] = useState<number>(() => getSavedSpeechSpeed());
+  const [testingVoiceId, setTestingVoiceId] = useState<MaleVoiceOption | null>(null);
+  const [showModal, setShowModal] = useState<boolean>(false);
+
+  const SPEED_PRESETS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+  const currentInfo =
+    MALE_VOICE_OPTIONS.find((v) => v.id === activeVoice) || MALE_VOICE_OPTIONS[0];
+
+  const handleSelectVoice = (voiceId: MaleVoiceOption, previewImmediately = false) => {
+    setActiveVoice(voiceId);
+    saveMaleVoicePersona(voiceId);
+    onVoiceSelected?.(voiceId);
+
+    if (previewImmediately) {
+      handleTestVoice(voiceId);
+    }
+  };
+
+  const handleSelectSpeed = (newSpeed: number, previewImmediately = false) => {
+    const clamped = Math.min(2.0, Math.max(0.5, newSpeed));
+    setSpeechSpeed(clamped);
+    saveSpeechSpeed(clamped);
+    onSpeedSelected?.(clamped);
+
+    if (previewImmediately) {
+      handleTestVoice(activeVoice, clamped);
+    }
+  };
+
+  const handleTestVoice = (voiceId: MaleVoiceOption, speedOverride?: number) => {
+    stopMursyidVoice();
+    const info = MALE_VOICE_OPTIONS.find((v) => v.id === voiceId) || currentInfo;
+    setTestingVoiceId(voiceId);
+
+    speakMursyidVoice(
+      info.previewPhrase,
+      voiceId === 'puck' ? 'happy' : voiceId === 'charon' ? 'empathetic' : 'neutral',
+      {
+        onStart: () => setTestingVoiceId(voiceId),
+        onEnd: () => setTestingVoiceId(null),
+      },
+      voiceId,
+      speedOverride || speechSpeed
+    );
+  };
+
+  return (
+    <div className={`relative ${className}`}>
+      {/* Compact Selector Bar */}
+      <div className="bg-slate-900/95 border border-amber-500/50 p-1.5 rounded-xl shadow-md text-[11px] text-slate-200 flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-5 h-5 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
+            <Volume2 className="w-3 h-3" />
+          </div>
+          <div className="min-w-0 text-left">
+            <p className="text-[10px] font-bold text-amber-300 leading-tight truncate flex items-center gap-1">
+              <span>Suara:</span>
+              <span className="text-white">{currentInfo.name}</span>
+              <span className="ml-1 px-1 py-0.2 bg-amber-400/20 text-amber-300 rounded text-[9px] font-extrabold border border-amber-400/30">
+                ⚡ {speechSpeed.toFixed(2).replace(/\.00$/, '.0')}x
+              </span>
+            </p>
+            <p className="text-[9px] text-slate-400 truncate leading-none">
+              {currentInfo.subTitle}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => handleTestVoice(activeVoice)}
+            className={`px-2 py-0.5 rounded-lg font-extrabold text-[10px] flex items-center gap-1 transition cursor-pointer ${
+              testingVoiceId === activeVoice
+                ? 'bg-rose-500 text-white animate-pulse'
+                : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-2xs'
+            }`}
+            title="Uji dengar contoh suara lelaki pilihan semasa"
+          >
+            {testingVoiceId === activeVoice ? (
+              <>
+                <VolumeX className="w-3 h-3" />
+                <span>Bercakap...</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-3 h-3" />
+                <span>Uji Suara</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowModal((prev) => !prev)}
+            className="px-2 py-0.5 rounded-lg bg-teal-800 hover:bg-teal-700 text-amber-200 font-bold text-[10px] transition cursor-pointer border border-teal-600/50"
+            title="Tukar suara & kelajuan pertuturan Mursyid AI"
+          >
+            Tetapan ⚙️
+          </button>
+        </div>
+      </div>
+
+      {/* Popover / Dropdown Modal for Selecting Male Voice Personas & Speed */}
+      {showModal && (
+        <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-slate-950 border border-teal-500/60 rounded-2xl p-2.5 shadow-2xl animate-in fade-in duration-150 text-left">
+          <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-800">
+            <h4 className="text-[11px] font-extrabold text-amber-300 flex items-center gap-1">
+              <span>⚙️</span>
+              <span>Tetapan Suara & Kelajuan Mursyid AI</span>
+            </h4>
+            <button
+              type="button"
+              onClick={() => {
+                stopMursyidVoice();
+                setTestingVoiceId(null);
+                setShowModal(false);
+              }}
+              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Speed Control Section (0.5x to 2.0x) */}
+          <div className="mb-2.5 p-2 rounded-xl bg-slate-900/90 border border-teal-500/40 text-slate-200">
+            <div className="flex items-center justify-between gap-1 mb-1.5">
+              <span className="text-[10px] font-extrabold text-amber-300 flex items-center gap-1">
+                <span>⚡</span>
+                <span>Kelajuan Pertuturan (Speed Control)</span>
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px]">
+                {speechSpeed.toFixed(2).replace(/\.00$/, '.0')}x
+              </span>
+            </div>
+
+            {/* Quick Speed Preset Chips (0.5x, 0.75x, 1.0x, 1.25x, 1.5x, 1.75x, 2.0x) */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar">
+              {SPEED_PRESETS.map((s) => {
+                const isCurrent = Math.abs(speechSpeed - s) < 0.01;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleSelectSpeed(s, true)}
+                    className={`px-2 py-0.5 rounded-lg text-[9.5px] font-bold transition cursor-pointer whitespace-nowrap ${
+                      isCurrent
+                        ? 'bg-amber-400 text-slate-950 shadow-2xs'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
+                    }`}
+                    title={`Tetapkan kelajuan pertuturan Mursyid AI ke ${s}x`}
+                  >
+                    {s === 1.0 ? '1.0x (Normal)' : `${s}x`}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Smooth Range Slider */}
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-[9px] text-slate-400 font-bold">0.5x</span>
+              <input
+                type="range"
+                min="0.5"
+                max="2.0"
+                step="0.05"
+                value={speechSpeed}
+                onChange={(e) => handleSelectSpeed(parseFloat(e.target.value))}
+                className="flex-1 h-1.5 bg-slate-800 rounded-lg accent-amber-400 cursor-pointer"
+                title="Slaid untuk melaraskan kelajuan pertuturan Mursyid AI"
+              />
+              <span className="text-[9px] text-slate-400 font-bold">2.0x</span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-slate-300 mb-1.5 leading-relaxed">
+            Pilihan Persona **Suara Lelaki Melayu** (macho, santai, ceria, atau baritone tempatan):
+          </p>
+
+          <div className="space-y-1.5 max-h-[190px] overflow-y-auto pr-0.5">
+            {MALE_VOICE_OPTIONS.map((v) => {
+              const isSelected = v.id === activeVoice;
+              const isTesting = testingVoiceId === v.id;
+
+              return (
+                <div
+                  key={v.id}
+                  onClick={() => handleSelectVoice(v.id, false)}
+                  className={`p-2 rounded-xl border transition-all cursor-pointer flex flex-col gap-1 ${
+                    isSelected
+                      ? 'bg-teal-950/90 border-amber-400 shadow-xs'
+                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-600 hover:bg-slate-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-amber-400 font-bold text-[11px]">
+                        {isSelected ? '✓' : '•'}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="text-xs font-extrabold text-white truncate block">
+                          {v.name}
+                        </span>
+                        <span className="text-[9px] text-amber-300 font-medium truncate block">
+                          {v.subTitle}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                        {v.tag}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectVoice(v.id, false);
+                          handleTestVoice(v.id);
+                        }}
+                        className={`px-2 py-0.5 rounded-md font-extrabold text-[9px] flex items-center gap-1 transition cursor-pointer ${
+                          isTesting
+                            ? 'bg-rose-500 text-white animate-pulse'
+                            : 'bg-amber-400 hover:bg-amber-300 text-slate-950'
+                        }`}
+                        title="Uji dengar contoh suara lelaki ini"
+                      >
+                        {isTesting ? 'Bercakap...' : 'Uji 🔊'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-[9.5px] text-slate-300 leading-tight">
+                    {v.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-2 pt-1.5 border-t border-slate-800 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-[10px] transition cursor-pointer"
+            >
+              Simpan & Guna Tetapan Ini
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
