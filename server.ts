@@ -3,6 +3,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
+import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 
@@ -522,6 +523,319 @@ async function startServer() {
       shareUrl: `${origin}/berita/${encodeURIComponent(news.id)}`,
       ogImageUrl: `${origin}/api/og-image/${encodeURIComponent(news.id)}.jpg`,
     });
+  });
+
+  // Helper to format HTML email letter
+  const generateOfficialLetterHtml = (payload: any, recipient: any) => {
+    const subject = String(payload.subject || 'SURAT RASMI MPGBSIM');
+    const referenceNo = String(payload.referenceNo || 'MPGBSIM/EML/2026');
+    const letterDate = String(payload.letterDate || new Date().toLocaleDateString('ms-MY'));
+    const salutation = String(payload.salutation || 'YBhg. Datin / Tuan / Puan,');
+    const bodyText = String(payload.bodyText || '');
+    const closingText = String(payload.closingText || 'Sekian, terima kasih.');
+    const slogan = String(payload.slogan || 'MEMACU KECEMERLANGAN KEPIMPINAN PENDIDIKAN ISLAM');
+    const chairmanName = String(payload.chairmanName || 'USTAZ MOHAMAD FAIZ BIN AZIZAN');
+    const chairmanRole = String(payload.chairmanRole || 'Pengerusi Kebangsaan MPGBSIM');
+    const showSignature = Boolean(payload.showChairmanSignature);
+    const signatureUrl = payload.chairmanSignatureUrl;
+
+    const formattedBody = bodyText
+      .split('\n\n')
+      .map((p) => `<p style="margin: 0 0 14px 0; line-height: 1.7; color: #1e293b; font-size: 14px; text-align: justify;">${p.replace(/\n/g, '<br/>')}</p>`)
+      .join('');
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 24px 0; background-color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+  <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+    <div style="background: linear-gradient(135deg, #042f2e 0%, #115e59 100%); padding: 24px 32px; color: #ffffff; text-align: center; border-bottom: 4px solid #f59e0b;">
+      <h1 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;">MAJLIS PENGETUA GURU BESAR SEKOLAH-SEKOLAH ISLAM MALAYSIA (MPGBSIM)</h1>
+      <p style="margin: 4px 0 0 0; font-size: 11px; color: #99f6e4; letter-spacing: 0.3px;">PPM-012-10-18112014 &bull; KEBANGSAAN</p>
+      <p style="margin: 2px 0 0 0; font-size: 10px; color: #ccfbf1;">Emel: mpgbsim.cemerlang@gmail.com &bull; Laman Web: https://mpgbsim.edu.my</p>
+    </div>
+
+    <div style="padding: 32px;">
+      <table style="width: 100%; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 24px; font-size: 13px; color: #475569;">
+        <tr>
+          <td style="vertical-align: top; width: 60%;">
+            <strong style="color: #64748b;">Kepada:</strong><br/>
+            <span style="color: #0f172a; font-weight: 700; font-size: 14px;">${recipient.principal || 'Pengetua / Guru Besar'}</span><br/>
+            ${recipient.schoolName ? `<span style="color: #1e293b; font-weight: 500;">${recipient.schoolName}</span><br/>` : ''}
+            ${recipient.schoolCode ? `<span style="font-size: 11px; color: #64748b;">(Kod: ${recipient.schoolCode})</span><br/>` : ''}
+            ${recipient.state ? `<span style="color: #475569;">${recipient.state}</span>` : ''}
+          </td>
+          <td style="vertical-align: top; text-align: right; width: 40%; font-size: 12px; line-height: 1.6;">
+            <strong>No. Rujukan:</strong> ${referenceNo}<br/>
+            <strong>Tarikh:</strong> ${letterDate}
+          </td>
+        </tr>
+      </table>
+
+      <div style="background-color: #f8fafc; border-left: 4px solid #0d9488; padding: 12px 16px; margin-bottom: 20px;">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 800; color: #0f172a; text-transform: uppercase; line-height: 1.4;">
+          ${subject}
+        </h2>
+      </div>
+
+      <p style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #334155;">
+        ${salutation}
+      </p>
+
+      <div style="font-size: 14px; color: #1e293b; line-height: 1.7;">
+        ${formattedBody}
+      </div>
+
+      <p style="margin: 20px 0 10px 0; font-size: 14px; color: #334155;">
+        ${closingText}
+      </p>
+
+      <div style="margin: 20px 0; padding: 10px 14px; background: #ecfdf5; border-radius: 6px; display: inline-block;">
+        <span style="font-weight: 800; font-size: 12px; color: #065f46; letter-spacing: 0.5px;">
+          "${slogan}"
+        </span>
+      </div>
+
+      <div style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b;">Saya yang menjalankan amanah,</p>
+        ${showSignature && signatureUrl ? `
+          <div style="margin: 8px 0;">
+            <img src="${signatureUrl}" alt="Tandatangan Pengerusi" style="max-height: 65px; max-width: 200px; display: block;" />
+          </div>
+        ` : ''}
+        <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 800; color: #0f172a; text-transform: uppercase;">
+          ${chairmanName}
+        </p>
+        <p style="margin: 2px 0 0 0; font-size: 12px; color: #0d9488; font-weight: 600;">
+          ${chairmanRole}
+        </p>
+        <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">
+          Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia (MPGBSIM)
+        </p>
+      </div>
+    </div>
+
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 14px 24px; text-align: center; font-size: 11px; color: #94a3b8;">
+      Emel rasmi ini dijana melalui Portal & CMS Majlis Pengetua Guru Besar Sekolah-Sekolah Islam Malaysia. Sila hubungi urus setia di <a href="mailto:mpgbsim.cemerlang@gmail.com" style="color: #0d9488; text-decoration: none;">mpgbsim.cemerlang@gmail.com</a>.
+    </div>
+  </div>
+</body>
+</html>`;
+  };
+
+  // Helper to build SMTP transporter
+  const buildSmtpTransporter = (customConfig?: any) => {
+    const host = String(customConfig?.host || process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+    const port = Number(customConfig?.port || process.env.SMTP_PORT || 465);
+    const user = String(customConfig?.user || process.env.SMTP_USER || 'mpgbsim.cemerlang@gmail.com').trim();
+    const pass = String(customConfig?.pass || process.env.SMTP_PASS || '').trim();
+
+    if (!pass) return null;
+
+    return {
+      transporter: nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+      }),
+      fromEmail: user,
+      fromName: customConfig?.fromName || process.env.SMTP_FROM || 'MPGBSIM Kebangsaan <' + user + '>',
+    };
+  };
+
+  // 2b. Test SMTP Connection endpoint
+  app.post('/api/test-smtp-connection', async (req, res) => {
+    try {
+      const config = req.body?.smtpConfig;
+      const targetEmail = String(req.body?.targetEmail || config?.user || process.env.SMTP_USER || 'mpgbsim.cemerlang@gmail.com').trim();
+      const mailSetup = buildSmtpTransporter(config);
+
+      if (!mailSetup) {
+        res.status(400).json({
+          ok: false,
+          error: 'Kata laluan aplikasi (App Password) belum dimasukkan. Sila masukkan kata laluan aplikasi Gmail (16 aksara) di bahagian tetapan SMTP.',
+        });
+        return;
+      }
+
+      await mailSetup.transporter.verify();
+
+      const testInfo = await mailSetup.transporter.sendMail({
+        from: mailSetup.fromName,
+        to: targetEmail,
+        subject: 'UJIAN SAMBUNGAN EMEL RASMI MPGBSIM (BERJAYA)',
+        text: 'Tahniah! Sambungan pelayan emel SMTP MPGBSIM telah berjaya dikonfigurasikan. Sistem sedia untuk menghantar surat rasmi ke sekolah-sekolah ahli.',
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; border: 1px solid #10b981; border-radius: 8px;">
+            <h2 style="color: #065f46; margin-top: 0;">Pengesahan Sambungan Emel Berjaya</h2>
+            <p>Tahniah! Pelayan SMTP bagi <strong>${mailSetup.fromEmail}</strong> berfungsi dengan sempurna.</p>
+            <p style="font-size: 12px; color: #64748b;">Masa Ujian: ${new Date().toLocaleString('ms-MY')}</p>
+          </div>
+        `,
+      });
+
+      res.status(200).json({
+        ok: true,
+        message: `Sambungan SMTP berjaya disahkan! Emel percubaan telah dihantar ke ${targetEmail}.`,
+        messageId: testInfo.messageId,
+      });
+    } catch (err: any) {
+      res.status(400).json({
+        ok: false,
+        error: `Ralat sambungan SMTP: ${err?.message || 'Gagal menyambung. Sila pastikan kata laluan aplikasi Gmail sah.'}`,
+      });
+    }
+  });
+
+  // 2c. Server-Side School Email Dispatch API
+  app.post('/api/dispatch-school-email', async (req, res) => {
+    try {
+      const emailPayload = req.body;
+      const recipients = Array.isArray(emailPayload?.recipients) ? emailPayload.recipients : [];
+      const subject = String(emailPayload?.subject || 'Surat Rasmi MPGBSIM');
+      const referenceNo = String(emailPayload?.referenceNo || 'MPGBSIM/EML/2026');
+      const customConfig = emailPayload?.smtpConfig;
+
+      if (!recipients || recipients.length === 0) {
+        res.status(400).json({ ok: false, error: 'Tiada senarai emel sekolah penerima.' });
+        return;
+      }
+
+      const mailSetup = buildSmtpTransporter(customConfig);
+
+      // CASE A: Real SMTP credentials provided -> Send real emails through SMTP
+      if (mailSetup) {
+        try {
+          await mailSetup.transporter.verify();
+        } catch (authErr: any) {
+          res.status(400).json({
+            ok: false,
+            hasRealSmtp: false,
+            error: `Ralat pengesahan SMTP (${mailSetup.fromEmail}): ${authErr.message}. Sila pastikan anda menggunakan Kata Laluan Aplikasi (App Password) Gmail yang betul.`,
+          });
+          return;
+        }
+
+        const results = [];
+        let sentCount = 0;
+        let unsentCount = 0;
+
+        for (const r of recipients) {
+          const cleanEmail = String(r?.email || '').trim();
+          const isValid = cleanEmail.includes('@') && cleanEmail.includes('.');
+
+          if (!isValid) {
+            unsentCount++;
+            results.push({
+              schoolId: r.schoolId || '',
+              schoolName: r.schoolName || '',
+              schoolCode: r.schoolCode || '',
+              principal: r.principal || '',
+              email: cleanEmail,
+              state: r.state || '',
+              status: 'FAILED' as const,
+              deliveryMethod: 'UNSENT' as const,
+              errorMessage: 'Format alamat emel tidak sah',
+              customReferenceNo: referenceNo,
+            });
+            continue;
+          }
+
+          try {
+            const htmlContent = generateOfficialLetterHtml(emailPayload, r);
+            const plainText = `${subject}\n\nKepada: ${r.principal || 'Pengetua / Guru Besar'}\n${r.schoolName || ''}\n\n${emailPayload.bodyText || ''}\n\n${emailPayload.closingText || 'Sekian, terima kasih.'}\n\n${emailPayload.chairmanName || 'USTAZ MOHAMAD FAIZ BIN AZIZAN'}\n${emailPayload.chairmanRole || 'Pengerusi Kebangsaan MPGBSIM'}`;
+
+            const info = await mailSetup.transporter.sendMail({
+              from: mailSetup.fromName,
+              to: cleanEmail,
+              subject: `${subject} [Ruj: ${referenceNo}]`,
+              text: plainText,
+              html: htmlContent,
+            });
+
+            sentCount++;
+            results.push({
+              schoolId: r.schoolId || '',
+              schoolName: r.schoolName || '',
+              schoolCode: r.schoolCode || '',
+              principal: r.principal || '',
+              email: cleanEmail,
+              state: r.state || '',
+              status: 'SENT' as const,
+              deliveryMethod: 'REAL_SMTP' as const,
+              sentAt: new Date().toISOString(),
+              messageId: info.messageId,
+              customReferenceNo: referenceNo,
+            });
+          } catch (sendErr: any) {
+            unsentCount++;
+            results.push({
+              schoolId: r.schoolId || '',
+              schoolName: r.schoolName || '',
+              schoolCode: r.schoolCode || '',
+              principal: r.principal || '',
+              email: cleanEmail,
+              state: r.state || '',
+              status: 'FAILED' as const,
+              deliveryMethod: 'UNSENT' as const,
+              errorMessage: sendErr?.message || 'Gagal menghantar melalui pelayan SMTP',
+              customReferenceNo: referenceNo,
+            });
+          }
+        }
+
+        res.status(200).json({
+          ok: true,
+          dispatched: true,
+          hasRealSmtp: true,
+          method: 'real-smtp',
+          sentCount,
+          unsentCount,
+          total: results.length,
+          results,
+        });
+        return;
+      }
+
+      // CASE B: No SMTP password configured -> Do NOT pretend emails are sent!
+      // Return honest UNSENT status so user knows real email has NOT gone out yet
+      const results = recipients.map((r: any) => {
+        const cleanEmail = String(r?.email || '').trim();
+        const isValid = cleanEmail.includes('@') && cleanEmail.includes('.');
+        return {
+          schoolId: r.schoolId || '',
+          schoolName: r.schoolName || '',
+          schoolCode: r.schoolCode || '',
+          principal: r.principal || '',
+          email: cleanEmail,
+          state: r.state || '',
+          status: 'UNSENT' as const,
+          deliveryMethod: 'UNSENT' as const,
+          errorMessage: isValid
+            ? 'Pelayan SMTP belum disambungkan (tiada Kata Laluan Aplikasi Gmail). Surat disimpan sebagai Draf atau boleh dihantar terus melalui butang "Buka di Gmail".'
+            : 'Alamat emel tidak sah',
+          customReferenceNo: referenceNo,
+        };
+      });
+
+      res.status(200).json({
+        ok: true,
+        dispatched: false,
+        hasRealSmtp: false,
+        method: 'draft-saved',
+        sentCount: 0,
+        unsentCount: results.length,
+        total: results.length,
+        message: 'Pelayan SMTP belum dikonfigurasikan. Surat disimpan sebagai DRAF rasmi dalam sistem. Sila masukkan kata laluan aplikasi Gmail di tetapan SMTP untuk penghantaran automatik, atau gunakan butang "Buka di Gmail (1-Klik)".',
+        results,
+      });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err?.message || 'Ralat semasa memproses penghantaran emel.' });
+    }
   });
 
   // Track temporary cooldown if project prepayment credits are depleted (HTTP 402 / RESOURCE_EXHAUSTED)

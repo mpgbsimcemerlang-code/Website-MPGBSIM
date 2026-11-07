@@ -125,18 +125,82 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
     };
   }, []);
 
-  // Merge registered schools with any approved applications & enrich designation from applications
+  // Helper to normalize school name for matching & deduplication
+  const normalizeSchoolKey = (raw: string): string => {
+    return (raw || '')
+      .toLowerCase()
+      .replace(/^sekolah\s+rendah\s+islam\s+integrasi\s+/i, '')
+      .replace(/^sekolah\s+rendah\s+islam\s+/i, '')
+      .replace(/^sekolah\s+menengah\s+islam\s+/i, '')
+      .replace(/^sekolah\s+menengah\s+agama\s+/i, '')
+      .replace(/^sekolah\s+rendah\s+agama\s+/i, '')
+      .replace(/^sekolah\s+rendah\s+sri\s+/i, '')
+      .replace(/^sekolah\s+menengah\s+sri\s+/i, '')
+      .replace(/^sekolah\s+rendah\s+/i, '')
+      .replace(/^sekolah\s+menengah\s+/i, '')
+      .replace(/^sek\s+ren\s+islam\s+/i, '')
+      .replace(/^sri\s+/i, '')
+      .replace(/^smi\s+/i, '')
+      .replace(/^sma\s+/i, '')
+      .replace(/[^a-z0-9]/g, '');
+  };
+
+  const normalizeCodeKey = (raw: string): string => (raw || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const isMatchingSchool = (
+    s: MemberSchool,
+    app: { schoolCode?: string; schoolName?: string; fullName?: string; icNumber?: string; email?: string; pgbEmail?: string }
+  ): boolean => {
+    const sCode = normalizeCodeKey(s.code || '');
+    const aCode = normalizeCodeKey(app.schoolCode || '');
+
+    // Exact code match
+    if (sCode && aCode && sCode === aCode) return true;
+
+    // Specific alias for SRI AL AMIN WILAYAH PERSEKUTUAN (codes WJJ 0005, WJJ0005, WJAA001)
+    const isSAlAminWp =
+      sCode === 'wjaa001' ||
+      sCode === 'wjj0005' ||
+      (s.name || '').toLowerCase().includes('wilayah persekutuan');
+    const isAAlAminWp =
+      aCode === 'wjaa001' ||
+      aCode === 'wjj0005' ||
+      (app.schoolName || '').toLowerCase().includes('wilayah persekutuan');
+    if (isSAlAminWp && isAAlAminWp) return true;
+
+    // Normalized Name Match
+    const sKey = normalizeSchoolKey(s.name || '');
+    const aKey = normalizeSchoolKey(app.schoolName || '');
+    if (sKey && aKey && sKey === aKey) return true;
+
+    // Exact Name Match
+    if (s.name && app.schoolName && s.name.trim().toLowerCase() === app.schoolName.trim().toLowerCase()) {
+      return true;
+    }
+
+    // IC Number Match
+    const sIc = (s.icNumber || '').replace(/[^0-9]/g, '');
+    const aIc = (app.icNumber || '').replace(/[^0-9]/g, '');
+    if (sIc && aIc && sIc.length >= 10 && sIc === aIc) return true;
+
+    // Principal Name Match
+    const sPgb = (s.principal || '').replace(/\(.*?\)/g, '').toLowerCase().replace(/[^a-z]/g, '');
+    const aPgb = (app.fullName || '').replace(/\(.*?\)/g, '').toLowerCase().replace(/[^a-z]/g, '');
+    if (sPgb && aPgb && (sPgb === aPgb || (sPgb.length > 8 && (sPgb.includes(aPgb) || aPgb.includes(sPgb))))) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Merge registered schools with any approved applications & deduplicate seamlessly
   const effectiveSchools = useMemo(() => {
     const baseList = schools && schools.length > 0 ? schools : siteData.memberSchools || [];
     const approvedApps = (siteData.memberApplications || []).filter((a) => a.status === 'approved');
 
     const enriched = baseList.map((sch) => {
       if (sch.designation) return sch;
-      const matchedApp = approvedApps.find(
-        (a) =>
-          (a.schoolCode && sch.code && a.schoolCode.toLowerCase() === sch.code.toLowerCase()) ||
-          (a.schoolName && sch.name && a.schoolName.toLowerCase() === sch.name.toLowerCase())
-      );
+      const matchedApp = approvedApps.find((a) => isMatchingSchool(sch, a));
       if (matchedApp?.designation) {
         return { ...sch, designation: matchedApp.designation };
       }
@@ -145,11 +209,7 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
 
     // Include any approved application not yet present in baseList
     approvedApps.forEach((app) => {
-      const exists = enriched.some(
-        (s) =>
-          (app.schoolCode && s.code && app.schoolCode.toLowerCase() === s.code.toLowerCase()) ||
-          (app.schoolName && s.name && app.schoolName.toLowerCase() === s.name.toLowerCase())
-      );
+      const exists = enriched.some((s) => isMatchingSchool(s, app));
       if (!exists && app.schoolName) {
         enriched.push({
           id: `app-sch-${app.id}`,
@@ -174,7 +234,35 @@ export const SchoolNetworkSection: React.FC<SchoolNetworkProps> = ({
       }
     });
 
-    return enriched;
+    // Final deduplication pass to ensure absolute uniqueness (59 schools)
+    const uniqueMap = new Map<string, MemberSchool>();
+    enriched.forEach((sch) => {
+      const cKey = normalizeCodeKey(sch.code || '');
+      const isWp = cKey === 'wjaa001' || cKey === 'wjj0005' || (sch.name || '').toLowerCase().includes('wilayah persekutuan');
+      const dedupKey = isWp
+        ? 'school-wp-sri-al-amin'
+        : cKey && cKey !== '-' && cKey !== 'na'
+        ? `code-${cKey}`
+        : `name-${normalizeSchoolKey(sch.name)}`;
+
+      if (!uniqueMap.has(dedupKey)) {
+        uniqueMap.set(dedupKey, sch);
+      } else {
+        const existing = uniqueMap.get(dedupKey)!;
+        uniqueMap.set(dedupKey, {
+          ...existing,
+          code: existing.code && existing.code !== '-' ? existing.code : sch.code,
+          designation: existing.designation || sch.designation,
+          principalPhotoUrl: existing.principalPhotoUrl || sch.principalPhotoUrl,
+          schoolPhotoUrl: existing.schoolPhotoUrl || sch.schoolPhotoUrl,
+          logoUrl: existing.logoUrl || sch.logoUrl,
+          email: existing.email || sch.email,
+          phone: existing.phone || sch.phone,
+        });
+      }
+    });
+
+    return Array.from(uniqueMap.values());
   }, [schools, siteData.memberSchools, siteData.memberApplications]);
 
   // Compute the 5 real-time Live Metrics from effectiveSchools

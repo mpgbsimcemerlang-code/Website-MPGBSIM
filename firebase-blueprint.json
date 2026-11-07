@@ -321,6 +321,29 @@
         "submittedAt": { "type": "string" }
       },
       "required": ["fullName", "lastPosition", "lastSchool", "verificationStatus", "submittedAt"]
+    },
+    "SchoolOfficialEmail": {
+      "title": "SchoolOfficialEmail",
+      "description": "Log pengeluaran emel dan surat rasmi pentadbiran MPGBSIM kepada sekolah-sekolah ahli",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "templateType": { "type": "string", "enum": ["JEMPUTAN_MESYUARAT", "YURAN_TAHUNAN", "PEMBERITAHUAN_PROGRAM", "PEKELILING_KHAS", "SURAT_RASMI_CUSTOM"] },
+        "referenceNo": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "subject": { "type": "string" },
+        "bodyText": { "type": "string" },
+        "letterDate": { "type": "string" },
+        "chairmanSignatureUrl": { "type": "string" },
+        "chairmanName": { "type": "string" },
+        "chairmanRole": { "type": "string" },
+        "status": { "type": "string", "enum": ["SENT", "UNSENT", "DRAFT", "SCHEDULED"] },
+        "recipientCount": { "type": "number" },
+        "sentAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "templateType", "subject", "bodyText", "status"]
     }
   },
   "firestore": {
@@ -391,6 +414,10 @@
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/Settings" },
       "description": "Global portal configurations"
+    },
+    "/schoolOfficialEmails/{emailId}": {
+      "schema": { "$ref": "#/entities/SchoolOfficialEmail" },
+      "description": "Official admin email dispatches and letter communications to registered schools"
     }
   }
 }

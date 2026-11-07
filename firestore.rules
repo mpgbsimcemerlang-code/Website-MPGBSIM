@@ -162,6 +162,11 @@ service cloud.firestore {
     match /memberProfiles/{profileId} {
       allow read, write: if true;
     }
+
+    // 23. School Official Email Dispatches & Logs
+    match /schoolOfficialEmails/{emailId} {
+      allow read, write: if true;
+    }
   }
 }
 

@@ -1303,9 +1303,22 @@ const sanitizeMemberSchoolsList = (schools: MemberSchool[] = []): MemberSchool[]
 
     const schoolMap = new Map<string, MemberSchool>();
     schools.forEach((s) => {
-      if (!s || (!s.id && !s.code)) return;
-      const key = s.id || s.code;
-      schoolMap.set(key, s);
+      if (!s || (!s.id && !s.code && !s.name)) return;
+      const cKey = (s.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const isWp =
+        cKey === 'wjaa001' ||
+        cKey === 'wjj0005' ||
+        (s.name || '').toLowerCase().includes('wilayah persekutuan');
+      const key = isWp
+        ? 'school-wp-sri-al-amin'
+        : (s.id || s.code || s.name);
+
+      if (!schoolMap.has(key)) {
+        schoolMap.set(key, s);
+      } else {
+        const existing = schoolMap.get(key)!;
+        schoolMap.set(key, { ...existing, ...s, id: existing.id || s.id });
+      }
     });
 
     const portalUserRaw = typeof window !== 'undefined' ? localStorage.getItem('mpgbsim_portal_user_v1') : null;

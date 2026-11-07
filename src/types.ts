@@ -800,3 +800,74 @@ export interface MembershipCertificateConfig {
   updatedAt?: string;
 }
 
+export type EmailTemplateType =
+  | 'JEMPUTAN_MESYUARAT'
+  | 'YURAN_TAHUNAN'
+  | 'PEMBERITAHUAN_PROGRAM'
+  | 'PEKELILING_KHAS'
+  | 'SURAT_RASMI_CUSTOM';
+
+export type EmailDispatchStatus = 'SENT' | 'UNSENT' | 'DRAFT' | 'SCHEDULED';
+
+export type EmailDeliveryMethod = 'REAL_SMTP' | 'DIRECT_GMAIL' | 'MANUAL' | 'UNSENT';
+
+export interface EmailSmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  fromName?: string;
+  fromEmail?: string;
+}
+
+export interface EmailRecipientItem {
+  schoolId: string;
+  schoolName: string;
+  schoolCode: string;
+  principal: string;
+  email: string;
+  state: string;
+  status: 'SENT' | 'UNSENT' | 'FAILED' | 'PENDING';
+  deliveryMethod?: EmailDeliveryMethod;
+  sentAt?: string;
+  errorMessage?: string;
+  messageId?: string;
+  customReferenceNo?: string;
+}
+
+export interface SchoolOfficialEmail {
+  id: string;
+  title: string;
+  templateType: EmailTemplateType;
+  referenceNo: string;
+  letterDate: string;
+  senderName: string;
+  senderRole: string;
+  senderOrg: string;
+  senderPhone?: string;
+  senderEmail?: string;
+  subject: string;
+  salutation: string;
+  bodyText: string;
+  closingText: string;
+  slogan: string;
+  chairmanName: string;
+  chairmanRole: string;
+  chairmanSignatureUrl?: string;
+  showChairmanSignature: boolean;
+  showOfficialLetterhead: boolean;
+  includePdfAttachmentNotice: boolean;
+  status: EmailDispatchStatus;
+  deliveryMethod?: EmailDeliveryMethod;
+  recipients: EmailRecipientItem[];
+  recipientCount: number;
+  sentCount: number;
+  unsentCount: number;
+  sentAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastUpdatedBy?: string;
+  tags?: string[];
+}
+

@@ -30,6 +30,7 @@ import {
   Cake,
   Bot,
   CreditCard,
+  Mail,
 } from 'lucide-react';
 import { useAdminContent } from '../context/AdminContentContext';
 import { useMemberPortal } from '../context/MemberPortalContext';
@@ -41,6 +42,7 @@ import { AdminEventManagement } from './admin/AdminEventManagement';
 import { AdminProgramAttendanceManagement } from './admin/AdminProgramAttendanceManagement';
 import { AdminBestPracticeManagement } from './admin/AdminBestPracticeManagement';
 import { AdminSchoolManagement } from './admin/AdminSchoolManagement';
+import { AdminSchoolEmailManagement } from './admin/AdminSchoolEmailManagement';
 import { AdminApplicationManagement } from './admin/AdminApplicationManagement';
 import { AdminFeeManagement } from './admin/AdminFeeManagement';
 import { AdminMediaManagement } from './admin/AdminMediaManagement';
@@ -195,6 +197,13 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
           label: 'Direktori Sekolah Ahli',
           icon: School,
           count: siteData.memberSchools?.length || 0,
+        },
+        {
+          id: 'emel-sekolah',
+          label: 'Emel Rasmi & Surat Sekolah',
+          icon: Mail,
+          count: 'Surat',
+          isHighlight: true,
         },
         {
           id: 'alumni-pgb',
@@ -545,6 +554,7 @@ export const AdminCMSModal: React.FC<AdminCMSModalProps> = ({
             )}
             {activeTab === 'yuran-bendahari' && <AdminFeeManagement />}
             {activeTab === 'sekolah-ahli' && <AdminSchoolManagement />}
+            {activeTab === 'emel-sekolah' && <AdminSchoolEmailManagement />}
             {activeTab === 'alumni-pgb' && (
               <AdminAlumniManagement
                 alumniList={siteData.alumni || []}
